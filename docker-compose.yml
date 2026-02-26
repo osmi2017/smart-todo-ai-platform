@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14
+    container_name: todo_ai_db
+    environment:
+      POSTGRES_DB: todo_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - todo_ai_network
+
+  redis:
+    image: redis:7
+    container_name: todo_ai_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - todo_ai_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: todo_ai_backend
+    environment:
+      DB_HOST: postgres
+      DB_NAME: todo_ai
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      REDIS_URL: redis://redis:6379/0
+      ML_SERVICE_URL: http://ml-service:5001
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+      - ml-service
+    volumes:
+      - ./backend:/app
+    networks:
+      - todo_ai_network
+
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: todo_ai_ml
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./ml-service:/app
+      - ml_models:/app/models
+    networks:
+      - todo_ai_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: todo_ai_frontend
+    environment:
+      REACT_APP_API_URL: http://localhost:8000/api
+      REACT_APP_ML_URL: http://localhost:5001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - todo_ai_network
+
+volumes:
+  postgres_data:
+  ml_models:
+
+networks:
+  todo_ai_network:
+    driver: bridge
