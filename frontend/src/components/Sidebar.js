@@ -22,6 +22,9 @@ import {
   FiSettings,
   FiBarChart2,
   FiCpu,
+  FiCalendar,     // Pour les jalons (remplace FiTarget)
+  FiClock,        // Alternative
+  FiFlag,         // Alternative
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 
@@ -36,6 +39,7 @@ const Sidebar = () => {
     { path: '/projects', name: 'Projets', icon: FiFolder },
     { path: '/tasks', name: 'Tâches', icon: FiCheckSquare },
     { path: '/kanban', name: 'Kanban', icon: FiColumns },
+    { path: '/milestones', name: 'Jalons', icon: FiCalendar },  // Changé ici
     { path: '/analytics', name: 'Analytics', icon: FiBarChart2 },
     { path: '/profile', name: 'Profil', icon: FiUser },
     { path: '/settings', name: 'Paramètres', icon: FiSettings },

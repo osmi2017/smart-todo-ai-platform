@@ -41,7 +41,7 @@ import {
 } from 'react-icons/fi';
 import { useQuery } from 'react-query';
 import { useTaskService } from '../services/taskService';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -53,6 +53,7 @@ const Tasks = () => {
   });
 
   const toast = useToast();
+  const navigate = useNavigate();
   const taskService = useTaskService();
 
   const { data: tasks, isLoading } = useQuery(
@@ -102,6 +103,10 @@ const Tasks = () => {
     return labels[status] || status;
   };
 
+  const handleTaskClick = (taskId) => {
+    navigate(`/tasks/${taskId}`);
+  };
+
   if (isLoading) {
     return (
       <Box textAlign="center" py={10}>
@@ -121,7 +126,7 @@ const Tasks = () => {
             leftIcon={<FiPlus />}
             colorScheme="blue"
             as={RouterLink}
-            to="/tasks/new"
+            to="/tasks/create"  // ← CORRIGÉ: /create au lieu de /new
           >
             Nouvelle tâche
           </Button>
@@ -172,8 +177,8 @@ const Tasks = () => {
             {tasks.map((task) => (
               <Card
                 key={task.id}
-                as={RouterLink}
-                to={`/tasks/${task.id}`}
+                onClick={() => handleTaskClick(task.id)}
+                cursor="pointer"
                 _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
                 transition="all 0.2s"
                 position="relative"
@@ -203,11 +208,21 @@ const Tasks = () => {
                           icon={<FiMoreVertical />}
                           variant="ghost"
                           size="sm"
-                          onClick={(e) => e.preventDefault()}
+                          onClick={(e) => e.stopPropagation()}
                         />
-                        <MenuList onClick={(e) => e.preventDefault()}>
-                          <MenuItem icon={<FiEye />}>Voir détails</MenuItem>
-                          <MenuItem icon={<FiEdit2 />}>Modifier</MenuItem>
+                        <MenuList onClick={(e) => e.stopPropagation()}>
+                          <MenuItem 
+                            icon={<FiEye />}
+                            onClick={() => navigate(`/tasks/${task.id}`)}
+                          >
+                            Voir détails
+                          </MenuItem>
+                          <MenuItem 
+                            icon={<FiEdit2 />}
+                            onClick={() => navigate(`/tasks/${task.id}/edit`)}
+                          >
+                            Modifier
+                          </MenuItem>
                           <MenuItem icon={<FiTrash2 />} color="red.500">
                             Supprimer
                           </MenuItem>
@@ -253,6 +268,13 @@ const Tasks = () => {
                           <TagLabel>Risque {Math.round(task.delay_probability * 100)}%</TagLabel>
                         </Tag>
                       </Tooltip>
+                    )}
+
+                    {/* Projet */}
+                    {task.project_name && (
+                      <Badge colorScheme="purple" alignSelf="flex-start">
+                        {task.project_name}
+                      </Badge>
                     )}
 
                     {/* Pied de carte */}
@@ -302,7 +324,7 @@ const Tasks = () => {
               leftIcon={<FiPlus />}
               colorScheme="blue"
               as={RouterLink}
-              to="/tasks/new"
+              to="/tasks/create"  // ← CORRIGÉ: /create au lieu de /new
             >
               Créer votre première tâche
             </Button>

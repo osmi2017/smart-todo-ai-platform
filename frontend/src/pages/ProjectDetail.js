@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ProjectMembers from '../components/ProjectMembers';
 import {
   Box,
   Heading,
@@ -39,6 +40,19 @@ import {
   AlertIcon,
   AlertTitle,
   AlertDescription,
+  useDisclosure,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  FormControl,
+  FormLabel,
+  Input,
+  Textarea,
+  Select,
 } from '@chakra-ui/react';
 import {
   FiCalendar,
@@ -52,6 +66,7 @@ import {
   FiTrash2,
   FiFlag,
   FiBarChart2,
+  FiUserPlus,
 } from 'react-icons/fi';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
@@ -67,12 +82,32 @@ const ProjectDetail = () => {
   const queryClient = useQueryClient();
   const projectService = useProjectService();
   const taskService = useTaskService();
+  
+  // State pour le modal d'édition
+  const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    description: '',
+    status: '',
+    start_date: '',
+    deadline: '',
+  });
 
   // Charger les détails du projet
   const { data: project, isLoading: projectLoading } = useQuery(
     ['project', id],
     () => projectService.getProject(id),
     {
+      onSuccess: (data) => {
+        // Initialiser le formulaire d'édition avec les données du projet
+        setEditFormData({
+          name: data.name || '',
+          description: data.description || '',
+          status: data.status || 'not_started',
+          start_date: data.start_date || '',
+          deadline: data.deadline || '',
+        });
+      },
       onError: (error) => {
         toast({
           title: 'Erreur',
@@ -102,6 +137,68 @@ const ProjectDetail = () => {
       enabled: !!project,
     }
   );
+
+  // Mutation pour mettre à jour le projet
+  const updateProjectMutation = useMutation(
+    (data) => projectService.updateProject(id, data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['project', id]);
+        queryClient.invalidateQueries('projects');
+        toast({
+          title: 'Succès',
+          description: 'Projet mis à jour avec succès',
+          status: 'success',
+          duration: 3000,
+        });
+        onEditClose();
+      },
+      onError: (error) => {
+        toast({
+          title: 'Erreur',
+          description: error.response?.data?.message || 'Erreur lors de la mise à jour',
+          status: 'error',
+          duration: 3000,
+        });
+      },
+    }
+  );
+
+  // Mutation pour supprimer le projet
+  const deleteProjectMutation = useMutation(
+    () => projectService.deleteProject(id),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('projects');
+        toast({
+          title: 'Succès',
+          description: 'Projet supprimé avec succès',
+          status: 'success',
+          duration: 3000,
+        });
+        navigate('/projects');
+      },
+      onError: (error) => {
+        toast({
+          title: 'Erreur',
+          description: error.response?.data?.message || 'Erreur lors de la suppression',
+          status: 'error',
+          duration: 3000,
+        });
+      },
+    }
+  );
+
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    updateProjectMutation.mutate(editFormData);
+  };
+
+  const handleDeleteProject = () => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.')) {
+      deleteProjectMutation.mutate();
+    }
+  };
 
   if (projectLoading || statsLoading || tasksLoading) {
     return (
@@ -172,7 +269,7 @@ const ProjectDetail = () => {
               colorScheme="blue"
               size="sm"
               as={RouterLink}
-              to={`/tasks/new?project=${id}`}
+              to={`/tasks/create?project=${id}`}
             >
               Nouvelle tâche
             </Button>
@@ -181,9 +278,20 @@ const ProjectDetail = () => {
                 <FiMoreVertical />
               </MenuButton>
               <MenuList>
-                <MenuItem icon={<FiEdit2 />}>Modifier le projet</MenuItem>
-                <MenuItem icon={<FiBarChart2 />}>Voir les analytics</MenuItem>
-                <MenuItem icon={<FiTrash2 />} color="red.500">
+                <MenuItem icon={<FiEdit2 />} onClick={onEditOpen}>
+                  Modifier le projet
+                </MenuItem>
+                <MenuItem icon={<FiBarChart2 />} as={RouterLink} to={`/analytics?project=${id}`}>
+                  Voir les analytics
+                </MenuItem>
+                <MenuItem icon={<FiUserPlus />} onClick={() => {
+                  // Changer l'onglet actif vers "Membres"
+                  const membersTab = document.querySelector('[aria-selected="false"]:has-text("Membres")');
+                  if (membersTab) membersTab.click();
+                }}>
+                  Gérer les membres
+                </MenuItem>
+                <MenuItem icon={<FiTrash2 />} color="red.500" onClick={handleDeleteProject}>
                   Supprimer
                 </MenuItem>
               </MenuList>
@@ -288,7 +396,7 @@ const ProjectDetail = () => {
         <Divider />
 
         {/* Tabs */}
-        <Tabs variant="enclosed">
+        <Tabs variant="enclosed" colorScheme="blue">
           <TabList>
             <Tab>Tâches</Tab>
             <Tab>Jalons</Tab>
@@ -307,6 +415,7 @@ const ProjectDetail = () => {
                       to={`/tasks/${task.id}`}
                       _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
                       transition="all 0.2s"
+                      cursor="pointer"
                     >
                       <CardBody>
                         <Flex justify="space-between" align="center">
@@ -355,8 +464,9 @@ const ProjectDetail = () => {
                       mt={4}
                       leftIcon={<FiPlus />}
                       size="sm"
+                      colorScheme="blue"
                       as={RouterLink}
-                      to={`/tasks/new?project=${id}`}
+                      to={`/tasks/create?project=${id}`}
                     >
                       Créer une tâche
                     </Button>
@@ -368,13 +478,25 @@ const ProjectDetail = () => {
             <TabPanel>
               <Box textAlign="center" py={8}>
                 <Text color="gray.500">Fonctionnalité à venir</Text>
+                <Button
+                  mt={4}
+                  leftIcon={<FiPlus />}
+                  size="sm"
+                  colorScheme="purple"
+                  as={RouterLink}
+                  to={`/milestones/create?project=${id}`}
+                >
+                  Créer un jalon
+                </Button>
               </Box>
             </TabPanel>
 
             <TabPanel>
-              <Box textAlign="center" py={8}>
-                <Text color="gray.500">Fonctionnalité à venir</Text>
-              </Box>
+              {/* Intégration du composant ProjectMembers */}
+              <ProjectMembers 
+                projectId={id} 
+                projectOwnerId={project.owner_id} 
+              />
             </TabPanel>
 
             <TabPanel>
@@ -418,11 +540,138 @@ const ProjectDetail = () => {
                     <Text color="gray.500">tâches en retard</Text>
                   </CardBody>
                 </Card>
+
+                <Card gridColumn="span 2">
+                  <CardHeader>
+                    <Heading size="md">Distribution des tâches</Heading>
+                  </CardHeader>
+                  <CardBody>
+                    <SimpleGrid columns={2} spacing={4}>
+                      <Box>
+                        <Text fontSize="sm" color="gray.500">Par priorité</Text>
+                        <VStack align="stretch" mt={2}>
+                          <HStack justify="space-between">
+                            <Text>Basse</Text>
+                            <Badge>0</Badge>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text>Moyenne</Text>
+                            <Badge colorScheme="blue">0</Badge>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text>Haute</Text>
+                            <Badge colorScheme="orange">0</Badge>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text>Critique</Text>
+                            <Badge colorScheme="red">0</Badge>
+                          </HStack>
+                        </VStack>
+                      </Box>
+                      <Box>
+                        <Text fontSize="sm" color="gray.500">Par statut</Text>
+                        <VStack align="stretch" mt={2}>
+                          <HStack justify="space-between">
+                            <Text>À faire</Text>
+                            <Badge>0</Badge>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text>En cours</Text>
+                            <Badge colorScheme="blue">0</Badge>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text>Bloquées</Text>
+                            <Badge colorScheme="red">0</Badge>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text>Terminées</Text>
+                            <Badge colorScheme="green">0</Badge>
+                          </HStack>
+                        </VStack>
+                      </Box>
+                    </SimpleGrid>
+                  </CardBody>
+                </Card>
               </SimpleGrid>
             </TabPanel>
           </TabPanels>
         </Tabs>
       </VStack>
+
+      {/* Modal d'édition du projet */}
+      <Modal isOpen={isEditOpen} onClose={onEditClose} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <form onSubmit={handleEditSubmit}>
+            <ModalHeader>Modifier le projet</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel>Nom du projet</FormLabel>
+                  <Input
+                    value={editFormData.name}
+                    onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Description</FormLabel>
+                  <Textarea
+                    value={editFormData.description}
+                    onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                    rows={3}
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Statut</FormLabel>
+                  <Select
+                    value={editFormData.status}
+                    onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
+                  >
+                    <option value="not_started">Non démarré</option>
+                    <option value="in_progress">En cours</option>
+                    <option value="paused">En pause</option>
+                    <option value="completed">Terminé</option>
+                  </Select>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Date de début</FormLabel>
+                  <Input
+                    type="date"
+                    value={editFormData.start_date}
+                    onChange={(e) => setEditFormData({ ...editFormData, start_date: e.target.value })}
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Date de fin prévue</FormLabel>
+                  <Input
+                    type="date"
+                    value={editFormData.deadline}
+                    onChange={(e) => setEditFormData({ ...editFormData, deadline: e.target.value })}
+                  />
+                </FormControl>
+              </VStack>
+            </ModalBody>
+
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={onEditClose}>
+                Annuler
+              </Button>
+              <Button
+                type="submit"
+                colorScheme="blue"
+                isLoading={updateProjectMutation.isLoading}
+              >
+                Mettre à jour
+              </Button>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };

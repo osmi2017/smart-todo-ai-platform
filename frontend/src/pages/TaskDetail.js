@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import TaskComments from '../components/TaskComments';
 import {
   Box,
   Heading,
@@ -40,6 +41,19 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
+  useDisclosure,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
+  NumberIncrementStepper,
+  NumberDecrementStepper,
 } from '@chakra-ui/react';
 import {
   FiCalendar,
@@ -53,11 +67,15 @@ import {
   FiTrash2,
   FiCpu,
   FiMessageSquare,
+  FiSave,
+  FiX,
+  FiPlus,
 } from 'react-icons/fi';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useTaskService } from '../services/taskService';
 import { useProjectService } from '../services/projectService';
+import { useMilestoneService } from '../services/milestoneService';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -68,16 +86,35 @@ const TaskDetail = () => {
   const queryClient = useQueryClient();
   const taskService = useTaskService();
   const projectService = useProjectService();
+  const milestoneService = useMilestoneService();
 
   const [newComment, setNewComment] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [newTag, setNewTag] = useState('');
+  
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
 
   // Charger la tâche
   const { data: task, isLoading: taskLoading } = useQuery(
     ['task', id],
     () => taskService.getTask(id),
     {
+      onSuccess: (data) => {
+        if (data) {
+          setEditForm({
+            title: data.title || '',
+            description: data.description || '',
+            priority: data.priority || 2,
+            status: data.status || 'todo',
+            deadline: data.deadline || '',
+            estimated_time: data.estimated_time || '',
+            project: data.project || '',
+            milestone: data.milestone || '',
+            assigned_to: data.assigned_to || '',
+          });
+        }
+      },
       onError: (error) => {
         toast({
           title: 'Erreur',
@@ -97,12 +134,20 @@ const TaskDetail = () => {
     { enabled: isEditing }
   );
 
+  // Charger les milestones du projet sélectionné
+  const { data: milestones } = useQuery(
+    ['milestones', editForm.project],
+    () => milestoneService.getMilestones({ project: editForm.project }),
+    { enabled: !!editForm.project && isEditing }
+  );
+
   // Mutation pour mettre à jour la tâche
   const updateMutation = useMutation(
     (data) => taskService.updateTask(id, data),
     {
       onSuccess: () => {
         queryClient.invalidateQueries(['task', id]);
+        queryClient.invalidateQueries('tasks');
         toast({
           title: 'Succès',
           description: 'Tâche mise à jour',
@@ -110,6 +155,14 @@ const TaskDetail = () => {
           duration: 3000,
         });
         setIsEditing(false);
+      },
+      onError: (error) => {
+        toast({
+          title: 'Erreur',
+          description: error.response?.data?.message || 'Erreur lors de la mise à jour',
+          status: 'error',
+          duration: 3000,
+        });
       },
     }
   );
@@ -203,19 +256,32 @@ const TaskDetail = () => {
   };
 
   const handleChecklistToggle = (index) => {
-    const newChecklist = [...task.checklist];
+    const newChecklist = [...(task.checklist || [])];
     newChecklist[index].completed = !newChecklist[index].completed;
     updateMutation.mutate({ checklist: newChecklist });
   };
 
-  const handleAddTag = (tag) => {
-    if (tag && !task.tags.includes(tag)) {
-      updateMutation.mutate({ tags: [...task.tags, tag] });
+  const handleAddTag = () => {
+    if (newTag && !task.tags?.includes(newTag)) {
+      const newTags = [...(task.tags || []), newTag];
+      updateMutation.mutate({ tags: newTags });
+      setNewTag('');
     }
   };
 
   const handleRemoveTag = (tagToRemove) => {
-    updateMutation.mutate({ tags: task.tags.filter(t => t !== tagToRemove) });
+    const newTags = task.tags?.filter(t => t !== tagToRemove) || [];
+    updateMutation.mutate({ tags: newTags });
+  };
+
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    updateMutation.mutate(editForm);
+  };
+
+  const handleAddChecklistItem = () => {
+    const newChecklist = [...(task.checklist || []), { text: 'Nouvel élément', completed: false }];
+    updateMutation.mutate({ checklist: newChecklist });
   };
 
   return (
@@ -251,7 +317,7 @@ const TaskDetail = () => {
                 <MenuItem icon={<FiEdit2 />} onClick={() => setIsEditing(true)}>
                   Modifier
                 </MenuItem>
-                <MenuItem icon={<FiTrash2 />} color="red.500" onClick={() => deleteMutation.mutate()}>
+                <MenuItem icon={<FiTrash2 />} color="red.500" onClick={onDeleteOpen}>
                   Supprimer
                 </MenuItem>
               </MenuList>
@@ -298,16 +364,40 @@ const TaskDetail = () => {
             {task.checklist && task.checklist.length > 0 && (
               <Card>
                 <CardBody>
-                  <Heading size="md" mb={4}>Checklist</Heading>
+                  <Flex justify="space-between" align="center" mb={4}>
+                    <Heading size="md">Checklist</Heading>
+                    <Button
+                      size="xs"
+                      leftIcon={<FiPlus />}
+                      colorScheme="blue"
+                      variant="ghost"
+                      onClick={handleAddChecklistItem}
+                    >
+                      Ajouter
+                    </Button>
+                  </Flex>
                   <VStack align="stretch" spacing={2}>
                     {task.checklist.map((item, index) => (
-                      <Checkbox
-                        key={index}
-                        isChecked={item.completed}
-                        onChange={() => handleChecklistToggle(index)}
-                      >
-                        {item.text}
-                      </Checkbox>
+                      <HStack key={index}>
+                        <Checkbox
+                          isChecked={item.completed}
+                          onChange={() => handleChecklistToggle(index)}
+                          flex={1}
+                        >
+                          {item.text}
+                        </Checkbox>
+                        <IconButton
+                          icon={<FiTrash2 />}
+                          size="xs"
+                          variant="ghost"
+                          colorScheme="red"
+                          aria-label="Supprimer"
+                          onClick={() => {
+                            const newChecklist = task.checklist.filter((_, i) => i !== index);
+                            updateMutation.mutate({ checklist: newChecklist });
+                          }}
+                        />
+                      </HStack>
                     ))}
                   </VStack>
                   <Progress
@@ -321,25 +411,16 @@ const TaskDetail = () => {
               </Card>
             )}
 
-            {/* Commentaires */}
+            {/* Commentaires - INTÉGRATION DU COMPOSANT */}
             <Card>
+              <CardHeader>
+                <HStack>
+                  <FiMessageSquare />
+                  <Heading size="md">Commentaires</Heading>
+                </HStack>
+              </CardHeader>
               <CardBody>
-                <Heading size="md" mb={4}>Commentaires</Heading>
-                <VStack spacing={4}>
-                  <Textarea
-                    placeholder="Ajouter un commentaire..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                  />
-                  <Button
-                    alignSelf="flex-end"
-                    colorScheme="blue"
-                    size="sm"
-                    isDisabled={!newComment.trim()}
-                  >
-                    Commenter
-                  </Button>
-                </VStack>
+                <TaskComments taskId={id} />
               </CardBody>
             </Card>
           </VStack>
@@ -444,21 +525,31 @@ const TaskDetail = () => {
             )}
 
             {/* Tags */}
-            {task.tags && task.tags.length > 0 && (
-              <Card>
-                <CardBody>
-                  <Heading size="md" mb={4}>Tags</Heading>
-                  <HStack spacing={2} flexWrap="wrap">
-                    {task.tags.map((tag, index) => (
-                      <Tag key={index} size="md" colorScheme="blue" borderRadius="full">
-                        <TagLabel>{tag}</TagLabel>
-                        <TagCloseButton onClick={() => handleRemoveTag(tag)} />
-                      </Tag>
-                    ))}
-                  </HStack>
-                </CardBody>
-              </Card>
-            )}
+            <Card>
+              <CardBody>
+                <Heading size="md" mb={4}>Tags</Heading>
+                <HStack spacing={2} flexWrap="wrap" mb={3}>
+                  {task.tags?.map((tag, index) => (
+                    <Tag key={index} size="md" colorScheme="blue" borderRadius="full">
+                      <TagLabel>{tag}</TagLabel>
+                      <TagCloseButton onClick={() => handleRemoveTag(tag)} />
+                    </Tag>
+                  ))}
+                </HStack>
+                <HStack>
+                  <Input
+                    placeholder="Nouveau tag"
+                    size="sm"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
+                  />
+                  <Button size="sm" onClick={handleAddTag} isDisabled={!newTag}>
+                    Ajouter
+                  </Button>
+                </HStack>
+              </CardBody>
+            </Card>
 
             {/* Actions rapides */}
             <Card>
@@ -471,6 +562,7 @@ const TaskDetail = () => {
                     colorScheme="blue"
                     variant={task.status === 'in_progress' ? 'solid' : 'outline'}
                     onClick={() => handleStatusChange('in_progress')}
+                    isLoading={updateMutation.isLoading}
                   >
                     {task.status === 'in_progress' ? 'Déjà en cours' : 'Commencer'}
                   </Button>
@@ -481,6 +573,7 @@ const TaskDetail = () => {
                     variant={task.status === 'completed' ? 'solid' : 'outline'}
                     onClick={() => handleStatusChange('completed')}
                     isDisabled={task.status === 'completed'}
+                    isLoading={updateMutation.isLoading}
                   >
                     Marquer comme terminée
                   </Button>
@@ -491,6 +584,7 @@ const TaskDetail = () => {
                       colorScheme="orange"
                       variant="outline"
                       onClick={() => handleStatusChange('todo')}
+                      isLoading={updateMutation.isLoading}
                     >
                       Réactiver
                     </Button>
@@ -501,6 +595,179 @@ const TaskDetail = () => {
           </VStack>
         </SimpleGrid>
       </VStack>
+
+      {/* Modal d'édition */}
+      <Modal isOpen={isEditing} onClose={() => setIsEditing(false)} size="xl">
+        <ModalOverlay />
+        <ModalContent>
+          <form onSubmit={handleEditSubmit}>
+            <ModalHeader>Modifier la tâche</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel>Titre</FormLabel>
+                  <Input
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Description</FormLabel>
+                  <Textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    rows={3}
+                  />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Projet</FormLabel>
+                  <Select
+                    value={editForm.project}
+                    onChange={(e) => setEditForm({ 
+                      ...editForm, 
+                      project: e.target.value,
+                      milestone: '' 
+                    })}
+                  >
+                    {projects?.map(project => (
+                      <option key={project.id} value={project.id}>
+                        {project.name}
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                {editForm.project && (
+                  <FormControl>
+                    <FormLabel>Jalon</FormLabel>
+                    <Select
+                      value={editForm.milestone}
+                      onChange={(e) => setEditForm({ ...editForm, milestone: e.target.value })}
+                    >
+                      <option value="">Aucun jalon</option>
+                      {milestones?.map(milestone => (
+                        <option key={milestone.id} value={milestone.id}>
+                          {milestone.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormControl>
+                )}
+
+                <SimpleGrid columns={2} spacing={4}>
+                  <FormControl>
+                    <FormLabel>Priorité</FormLabel>
+                    <Select
+                      value={editForm.priority}
+                      onChange={(e) => setEditForm({ ...editForm, priority: parseInt(e.target.value) })}
+                    >
+                      <option value={1}>Basse</option>
+                      <option value={2}>Moyenne</option>
+                      <option value={3}>Haute</option>
+                      <option value={4}>Critique</option>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Statut</FormLabel>
+                    <Select
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    >
+                      <option value="todo">À faire</option>
+                      <option value="in_progress">En cours</option>
+                      <option value="review">En révision</option>
+                      <option value="blocked">Bloquée</option>
+                      <option value="completed">Terminée</option>
+                    </Select>
+                  </FormControl>
+                </SimpleGrid>
+
+                <SimpleGrid columns={2} spacing={4}>
+                  <FormControl>
+                    <FormLabel>Temps estimé (heures)</FormLabel>
+                    <NumberInput
+                      value={editForm.estimated_time}
+                      onChange={(value) => setEditForm({ ...editForm, estimated_time: value })}
+                      min={0}
+                      step={0.5}
+                    >
+                      <NumberInputField />
+                      <NumberInputStepper>
+                        <NumberIncrementStepper />
+                        <NumberDecrementStepper />
+                      </NumberInputStepper>
+                    </NumberInput>
+                  </FormControl>
+
+                  <FormControl>
+                    <FormLabel>Date limite</FormLabel>
+                    <Input
+                      type="date"
+                      value={editForm.deadline}
+                      onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
+                    />
+                  </FormControl>
+                </SimpleGrid>
+
+                <FormControl>
+                  <FormLabel>Assigné à</FormLabel>
+                  <Select
+                    value={editForm.assigned_to}
+                    onChange={(e) => setEditForm({ ...editForm, assigned_to: e.target.value })}
+                  >
+                    <option value="">Non assigné</option>
+                    <option value="1">Moi</option>
+                  </Select>
+                </FormControl>
+              </VStack>
+            </ModalBody>
+
+            <ModalFooter>
+              <Button variant="ghost" mr={3} onClick={() => setIsEditing(false)}>
+                Annuler
+              </Button>
+              <Button
+                type="submit"
+                colorScheme="blue"
+                isLoading={updateMutation.isLoading}
+              >
+                Enregistrer
+              </Button>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
+
+      {/* Modal de confirmation de suppression */}
+      <Modal isOpen={isDeleteOpen} onClose={onDeleteClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Supprimer la tâche</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            Êtes-vous sûr de vouloir supprimer cette tâche ? Cette action est irréversible.
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={onDeleteClose}>
+              Annuler
+            </Button>
+            <Button
+              colorScheme="red"
+              onClick={() => {
+                deleteMutation.mutate();
+                onDeleteClose();
+              }}
+              isLoading={deleteMutation.isLoading}
+            >
+              Supprimer
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </Box>
   );
 };

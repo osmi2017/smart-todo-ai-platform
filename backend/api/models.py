@@ -285,12 +285,24 @@ class ActivityLog(models.Model):
         return f"{self.user} - {self.action} - {self.entity_type} - {self.created_at}"
 
 
+# UN SEUL MODÈLE COMMENT - J'ai supprimé la première définition
 class Comment(models.Model):
     """Modèle pour les commentaires sur les tâches"""
     content = models.TextField()
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='comments')
-    parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE, 
+        null=True, 
+        blank=True, 
+        related_name='replies'
+    )
+    
+    # Métadonnées
+    edited = models.BooleanField(default=False)
+    attachments = models.JSONField(default=list, blank=True)
+    mentions = models.JSONField(default=list, blank=True)
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -298,8 +310,10 @@ class Comment(models.Model):
     class Meta:
         db_table = 'comments'
         ordering = ['created_at']
-        verbose_name = 'Commentaire'
-        verbose_name_plural = 'Commentaires'
+        indexes = [
+            models.Index(fields=['task', '-created_at']),
+            models.Index(fields=['author', '-created_at']),
+        ]
     
     def __str__(self):
         return f"Commentaire de {self.author} sur {self.task}"

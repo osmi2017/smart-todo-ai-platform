@@ -1,6 +1,5 @@
 from rest_framework import permissions
 
-
 class IsAdminOrReadOnly(permissions.BasePermission):
     """Permission: Admin peut tout faire, les autres en lecture seule"""
     
@@ -22,6 +21,8 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
             return obj.owner == request.user
         elif hasattr(obj, 'created_by'):
             return obj.created_by == request.user
+        elif hasattr(obj, 'author'):  # Pour les commentaires
+            return obj.author == request.user
         
         return False
 
@@ -37,3 +38,19 @@ class IsAssignedOrReadOnly(permissions.BasePermission):
             return obj.assigned_to == request.user
         
         return False
+
+
+# ✅ NOUVELLE CLASSE AJOUTÉE
+class IsAuthorOrReadOnly(permissions.BasePermission):
+    """
+    Permission personnalisée pour que seul l'auteur puisse modifier/supprimer
+    Utilisé principalement pour les commentaires
+    """
+    
+    def has_object_permission(self, request, view, obj):
+        # Lecture autorisée pour tout le monde
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        
+        # Écriture réservée à l'auteur
+        return obj.author == request.user

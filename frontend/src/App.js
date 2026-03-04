@@ -13,8 +13,11 @@ import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import Tasks from './pages/Tasks';
 import TaskDetail from './pages/TaskDetail';
+import TaskForm from './pages/TaskForm';  // ← IMPORT AJOUTÉ
 import Kanban from './pages/Kanban';
+import Milestones from './pages/Milestones';  // ← IMPORT AJOUTÉ
 import Profile from './pages/Profile';
+import Analytics from './pages/Analytics';  // ← IMPORT AJOUTÉ (si tu l'as créé)
 
 // Components
 import Layout from './components/Layout';
@@ -77,8 +80,12 @@ function App() {
                   <Route path="projects" element={<Projects />} />
                   <Route path="projects/:id" element={<ProjectDetail />} />
                   <Route path="tasks" element={<Tasks />} />
+                  <Route path="tasks/create" element={<TaskForm />} />  {/* ← Route pour création */}
                   <Route path="tasks/:id" element={<TaskDetail />} />
+                  <Route path="tasks/:id/edit" element={<TaskForm />} />  {/* ← Route pour édition */}
                   <Route path="kanban" element={<Kanban />} />
+                  <Route path="milestones" element={<Milestones />} />
+                  <Route path="analytics" element={<Analytics />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>
               </Routes>

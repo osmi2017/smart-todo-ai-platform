@@ -64,6 +64,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Project.objects.filter(Q(owner=user) | Q(members=user)).distinct()
     
     def perform_create(self, serializer):
+        # Ici on assigne l'utilisateur connecté comme owner
         serializer.save(owner=self.request.user)
         self._log_activity('create', 'project', serializer.instance)
     
@@ -97,6 +98,121 @@ class ProjectViewSet(viewsets.ModelViewSet):
             entity_id=instance.id,
             metadata={'name': str(instance)}
         )
+        
+    @action(detail=True, methods=['get'])
+    def members(self, request, pk=None):
+        """Récupère la liste des membres du projet"""
+        project = self.get_object()
+        members = project.members.all()
+        serializer = UserSimpleSerializer(members, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def add_member(self, request, pk=None):
+        """Ajoute un membre au projet"""
+        project = self.get_object()
+        user_id = request.data.get('user_id')
+        email = request.data.get('email')
+        try:
+            if user_id:
+                user = User.objects.get(id=user_id)
+            elif email:
+                user = User.objects.get(email=email)
+            else:
+                return Response(
+                    {'error': 'user_id ou email requis'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if project.members.filter(id=user.id).exists():
+                return Response(
+                    {'error': 'Cet utilisateur est déjà membre du projet'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            project.members.add(user)
+            
+            # Log l'activité
+            ActivityLog.objects.create(
+                user=request.user,
+                action='add_member',
+                entity_type='project',
+                entity_id=project.id,
+                metadata={'member': user.username}
+            )
+            
+            serializer = UserSimpleSerializer(user)
+            return Response(serializer.data)
+            
+        except User.DoesNotExist:
+                return Response(
+                {'error': 'Utilisateur non trouvé'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['delete'])
+    def remove_member(self, request, pk=None):
+        """Retire un membre du projet"""
+        project = self.get_object()
+        user_id = request.data.get('user_id')
+        
+        if not user_id:
+            return Response(
+                {'error': 'user_id requis'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(id=user_id)
+            
+            # Vérifier qu'on ne retire pas le propriétaire
+            if user.id == project.owner.id:
+                return Response(
+                    {'error': 'Impossible de retirer le propriétaire du projet'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            project.members.remove(user)
+            
+            # Log l'activité
+            ActivityLog.objects.create(
+                user=request.user,
+                action='remove_member',
+                entity_type='project',
+                entity_id=project.id,
+                metadata={'member': user.username}
+            )
+            
+            return Response({'status': 'Membre retiré'})
+            
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'Utilisateur non trouvé'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['get'])
+    def available_users(self, request, pk=None):
+        """Récupère les utilisateurs disponibles à ajouter"""
+        project = self.get_object()
+        
+        # Exclure le propriétaire et les membres actuels
+        current_members = project.members.all().values_list('id', flat=True)
+        excluded_users = list(current_members) + [project.owner.id]
+        
+        # Recherche optionnelle
+        search = request.query_params.get('search', '')
+        if search:
+            users = User.objects.filter(
+                Q(username__icontains=search) | 
+                Q(email__icontains=search) |
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search)
+            ).exclude(id__in=excluded_users)[:10]
+        else:
+            users = User.objects.exclude(id__in=excluded_users)[:20]
+        
+        serializer = UserSimpleSerializer(users, many=True)
+        return Response(serializer.data)
 
 
 class MilestoneViewSet(viewsets.ModelViewSet):
