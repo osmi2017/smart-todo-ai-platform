@@ -317,3 +317,34 @@ class Comment(models.Model):
     
     def __str__(self):
         return f"Commentaire de {self.author} sur {self.task}"
+        
+class Notification(models.Model):
+    """Modèle pour les notifications"""
+    NOTIFICATION_TYPES = (
+        ('task_assigned', 'Tâche assignée'),
+        ('task_completed', 'Tâche terminée'),
+        ('task_delayed', 'Tâche en retard'),
+        ('comment_added', 'Commentaire ajouté'),
+        ('member_added', 'Membre ajouté'),
+        ('milestone_due', 'Jalon à échéance'),
+    )
+    
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    type = models.CharField(max_length=30, choices=NOTIFICATION_TYPES)
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    data = models.JSONField(default=dict, blank=True)
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'notifications'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', '-created_at']),
+            models.Index(fields=['recipient', 'is_read']),
+        ]
+    
+    def __str__(self):
+        return f"Notification pour {self.recipient}: {self.title}"        
+

@@ -39,6 +39,7 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver
+*****python -m daphne -b 0.0.0.0 -p 8000 core.asgi:application
 
 # Frontend (nouveau terminal)
 cd frontend

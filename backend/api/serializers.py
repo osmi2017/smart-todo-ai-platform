@@ -100,8 +100,12 @@ class MilestoneSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Milestone
-        fields = '__all__'
-        read_only_fields = ('id', 'created_at', 'updated_at', 'progress', 'risk_score', 'status')
+        fields = [
+            'id', 'name', 'description', 'due_date', 'status', 'progress',
+            'risk_score', 'project', 'project_name', 'task_count', 
+            'completed_task_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ('id', 'created_at', 'updated_at', 'risk_score')
     
     def get_task_count(self, obj):
         return obj.tasks.count()

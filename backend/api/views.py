@@ -216,6 +216,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
 
 class MilestoneViewSet(viewsets.ModelViewSet):
+    
     queryset = Milestone.objects.all()
     serializer_class = MilestoneSerializer
     permission_classes = [IsAuthenticated]
@@ -226,9 +227,13 @@ class MilestoneViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
+        
         if user.role == 'admin':
+            print('ici2')
             return Milestone.objects.all()
-        return Milestone.objects.filter(project__in=user.projects.all())
+        return Milestone.objects.filter(
+        project__in=Project.objects.filter(Q(owner=user) | Q(members=user))
+    )
     
     def perform_create(self, serializer):
         milestone = serializer.save()
@@ -289,6 +294,12 @@ class MilestoneViewSet(viewsets.ModelViewSet):
             entity_id=instance.id,
             metadata={'name': str(instance)}
         )
+        
+    def update(self, request, *args, **kwargs):
+	    print("Données reçues pour mise à jour:", request.data)
+	    response = super().update(request, *args, **kwargs)
+	    print("Réponse du serveur:", response.data)
+	    return response
 
 
 class TaskViewSet(viewsets.ModelViewSet):

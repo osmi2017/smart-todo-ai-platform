@@ -47,6 +47,11 @@ import {
   AlertDialogHeader,
   AlertDialogContent,
   AlertDialogOverlay,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
+  SliderMark,
 } from '@chakra-ui/react';
 import {
   FiPlus,
@@ -80,10 +85,12 @@ const Milestones = () => {
     description: '',
     due_date: '',
     project_id: '',
+    status: 'not_started',
+    progress: 0,
   });
   const [filterProject, setFilterProject] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' ou 'calendar'
+  const [viewMode, setViewMode] = useState('grid');
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { 
@@ -147,8 +154,10 @@ const Milestones = () => {
   const updateMutation = useMutation(
     ({ id, data }) => milestoneService.updateMilestone(id, data),
     {
+    
       onSuccess: () => {
         queryClient.invalidateQueries('milestones');
+        
         toast({
           title: 'Succès',
           description: 'Jalon mis à jour',
@@ -156,6 +165,15 @@ const Milestones = () => {
           duration: 3000,
         });
         handleCloseModal();
+      },
+      onError: (error) => {
+        console.error('Erreur update milestone :', error.response?.data);
+        toast({
+          title: 'Erreur',
+          description: error.response?.data?.message || 'Erreur lors de la mise à jour',
+          status: 'error',
+          duration: 3000,
+        });
       },
     }
   );
@@ -201,6 +219,8 @@ const Milestones = () => {
         description: milestone.description || '',
         due_date: milestone.due_date,
         project_id: milestone.project_id,
+        status: milestone.status || 'not_started',
+        progress: milestone.progress || 0,
       });
     } else {
       setSelectedMilestone(null);
@@ -209,6 +229,8 @@ const Milestones = () => {
         description: '',
         due_date: '',
         project_id: '',
+        status: 'not_started',
+        progress: 0,
       });
     }
     onOpen();
@@ -221,16 +243,31 @@ const Milestones = () => {
       description: '',
       due_date: '',
       project_id: '',
+      status: 'not_started',
+      progress: 0,
     });
     onClose();
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    
+    // Transformer les données pour le backend
+    const milestoneData = {
+      name: formData.name,
+      description: formData.description,
+      due_date: formData.due_date,
+      project: formData.project_id,
+      status: formData.status,
+      progress: parseFloat(formData.progress) || 0,
+    };
+    
+    console.log('Données envoyées :', milestoneData);
+    
     if (selectedMilestone) {
-      updateMutation.mutate({ id: selectedMilestone.id, data: formData });
+      updateMutation.mutate({ id: selectedMilestone.id, data: milestoneData });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(milestoneData);
     }
   };
 
@@ -447,7 +484,6 @@ const Milestones = () => {
               >
                 <CardBody>
                   <VStack align="stretch" spacing={3}>
-                    {/* En-tête */}
                     <Flex justify="space-between" align="start">
                       <Box>
                         <HStack mb={2}>
@@ -504,7 +540,6 @@ const Milestones = () => {
                       </Menu>
                     </Flex>
 
-                    {/* Progression */}
                     <Box>
                       <Flex justify="space-between" mb={1}>
                         <Text fontSize="sm">Progression</Text>
@@ -523,7 +558,6 @@ const Milestones = () => {
                       />
                     </Box>
 
-                    {/* Métriques */}
                     <SimpleGrid columns={2} spacing={2}>
                       <Box>
                         <Text fontSize="xs" color="gray.500">Tâches</Text>
@@ -542,7 +576,6 @@ const Milestones = () => {
                       </Box>
                     </SimpleGrid>
 
-                    {/* Score de risque */}
                     {milestone.risk_score > 0 && (
                       <Tooltip label={`Risque: ${milestone.risk_score}%`}>
                         <Tag
@@ -557,7 +590,6 @@ const Milestones = () => {
                       </Tooltip>
                     )}
 
-                    {/* Alerte si en retard */}
                     {milestone.status === 'delayed' && (
                       <Alert status="error" size="sm" borderRadius="md" py={1}>
                         <AlertIcon />
@@ -583,7 +615,6 @@ const Milestones = () => {
             )}
           </SimpleGrid>
         ) : (
-          // Vue calendrier avec react-calendar
           <Card>
             <CardBody>
               <Calendar
@@ -664,7 +695,7 @@ const Milestones = () => {
         )}
       </VStack>
 
-      {/* Modal de création/édition */}
+      {/* Modal de création/édition avec slider et statut modifiable */}
       <Modal isOpen={isOpen} onClose={handleCloseModal} size="xl">
         <ModalOverlay />
         <ModalContent>
@@ -673,7 +704,7 @@ const Milestones = () => {
               {selectedMilestone ? 'Modifier le jalon' : 'Nouveau jalon'}
             </ModalHeader>
             <ModalCloseButton />
-            <ModalBody>
+            <ModalBody maxH="70vh" overflowY="auto">
               <VStack spacing={4}>
                 <FormControl isRequired>
                   <FormLabel>Nom du jalon</FormLabel>
@@ -717,6 +748,63 @@ const Milestones = () => {
                     ))}
                   </Select>
                 </FormControl>
+
+                {/* Statut modifiable par l'utilisateur */}
+                <FormControl>
+                  <FormLabel>
+                    Statut
+                    <Tooltip 
+                      label="Vous pouvez modifier manuellement le statut. Il sera mis à jour automatiquement par les tâches si vous ne le gérez pas." 
+                      placement="top"
+                    >
+                      <span style={{ marginLeft: '8px', cursor: 'help', fontSize: '14px', color: '#718096' }}>ⓘ</span>
+                    </Tooltip>
+                  </FormLabel>
+                  <Select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  >
+                    <option value="not_started">Non démarré</option>
+                    <option value="in_progress">En cours</option>
+                    <option value="completed">Terminé</option>
+                    <option value="delayed">En retard</option>
+                  </Select>
+                </FormControl>
+
+                {/* Progression avec slider */}
+                <FormControl>
+                  <FormLabel>Progression (%)</FormLabel>
+                  <Slider
+                    aria-label="progression-slider"
+                    defaultValue={formData.progress}
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={formData.progress}
+                    onChange={(val) => setFormData({ ...formData, progress: val })}
+                    mb={6}
+                  >
+                    <SliderMark
+                      value={formData.progress}
+                      textAlign="center"
+                      bg="blue.500"
+                      color="white"
+                      mt="3"
+                      ml="-5"
+                      w="10"
+                      borderRadius="full"
+                      fontSize="sm"
+                    >
+                      {Math.round(formData.progress)}%
+                    </SliderMark>
+                    <SliderTrack bg="gray.200">
+                      <SliderFilledTrack bg="blue.500" />
+                    </SliderTrack>
+                    <SliderThumb boxSize={5}>
+                      <Box color="blue.500" />
+                    </SliderThumb>
+                  </Slider>
+                </FormControl>
               </VStack>
             </ModalBody>
 
@@ -736,7 +824,7 @@ const Milestones = () => {
         </ModalContent>
       </Modal>
 
-      {/* Dialog de suppression - Version corrigée avec AlertDialog */}
+      {/* Dialog de suppression */}
       <AlertDialog
         isOpen={isDeleteOpen}
         leastDestructiveRef={null}

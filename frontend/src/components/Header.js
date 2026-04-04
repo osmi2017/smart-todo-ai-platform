@@ -27,6 +27,7 @@ import {
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import NotificationBell from './NotificationBell';
 
 const Header = () => {
   const navigate = useNavigate();
@@ -70,14 +71,9 @@ const Header = () => {
         <HStack spacing={3}>
           {/* Notifications */}
           <Menu>
-            <MenuButton
-              as={IconButton}
-              icon={<FiBell />}
-              variant="ghost"
-              borderRadius="full"
-              position="relative"
-              aria-label="Notifications"
-            />
+            
+              <NotificationBell />
+            
             <MenuList>
               <Box p={3}>
                 <Text fontWeight="600">Notifications</Text>
