@@ -9,13 +9,21 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-default-key-change-in-production')
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
+
+# SECURITY WARNING: keep the secret key used in production secret!
+_default_secret = 'django-insecure-default-key-FOR-DEV-ONLY'
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', _default_secret)
+if not DEBUG and SECRET_KEY == _default_secret:
+    raise ValueError(
+        'DJANGO_SECRET_KEY must be set to a unique, unpredictable value in production. '
+        'Generate one with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
+    )
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+
+LOG_LEVEL = 'DEBUG' if DEBUG else 'WARNING'
 
 LOGGING = {
     'version': 1,
@@ -27,12 +35,12 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': 'DEBUG',
+        'level': LOG_LEVEL,
     },
     'loggers': {
         'django.request': {
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': LOG_LEVEL,
             'propagate': False,
         },
     },
@@ -169,16 +177,14 @@ JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
 JWT_EXPIRATION_DELTA = timedelta(days=7)
 
 # CORS settings
-# Configuration CORS pour le développement
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
 
-# Ou plus permissif pour le développement (à ne pas utiliser en production)
-CORS_ALLOW_ALL_ORIGINS = True  # Temporaire pour tester
+# Only allow all origins in development — never in production
+CORS_ALLOW_ALL_ORIGINS = DEBUG
 
-# Permettre l'envoi des cookies/credentials
 CORS_ALLOW_CREDENTIALS = True
 
 # Headers autorisés

@@ -54,6 +54,8 @@ Thumbs.db
 .env
 .env.production
 .env.local
+backend/.env
+ml-service/.env
 
 # Logs
 *.log

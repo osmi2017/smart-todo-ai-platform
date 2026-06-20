@@ -229,7 +229,6 @@ class MilestoneViewSet(viewsets.ModelViewSet):
         user = self.request.user
         
         if user.role == 'admin':
-            print('ici2')
             return Milestone.objects.all()
         return Milestone.objects.filter(
         project__in=Project.objects.filter(Q(owner=user) | Q(members=user))
@@ -296,10 +295,7 @@ class MilestoneViewSet(viewsets.ModelViewSet):
         )
         
     def update(self, request, *args, **kwargs):
-	    print("Données reçues pour mise à jour:", request.data)
-	    response = super().update(request, *args, **kwargs)
-	    print("Réponse du serveur:", response.data)
-	    return response
+        return super().update(request, *args, **kwargs)
 
 
 class TaskViewSet(viewsets.ModelViewSet):
@@ -438,8 +434,8 @@ class TaskViewSet(viewsets.ModelViewSet):
                 task.predicted_priority = data.get('predicted_priority')
                 task.save(update_fields=['predicted_time', 'delay_probability', 'predicted_priority'])
                 
-        except requests.RequestException as e:
-            print(f"ML Service error: {e}")
+        except requests.RequestException:
+            pass
     
     def _log_activity(self, action, entity_type, instance):
         ActivityLog.objects.create(
