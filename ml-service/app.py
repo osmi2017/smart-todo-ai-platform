@@ -1,12 +1,16 @@
+import logging
+import os
+from datetime import datetime
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import numpy as np
 import pandas as pd
 import joblib
 import tensorflow as tf
-from datetime import datetime
-import os
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -50,9 +54,10 @@ def load_models():
         if os.path.exists(os.path.join(MODELS_DIR, 'scalers.pkl')):
             scalers = joblib.load(os.path.join(MODELS_DIR, 'scalers.pkl'))
         
-        print("✅ Modèles chargés avec succès")
-    except Exception as e:
-        print(f"❌ Erreur chargement modèles: {e}")
+        logger.info("Models loaded successfully")
+    except Exception:
+        logger.exception("Failed to load ML models")
+        raise
 
 @app.route('/health', methods=['GET'])
 def health():
@@ -174,7 +179,8 @@ def calculate_days_remaining(due_date_str):
         due_date = datetime.fromisoformat(due_date_str).date()
         today = datetime.now().date()
         return (due_date - today).days
-    except:
+    except (ValueError, TypeError):
+        logger.warning("Could not parse due_date: %s", due_date_str)
         return 30
 
 def calculate_risk_fallback(data):

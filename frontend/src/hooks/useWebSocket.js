@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '../context/AuthContext';
 
 export const useWebSocket = (userId) => {
   const [socket, setSocket] = useState(null);
@@ -10,19 +9,27 @@ export const useWebSocket = (userId) => {
     if (!userId) return;
 
     const ws = new WebSocket(`ws://localhost:8000/ws/notifications/${userId}/`);
-    
+
     ws.onopen = () => {
       console.log('WebSocket connecté');
       setIsConnected(true);
     };
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      setNotifications(prev => [data, ...prev]);
+      try {
+        const data = JSON.parse(event.data);
+        setNotifications(prev => [data, ...prev]);
+      } catch (error) {
+        console.error('Failed to parse WebSocket message:', error);
+      }
     };
 
-    ws.onclose = () => {
-      console.log('WebSocket déconnecté');
+    ws.onerror = (event) => {
+      console.error('WebSocket error:', event);
+    };
+
+    ws.onclose = (event) => {
+      console.log('WebSocket déconnecté', event.code, event.reason);
       setIsConnected(false);
     };
 

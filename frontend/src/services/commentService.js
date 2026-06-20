@@ -11,7 +11,7 @@ export const useCommentService = () => {
       return response.data;
     } catch (error) {
       console.error('Erreur chargement commentaires:', error);
-      return [];
+      throw error;
     }
   };
 

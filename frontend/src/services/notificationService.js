@@ -9,7 +9,7 @@ export const useNotificationService = () => {
       return response.data;
     } catch (error) {
       console.error('Erreur chargement notifications:', error);
-      return [];
+      throw error;
     }
   };
 
@@ -19,6 +19,7 @@ export const useNotificationService = () => {
       return response.data;
     } catch (error) {
       console.error('Erreur marquage lu:', error);
+      throw error;
     }
   };
 
@@ -28,6 +29,7 @@ export const useNotificationService = () => {
       return response.data;
     } catch (error) {
       console.error('Erreur marquage tous lus:', error);
+      throw error;
     }
   };
 
@@ -37,7 +39,7 @@ export const useNotificationService = () => {
       return response.data.count;
     } catch (error) {
       console.error('Erreur comptage:', error);
-      return 0;
+      throw error;
     }
   };
 

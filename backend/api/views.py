@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import viewsets, status, generics, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,6 +10,8 @@ from django.utils import timezone
 from datetime import timedelta
 import requests
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 from .models import User, Project, Milestone, Task, ActivityLog, Comment
 from .serializers import (
@@ -229,7 +233,6 @@ class MilestoneViewSet(viewsets.ModelViewSet):
         user = self.request.user
         
         if user.role == 'admin':
-            print('ici2')
             return Milestone.objects.all()
         return Milestone.objects.filter(
         project__in=Project.objects.filter(Q(owner=user) | Q(members=user))
@@ -268,7 +271,10 @@ class MilestoneViewSet(viewsets.ModelViewSet):
                 return Response({'risk_score': milestone.risk_score})
                 
         except requests.RequestException:
-            pass
+            logger.warning(
+                "ML service unavailable for risk prediction on milestone %s, using fallback",
+                milestone.id,
+            )
         
         # Calcul fallback si ML indisponible
         tasks = milestone.tasks.all()
@@ -296,10 +302,7 @@ class MilestoneViewSet(viewsets.ModelViewSet):
         )
         
     def update(self, request, *args, **kwargs):
-	    print("Données reçues pour mise à jour:", request.data)
-	    response = super().update(request, *args, **kwargs)
-	    print("Réponse du serveur:", response.data)
-	    return response
+        return super().update(request, *args, **kwargs)
 
 
 class TaskViewSet(viewsets.ModelViewSet):
@@ -438,8 +441,11 @@ class TaskViewSet(viewsets.ModelViewSet):
                 task.predicted_priority = data.get('predicted_priority')
                 task.save(update_fields=['predicted_time', 'delay_probability', 'predicted_priority'])
                 
-        except requests.RequestException as e:
-            print(f"ML Service error: {e}")
+        except requests.RequestException:
+            logger.warning(
+                "ML service unavailable for task prediction on task %s",
+                task.id,
+            )
     
     def _log_activity(self, action, entity_type, instance):
         ActivityLog.objects.create(

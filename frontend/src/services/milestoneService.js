@@ -64,7 +64,6 @@ export const useMilestoneService = () => {
    * @returns {Promise<Object>}
    */
   const updateMilestone = async (id, milestoneData) => {
-    alert("yaaaa")
     try {
       const formattedData = {
         name: milestoneData.name,
