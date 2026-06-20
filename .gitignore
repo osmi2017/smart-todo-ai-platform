@@ -1,9 +1,11 @@
-# Backend - Python
+# Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Backend
 backend/venv/
-backend/__pycache__/
-backend/*.pyc
-backend/*.pyo
-backend/*.pyd
 backend/.Python
 backend/env/
 backend/env.bak/
@@ -29,17 +31,12 @@ frontend/.cache/
 
 # ML Service
 ml-service/venv/
-ml-service/__pycache__/
-ml-service/*.pyc
-ml-service/*.pyo
-ml-service/*.pyd
 ml-service/.Python
 ml-service/env/
 ml-service/models/*.h5
 ml-service/models/*.pkl
 ml-service/data/*.csv
 ml-service/data/*.json
-ml-service/__pycache__/
 
 # IDE
 .vscode/
@@ -47,8 +44,6 @@ ml-service/__pycache__/
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
 
 # Environment
 .env
@@ -68,3 +63,6 @@ docker/*.pid
 # System
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+*.jar
