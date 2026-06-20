@@ -63,6 +63,8 @@ import { useProjectService } from '../services/projectService';
 import { Link as RouterLink } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { PROJECT_STATUS_COLORS, PROJECT_STATUS_LABELS } from '../utils/constants';
+import LoadingState from '../components/LoadingState';
 
 const Projects = () => {
   const [selectedProject, setSelectedProject] = useState(null);
@@ -232,35 +234,11 @@ const Projects = () => {
     }
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      'not_started': 'gray',
-      'in_progress': 'blue',
-      'paused': 'orange',
-      'completed': 'green',
-      'archived': 'purple',
-    };
-    return colors[status] || 'gray';
-  };
-
-  const getStatusLabel = (status) => {
-    const labels = {
-      'not_started': 'Non démarré',
-      'in_progress': 'En cours',
-      'paused': 'En pause',
-      'completed': 'Terminé',
-      'archived': 'Archivé',
-    };
-    return labels[status] || status;
-  };
+  const getStatusColor = (status) => PROJECT_STATUS_COLORS[status] || 'gray';
+  const getStatusLabel = (status) => PROJECT_STATUS_LABELS[status] || status;
 
   if (isLoading) {
-    return (
-      <Box textAlign="center" py={10}>
-        <Spinner size="xl" color="blue.500" />
-        <Text mt={4}>Chargement des projets...</Text>
-      </Box>
-    );
+    return <LoadingState message="Chargement des projets..." />;
   }
 
   if (error) {

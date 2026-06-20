@@ -26,7 +26,7 @@ export const useMemberService = () => {
   const removeMember = async (projectId, userId) => {
     try {
       const response = await axiosInstance.delete(`/projects/${projectId}/remove_member/`, {
-        data: { user_id: userId }
+        data: { user_id: userId },
       });
       return response.data;
     } catch (error) {
@@ -38,7 +38,7 @@ export const useMemberService = () => {
   const searchAvailableUsers = async (projectId, searchTerm) => {
     try {
       const response = await axiosInstance.get(`/projects/${projectId}/available_users/`, {
-        params: { search: searchTerm }
+        params: { search: searchTerm },
       });
       return response.data;
     } catch (error) {
