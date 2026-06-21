@@ -1,3 +1,5 @@
+import logging
+
 from rest_framework import viewsets, status, generics, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -9,6 +11,8 @@ from datetime import timedelta
 import logging
 import requests
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 from .models import User, Project, Milestone, Task, ActivityLog, Comment
 from .serializers import (
@@ -262,7 +266,10 @@ class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
                 return Response({'risk_score': milestone.risk_score})
                 
         except requests.RequestException:
-            pass
+            logger.warning(
+                "ML service unavailable for risk prediction on milestone %s, using fallback",
+                milestone.id,
+            )
         
         # Calcul fallback si ML indisponible
         tasks = milestone.tasks.all()

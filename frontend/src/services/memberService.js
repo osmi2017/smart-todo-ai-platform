@@ -9,7 +9,7 @@ export const useMemberService = () => {
       return response.data;
     } catch (error) {
       console.error('Erreur chargement membres:', error);
-      return [];
+      throw error;
     }
   };
 
@@ -43,7 +43,7 @@ export const useMemberService = () => {
       return response.data;
     } catch (error) {
       console.error('Erreur recherche utilisateurs:', error);
-      return [];
+      throw error;
     }
   };
 
