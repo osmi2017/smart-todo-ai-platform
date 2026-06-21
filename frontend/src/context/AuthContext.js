@@ -74,14 +74,10 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (username, password) => {
   try {
-    console.log('Tentative de connexion avec:', username); // LOG
-    
     const response = await axios.post(`${API_URL}/auth/login/`, {
       username,
       password,
     });
-    
-    console.log('Réponse login:', response.data); // LOG
     
     const { token, user } = response.data;
     
@@ -91,10 +87,7 @@ export const AuthProvider = ({ children }) => {
     
     // Vérifie que le token a le bon format (3 parties)
     const tokenParts = token.split('.');
-    console.log('Token parts:', tokenParts.length); // LOG
-    
     if (tokenParts.length !== 3) {
-      console.error('Token invalide - pas 3 parties:', token);
       throw new Error('Format de token invalide');
     }
     
@@ -111,9 +104,6 @@ export const AuthProvider = ({ children }) => {
     
     return { success: true };
   } catch (error) {
-    console.error('Erreur détaillée:', error);
-    console.error('Réponse erreur:', error.response?.data);
-    
     const message = error.response?.data?.message || 
                     error.response?.data?.non_field_errors?.[0] || 
                     'Erreur de connexion';
@@ -131,11 +121,7 @@ export const AuthProvider = ({ children }) => {
 
  const register = async (userData) => {
   try {
-    console.log('Tentative d\'inscription avec:', userData.email); // LOG
-    
     const response = await axios.post(`${API_URL}/auth/register/`, userData);
-    
-    console.log('Réponse register:', response.data); // LOG
     
     toast({
       title: 'Inscription réussie',
@@ -146,8 +132,6 @@ export const AuthProvider = ({ children }) => {
     
     return { success: true, data: response.data };
   } catch (error) {
-    console.error('Erreur register:', error.response?.data);
-    
     const message = error.response?.data?.message || 
                     Object.values(error.response?.data || {}).flat()[0] || 
                     "Erreur d'inscription";
