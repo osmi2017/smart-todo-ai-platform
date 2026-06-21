@@ -71,6 +71,8 @@ import { Link as RouterLink } from 'react-router-dom';
 import { format, isAfter, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import SortableTaskCard from '../components/SortableTaskCard';
+import { getPriorityColor, getPriorityLabel } from '../utils/constants';
+import LoadingState from '../components/LoadingState';
 
 const Kanban = () => {
   const [columns, setColumns] = useState({
@@ -289,25 +291,10 @@ const Kanban = () => {
     }
   };
 
-  // Obtenir la couleur de priorité
-  const getPriorityColor = (priority) => {
-    const colors = { 1: 'gray', 2: 'blue', 3: 'orange', 4: 'red' };
-    return colors[priority] || 'gray';
-  };
 
-  // Obtenir le libellé de priorité
-  const getPriorityLabel = (priority) => {
-    const labels = { 1: 'Basse', 2: 'Moyenne', 3: 'Haute', 4: 'Critique' };
-    return labels[priority] || priority;
-  };
 
   if (isLoading) {
-    return (
-      <Box textAlign="center" py={10}>
-        <Spinner size="xl" color="blue.500" />
-        <Text mt={4}>Chargement du tableau Kanban...</Text>
-      </Box>
-    );
+    return <LoadingState message="Chargement du tableau Kanban..." />;
   }
 
   return (

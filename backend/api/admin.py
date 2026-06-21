@@ -3,7 +3,8 @@ from django.utils.html import format_html
 from django.utils import timezone
 from .models import (
     User, Project, Milestone, Task, 
-    ActivityLog, Comment, Notification
+    ActivityLog, Comment, Notification,
+    Meeting, MeetingParticipant, MeetingSummary, MeetingActionItem,
 )
 
 # ----------------------------------------------------------------------
@@ -157,3 +158,43 @@ class NotificationAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
     list_select_related = ('recipient',)
     date_hierarchy = 'created_at'
+
+
+# ----------------------------------------------------------------------
+# Meeting Admin
+# ----------------------------------------------------------------------
+class MeetingParticipantInline(admin.TabularInline):
+    model = MeetingParticipant
+    extra = 0
+
+
+class MeetingActionItemInline(admin.TabularInline):
+    model = MeetingActionItem
+    extra = 0
+    readonly_fields = ('linked_task',)
+
+
+@admin.register(Meeting)
+class MeetingAdmin(admin.ModelAdmin):
+    list_display = ('title', 'status', 'organizer', 'scheduled_at', 'ai_processed', 'created_at')
+    list_filter = ('status', 'ai_processed', 'input_type', 'created_at')
+    search_fields = ('title', 'description', 'organizer__username')
+    readonly_fields = ('created_at', 'updated_at', 'ai_processed')
+    list_select_related = ('organizer', 'project')
+    inlines = [MeetingParticipantInline, MeetingActionItemInline]
+    date_hierarchy = 'created_at'
+
+
+@admin.register(MeetingSummary)
+class MeetingSummaryAdmin(admin.ModelAdmin):
+    list_display = ('meeting', 'model_used', 'generated_at')
+    readonly_fields = ('generated_at',)
+    list_select_related = ('meeting',)
+
+
+@admin.register(MeetingActionItem)
+class MeetingActionItemAdmin(admin.ModelAdmin):
+    list_display = ('title', 'meeting', 'priority', 'status', 'assigned_to', 'deadline')
+    list_filter = ('status', 'priority')
+    search_fields = ('title', 'description')
+    list_select_related = ('meeting', 'assigned_to', 'linked_task')

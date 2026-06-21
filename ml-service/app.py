@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=os.getenv('CORS_ORIGINS', 'http://localhost:8000').split(','))
 
 # Chargement des modèles
 MODELS_DIR = os.path.join(os.path.dirname(__file__), 'models')
@@ -117,9 +117,12 @@ def predict_risk():
 
 @app.route('/train', methods=['POST'])
 def train_models():
-    """Lance l'entraînement des modèles"""
+    """Lance l'entraînement des modèles (requires shared secret)"""
+    auth_header = request.headers.get('Authorization', '')
+    expected_token = os.getenv('ML_TRAIN_SECRET', '')
+    if not expected_token or auth_header != f'Bearer {expected_token}':
+        return jsonify({'error': 'Unauthorized'}), 401
     try:
-        # Importer et exécuter le script d'entraînement
         from training.train import train_all_models
         results = train_all_models()
         return jsonify({'status': 'success', 'results': results})
@@ -197,4 +200,4 @@ def calculate_risk_fallback(data):
 
 if __name__ == '__main__':
     load_models()
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=False)

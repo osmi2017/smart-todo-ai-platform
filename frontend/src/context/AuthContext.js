@@ -73,79 +73,79 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (username, password) => {
-    try {
-      const response = await axios.post(`${API_URL}/auth/login/`, {
-        username,
-        password,
-      });
-
-      const { token, user } = response.data;
-
-      if (!token) {
-        throw new Error('Token non reçu');
-      }
-
-      const tokenParts = token.split('.');
-
-      if (tokenParts.length !== 3) {
-        throw new Error('Format de token invalide');
-      }
-
-      localStorage.setItem('token', token);
-      setToken(token);
-      setUser(user);
-
-      toast({
-        title: 'Connexion réussie',
-        description: `Bienvenue ${user.username} !`,
-        status: 'success',
-        duration: 3000,
-      });
-
-      return { success: true };
-    } catch (error) {
-      const message = error.response?.data?.message ||
-                      error.response?.data?.non_field_errors?.[0] ||
-                      'Erreur de connexion';
-
-      toast({
-        title: 'Erreur',
-        description: message,
-        status: 'error',
-        duration: 3000,
-      });
-
-      return { success: false, error: message };
+  try {
+    const response = await axios.post(`${API_URL}/auth/login/`, {
+      username,
+      password,
+    });
+    
+    const { token, user } = response.data;
+    
+    if (!token) {
+      throw new Error('Token non reçu');
     }
-  };
-
-  const register = async (userData) => {
-    try {
-      const response = await axios.post(`${API_URL}/auth/register/`, userData);
-
-      toast({
-        title: 'Inscription réussie',
-        description: 'Vous pouvez maintenant vous connecter',
-        status: 'success',
-        duration: 3000,
-      });
-
-      return { success: true, data: response.data };
-    } catch (error) {
-      const message = error.response?.data?.message ||
-                      Object.values(error.response?.data || {}).flat()[0] ||
-                      "Erreur d'inscription";
-
-      toast({
-        title: 'Erreur',
-        description: message,
-        status: 'error',
-        duration: 3000,
-      });
-
-      return { success: false, error: message };
+    
+    // Vérifie que le token a le bon format (3 parties)
+    const tokenParts = token.split('.');
+    if (tokenParts.length !== 3) {
+      throw new Error('Format de token invalide');
     }
-  };
+    
+    localStorage.setItem('token', token);
+    setToken(token);
+    setUser(user);
+    
+    toast({
+      title: 'Connexion réussie',
+      description: `Bienvenue ${user.username} !`,
+      status: 'success',
+      duration: 3000,
+    });
+    
+    return { success: true };
+  } catch (error) {
+    const message = error.response?.data?.message || 
+                    error.response?.data?.non_field_errors?.[0] || 
+                    'Erreur de connexion';
+    
+    toast({
+      title: 'Erreur',
+      description: message,
+      status: 'error',
+      duration: 3000,
+    });
+    
+    return { success: false, error: message };
+  }
+};
+
+ const register = async (userData) => {
+  try {
+    const response = await axios.post(`${API_URL}/auth/register/`, userData);
+    
+    toast({
+      title: 'Inscription réussie',
+      description: 'Vous pouvez maintenant vous connecter',
+      status: 'success',
+      duration: 3000,
+    });
+    
+    return { success: true, data: response.data };
+  } catch (error) {
+    const message = error.response?.data?.message || 
+                    Object.values(error.response?.data || {}).flat()[0] || 
+                    "Erreur d'inscription";
+    
+    toast({
+      title: 'Erreur',
+      description: message,
+      status: 'error',
+      duration: 3000,
+    });
+    
+    return { success: false, error: message };
+  }
+};
 
   const logout = () => {
     localStorage.removeItem('token');

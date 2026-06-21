@@ -1,53 +1,65 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+
+const WS_BASE_URL = process.env.REACT_APP_WS_URL ||
+  `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
+
+const MAX_RECONNECT_DELAY = 30000;
 
 export const useWebSocket = (userId) => {
-  const [socket, setSocket] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
+  const socketRef = useRef(null);
+  const reconnectAttempts = useRef(0);
+  const reconnectTimer = useRef(null);
 
   useEffect(() => {
     if (!userId) return;
 
-    const ws = new WebSocket(`ws://localhost:8000/ws/notifications/${userId}/`);
+    const connect = () => {
+      const ws = new WebSocket(`${WS_BASE_URL}/ws/notifications/${userId}/`);
 
-    ws.onopen = () => {
-      console.log('WebSocket connecté');
-      setIsConnected(true);
-    };
+      ws.onopen = () => {
+        setIsConnected(true);
+        reconnectAttempts.current = 0;
+      };
 
-    ws.onmessage = (event) => {
-      try {
+      ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         setNotifications(prev => [data, ...prev]);
-      } catch (error) {
-        console.error('Failed to parse WebSocket message:', error);
-      }
+      };
+
+      ws.onclose = () => {
+        setIsConnected(false);
+        const delay = Math.min(1000 * 2 ** reconnectAttempts.current, MAX_RECONNECT_DELAY);
+        reconnectAttempts.current += 1;
+        reconnectTimer.current = setTimeout(connect, delay);
+      };
+
+      ws.onerror = () => {
+        ws.close();
+      };
+
+      socketRef.current = ws;
     };
 
-    ws.onerror = (event) => {
-      console.error('WebSocket error:', event);
-    };
-
-    ws.onclose = (event) => {
-      console.log('WebSocket déconnecté', event.code, event.reason);
-      setIsConnected(false);
-    };
-
-    setSocket(ws);
+    connect();
 
     return () => {
-      ws.close();
+      clearTimeout(reconnectTimer.current);
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
     };
   }, [userId]);
 
   const markAsRead = useCallback((notificationId) => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
         action: 'mark_read',
         notification_id: notificationId
       }));
     }
-  }, [socket]);
+  }, []);
 
   return { notifications, isConnected, markAsRead };
 };

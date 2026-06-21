@@ -1,4 +1,4 @@
-import { useAuth } from '../context/AuthContext';
+import { useCrudService } from '../utils/createCrudService';
 
 export const useMilestoneService = () => {
   const { axiosInstance } = useAuth();
@@ -65,15 +65,7 @@ export const useMilestoneService = () => {
    */
   const updateMilestone = async (id, milestoneData) => {
     try {
-      const formattedData = {
-        name: milestoneData.name,
-        description: milestoneData.description,
-        due_date: milestoneData.due_date,
-        project: milestoneData.project_id,
-        status: milestoneData.status,
-        progress: milestoneData.progress,
-      };
-      const response = await axiosInstance.put(`/milestones/${id}/`, formattedData);
+      const response = await axiosInstance.put(`/milestones/${id}/`, milestoneData);
       return response.data;
     } catch (error) {
       console.error('Erreur mise à jour milestone:', error);
@@ -112,11 +104,11 @@ export const useMilestoneService = () => {
   };
 
   return {
-    getMilestones,
-    getMilestone,
-    createMilestone,
-    updateMilestone,
-    deleteMilestone,
-    predictRisk,
+    getMilestones: service.getAll,
+    getMilestone: service.getOne,
+    createMilestone: service.create,
+    updateMilestone: service.update,
+    deleteMilestone: service.remove,
+    predictRisk: service.predictRisk,
   };
 };

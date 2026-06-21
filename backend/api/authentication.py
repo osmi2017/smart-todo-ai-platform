@@ -1,3 +1,4 @@
+# backend/api/authentication.py
 import logging
 
 import jwt
@@ -35,5 +36,3 @@ class JWTAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed('Invalid token')
         except User.DoesNotExist:
             raise exceptions.AuthenticationFailed('User not found')
-        except KeyError:
-            raise exceptions.AuthenticationFailed('Invalid token payload')
