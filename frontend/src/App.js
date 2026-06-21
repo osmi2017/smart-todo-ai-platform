@@ -91,6 +91,7 @@ function App() {
                   <Route path="meetings" element={<Meetings />} />
                   <Route path="meetings/create" element={<MeetingForm />} />
                   <Route path="meetings/:id" element={<MeetingDetail />} />
+                  <Route path="meetings/:id/edit" element={<MeetingForm />} />
                   <Route path="analytics" element={<Analytics />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>

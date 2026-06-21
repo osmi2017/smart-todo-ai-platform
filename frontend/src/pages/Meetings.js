@@ -2,35 +2,33 @@ import React, { useState, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box, Heading, Button, HStack, VStack, Text, Badge, Icon,
-  Table, Thead, Tbody, Tr, Th, Td, IconButton,
+  SimpleGrid, IconButton,
   useToast, useColorModeValue, Spinner,
   Input, Select, InputGroup, InputLeftElement,
   Menu, MenuButton, MenuList, MenuItem,
+  Flex, Avatar, Tooltip,
+  AlertDialog, AlertDialogOverlay, AlertDialogContent,
+  AlertDialogHeader, AlertDialogBody, AlertDialogFooter,
+  useDisclosure,
 } from '@chakra-ui/react';
 import {
   FiPlus, FiSearch, FiMoreVertical, FiCalendar, FiMic,
-  FiFileText, FiTrash2, FiEye, FiCpu,
+  FiFileText, FiTrash2, FiEye, FiCpu, FiEdit2, FiUsers,
+  FiPlay, FiCheck, FiXCircle, FiClock,
 } from 'react-icons/fi';
 import { useMeetingService } from '../services/meetingService';
 
-const statusColors = {
-  scheduled: 'blue',
-  in_progress: 'orange',
-  completed: 'green',
-  cancelled: 'red',
+const statusConfig = {
+  scheduled: { color: 'blue', label: 'Scheduled', icon: FiClock },
+  in_progress: { color: 'orange', label: 'In Progress', icon: FiPlay },
+  completed: { color: 'green', label: 'Completed', icon: FiCheck },
+  cancelled: { color: 'red', label: 'Cancelled', icon: FiXCircle },
 };
 
-const statusLabels = {
-  scheduled: 'Scheduled',
-  in_progress: 'In Progress',
-  completed: 'Completed',
-  cancelled: 'Cancelled',
-};
-
-const inputTypeIcons = {
-  audio: FiMic,
-  text: FiFileText,
-  both: FiCpu,
+const inputTypeConfig = {
+  audio: { icon: FiMic, label: 'Audio' },
+  text: { icon: FiFileText, label: 'Text' },
+  both: { icon: FiCpu, label: 'Audio + Text' },
 };
 
 const Meetings = () => {
@@ -38,9 +36,14 @@ const Meetings = () => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [deleteId, setDeleteId] = useState(null);
   const { getMeetings, deleteMeeting } = useMeetingService();
   const toast = useToast();
   const bgColor = useColorModeValue('white', 'gray.800');
+  const hoverBg = useColorModeValue('gray.50', 'gray.700');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const cancelRef = React.useRef();
 
   useEffect(() => {
     loadMeetings();
@@ -60,13 +63,22 @@ const Meetings = () => {
     }
   };
 
-  const handleDelete = async (id) => {
+  const confirmDelete = (id) => {
+    setDeleteId(id);
+    onOpen();
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
     try {
-      await deleteMeeting(id);
-      setMeetings(meetings.filter(m => m.id !== id));
+      await deleteMeeting(deleteId);
+      setMeetings(meetings.filter(m => m.id !== deleteId));
       toast({ title: 'Meeting deleted', status: 'success', duration: 2000 });
     } catch (error) {
       toast({ title: 'Error deleting meeting', status: 'error', duration: 3000 });
+    } finally {
+      onClose();
+      setDeleteId(null);
     }
   };
 
@@ -75,15 +87,22 @@ const Meetings = () => {
   );
 
   const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
+    if (!dateStr) return null;
     return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit',
+      month: 'short', day: 'numeric', year: 'numeric',
+    });
+  };
+
+  const formatTime = (dateStr) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleTimeString('en-US', {
+      hour: '2-digit', minute: '2-digit',
     });
   };
 
   return (
     <Box>
-      <HStack justify="space-between" mb={6}>
+      <Flex justify="space-between" align="center" mb={6} wrap="wrap" gap={3}>
         <Heading size="lg">Meetings</Heading>
         <Button
           as={RouterLink}
@@ -93,15 +112,16 @@ const Meetings = () => {
         >
           New Meeting
         </Button>
-      </HStack>
+      </Flex>
 
-      <HStack mb={4} spacing={4}>
+      <HStack mb={6} spacing={4} flexWrap="wrap">
         <InputGroup maxW="300px">
           <InputLeftElement><Icon as={FiSearch} color="gray.400" /></InputLeftElement>
           <Input
             placeholder="Search meetings..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            bg={bgColor}
           />
         </InputGroup>
         <Select
@@ -109,6 +129,7 @@ const Meetings = () => {
           placeholder="All statuses"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
+          bg={bgColor}
         >
           <option value="scheduled">Scheduled</option>
           <option value="in_progress">In Progress</option>
@@ -120,72 +141,145 @@ const Meetings = () => {
       {loading ? (
         <Box textAlign="center" py={10}><Spinner size="xl" /></Box>
       ) : filtered.length === 0 ? (
-        <Box textAlign="center" py={10} bg={bgColor} borderRadius="lg" shadow="sm">
-          <Icon as={FiCalendar} boxSize={12} color="gray.300" mb={4} />
-          <Text color="gray.500">No meetings found</Text>
-          <Button as={RouterLink} to="/meetings/create" mt={4} colorScheme="blue" size="sm">
-            Create your first meeting
+        <Box textAlign="center" py={16} bg={bgColor} borderRadius="xl" shadow="sm" borderWidth="1px" borderColor={borderColor}>
+          <Icon as={FiCalendar} boxSize={16} color="gray.300" mb={4} />
+          <Heading size="md" color="gray.500" mb={2}>No meetings found</Heading>
+          <Text color="gray.400" mb={6}>Create your first meeting to get started with AI-powered summaries</Text>
+          <Button as={RouterLink} to="/meetings/create" colorScheme="blue" leftIcon={<FiPlus />}>
+            Create Meeting
           </Button>
         </Box>
       ) : (
-        <Box bg={bgColor} borderRadius="lg" shadow="sm" overflow="hidden">
-          <Table variant="simple">
-            <Thead>
-              <Tr>
-                <Th>Title</Th>
-                <Th>Status</Th>
-                <Th>Type</Th>
-                <Th>Date</Th>
-                <Th>Participants</Th>
-                <Th>AI</Th>
-                <Th>Actions</Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {filtered.map(meeting => (
-                <Tr key={meeting.id} _hover={{ bg: useColorModeValue('gray.50', 'gray.700') }}>
-                  <Td>
-                    <Text fontWeight="600">{meeting.title}</Text>
-                    {meeting.project_name && (
-                      <Text fontSize="xs" color="gray.500">{meeting.project_name}</Text>
-                    )}
-                  </Td>
-                  <Td>
-                    <Badge colorScheme={statusColors[meeting.status]}>
-                      {statusLabels[meeting.status]}
-                    </Badge>
-                  </Td>
-                  <Td>
-                    <Icon as={inputTypeIcons[meeting.input_type] || FiFileText} />
-                  </Td>
-                  <Td>{formatDate(meeting.scheduled_at)}</Td>
-                  <Td>{meeting.participants_count || 0}</Td>
-                  <Td>
-                    {meeting.ai_processed ? (
-                      <Badge colorScheme="green">Processed</Badge>
-                    ) : (
-                      <Badge colorScheme="gray">Pending</Badge>
-                    )}
-                  </Td>
-                  <Td>
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+          {filtered.map(meeting => {
+            const status = statusConfig[meeting.status] || statusConfig.scheduled;
+            const inputType = inputTypeConfig[meeting.input_type] || inputTypeConfig.text;
+            return (
+              <Box
+                key={meeting.id}
+                bg={bgColor}
+                borderRadius="xl"
+                borderWidth="1px"
+                borderColor={borderColor}
+                overflow="hidden"
+                transition="all 0.2s"
+                _hover={{ shadow: 'md', borderColor: 'blue.300', transform: 'translateY(-2px)' }}
+              >
+                <Box
+                  h="4px"
+                  bg={`${status.color}.400`}
+                />
+                <Box p={5}>
+                  <Flex justify="space-between" align="flex-start" mb={3}>
+                    <VStack align="start" spacing={1} flex={1} mr={2}>
+                      <Heading size="sm" noOfLines={1}>{meeting.title}</Heading>
+                      {meeting.project_name && (
+                        <Text fontSize="xs" color="gray.500" noOfLines={1}>
+                          {meeting.project_name}
+                        </Text>
+                      )}
+                    </VStack>
                     <Menu>
-                      <MenuButton as={IconButton} icon={<FiMoreVertical />} variant="ghost" size="sm" />
+                      <MenuButton
+                        as={IconButton}
+                        icon={<FiMoreVertical />}
+                        variant="ghost"
+                        size="sm"
+                        aria-label="Meeting actions"
+                      />
                       <MenuList>
                         <MenuItem as={RouterLink} to={`/meetings/${meeting.id}`} icon={<FiEye />}>
-                          View
+                          View Details
                         </MenuItem>
-                        <MenuItem icon={<FiTrash2 />} color="red.500" onClick={() => handleDelete(meeting.id)}>
+                        <MenuItem as={RouterLink} to={`/meetings/${meeting.id}/edit`} icon={<FiEdit2 />}>
+                          Edit
+                        </MenuItem>
+                        <MenuItem icon={<FiTrash2 />} color="red.500" onClick={() => confirmDelete(meeting.id)}>
                           Delete
                         </MenuItem>
                       </MenuList>
                     </Menu>
-                  </Td>
-                </Tr>
-              ))}
-            </Tbody>
-          </Table>
-        </Box>
+                  </Flex>
+
+                  <HStack spacing={2} mb={4} flexWrap="wrap">
+                    <Badge colorScheme={status.color} display="flex" alignItems="center" gap={1}>
+                      <Icon as={status.icon} boxSize={3} />
+                      {status.label}
+                    </Badge>
+                    <Tooltip label={inputType.label}>
+                      <Badge variant="outline" display="flex" alignItems="center" gap={1}>
+                        <Icon as={inputType.icon} boxSize={3} />
+                        {inputType.label}
+                      </Badge>
+                    </Tooltip>
+                    {meeting.ai_processed && (
+                      <Badge colorScheme="green" variant="subtle">
+                        AI Processed
+                      </Badge>
+                    )}
+                  </HStack>
+
+                  <VStack spacing={2} align="stretch">
+                    {meeting.scheduled_at && (
+                      <HStack fontSize="sm" color="gray.500">
+                        <Icon as={FiCalendar} boxSize={4} />
+                        <Text>{formatDate(meeting.scheduled_at)}</Text>
+                        <Text>{formatTime(meeting.scheduled_at)}</Text>
+                      </HStack>
+                    )}
+                    <HStack fontSize="sm" color="gray.500">
+                      <Icon as={FiUsers} boxSize={4} />
+                      <Text>{meeting.participants_count || 0} participants</Text>
+                    </HStack>
+                  </VStack>
+
+                  <Flex mt={4} pt={3} borderTopWidth="1px" borderColor={borderColor} justify="space-between" align="center">
+                    <Button
+                      as={RouterLink}
+                      to={`/meetings/${meeting.id}`}
+                      size="sm"
+                      variant="ghost"
+                      colorScheme="blue"
+                    >
+                      View Details
+                    </Button>
+                    {!meeting.ai_processed && (
+                      <Tooltip label="Process with AI">
+                        <IconButton
+                          as={RouterLink}
+                          to={`/meetings/${meeting.id}`}
+                          icon={<FiCpu />}
+                          size="sm"
+                          variant="ghost"
+                          colorScheme="purple"
+                          aria-label="Process with AI"
+                        />
+                      </Tooltip>
+                    )}
+                  </Flex>
+                </Box>
+              </Box>
+            );
+          })}
+        </SimpleGrid>
       )}
+
+      <AlertDialog isOpen={isOpen} leastDestructiveRef={cancelRef} onClose={onClose}>
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Delete Meeting
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              Are you sure? This action cannot be undone.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onClose}>Cancel</Button>
+              <Button colorScheme="red" onClick={handleDelete} ml={3}>Delete</Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </Box>
   );
 };
