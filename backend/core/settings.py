@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
-import logging
 
 load_dotenv()
 
@@ -35,12 +34,12 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': LOG_LEVEL,
+        'level': os.getenv('LOG_LEVEL', 'INFO'),
     },
     'loggers': {
         'django.request': {
             'handlers': ['console'],
-            'level': LOG_LEVEL,
+            'level': os.getenv('LOG_LEVEL', 'INFO'),
             'propagate': False,
         },
     },
@@ -203,6 +202,15 @@ CORS_ALLOW_HEADERS = [
 
 # ML Service URL
 ML_SERVICE_URL = os.getenv('ML_SERVICE_URL', 'http://localhost:5001')
+
+# OpenAI settings
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+
+# Google Calendar (stub - configure with OAuth credentials)
+GOOGLE_CALENDAR_CREDENTIALS = None
+
+# Slack (stub - configure with bot token)
+SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN', '')
 
 # Celery settings
 CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
