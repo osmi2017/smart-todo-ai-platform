@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
-import logging
 
 load_dotenv()
 
@@ -27,12 +26,12 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': 'DEBUG',
+        'level': os.getenv('LOG_LEVEL', 'INFO'),
     },
     'loggers': {
         'django.request': {
             'handlers': ['console'],
-            'level': 'DEBUG',
+            'level': os.getenv('LOG_LEVEL', 'INFO'),
             'propagate': False,
         },
     },
