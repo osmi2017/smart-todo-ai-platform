@@ -42,10 +42,14 @@ import {
   FiBarChart2,
   FiActivity,
   FiTarget,
+  FiMic,
+  FiPlay,
+  FiPlus,
 } from 'react-icons/fi';
 import { Link as RouterLink } from 'react-router-dom';
 import { useQuery } from 'react-query';
 import { useStatsService } from '../services/statsService';
+import { useMeetingService } from '../services/meetingService';
 import { format, formatDistance } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -71,6 +75,7 @@ import {
 const Dashboard = () => {
   const [timeRange, setTimeRange] = useState('week');
   const statsService = useStatsService();
+  const { getMeetings } = useMeetingService();
   const cardBg = useColorModeValue('white', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
@@ -81,6 +86,21 @@ const Dashboard = () => {
       refetchInterval: 30000,
     }
   );
+
+  const { data: meetingsData } = useQuery(
+    'dashboard-meetings',
+    async () => {
+      try {
+        const data = await getMeetings();
+        const list = Array.isArray(data) ? data : data.results || [];
+        return list.slice(0, 5);
+      } catch {
+        return [];
+      }
+    },
+    { refetchInterval: 30000 }
+  );
+  const recentMeetings = meetingsData || [];
 
   const COLORS = ['#4299E1', '#48BB78', '#ED8936', '#9F7AEA', '#F56565', '#38B2AC'];
 
@@ -495,6 +515,118 @@ const Dashboard = () => {
           </CardBody>
         </Card>
       </SimpleGrid>
+
+      {/* Widget Meetings */}
+      <Card mt={6} bg={cardBg} borderWidth="1px" borderColor={borderColor}>
+        <CardHeader>
+          <Flex justify="space-between" align="center">
+            <HStack spacing={3}>
+              <Icon as={FiMic} boxSize={5} color="purple.500" />
+              <Heading size="md">Recent Meetings</Heading>
+            </HStack>
+            <HStack spacing={2}>
+              <Button
+                size="sm"
+                variant="outline"
+                colorScheme="purple"
+                leftIcon={<FiPlus />}
+                as={RouterLink}
+                to="/meetings/create"
+              >
+                New Meeting
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                as={RouterLink}
+                to="/meetings"
+              >
+                View All
+              </Button>
+            </HStack>
+          </Flex>
+        </CardHeader>
+        <CardBody pt={0}>
+          {recentMeetings.length > 0 ? (
+            <VStack spacing={3} align="stretch">
+              {recentMeetings.map((meeting) => (
+                <Card
+                  key={meeting.id}
+                  as={RouterLink}
+                  to={`/meetings/${meeting.id}`}
+                  variant="outline"
+                  _hover={{ shadow: 'md', borderColor: 'purple.200' }}
+                  transition="all 0.2s"
+                >
+                  <CardBody py={3}>
+                    <Flex justify="space-between" align="center">
+                      <HStack spacing={3} flex={1}>
+                        <Icon
+                          as={
+                            meeting.status === 'in_progress' ? FiPlay :
+                            meeting.status === 'completed' ? FiCheckCircle :
+                            FiClock
+                          }
+                          color={
+                            meeting.status === 'in_progress' ? 'orange.500' :
+                            meeting.status === 'completed' ? 'green.500' :
+                            'blue.500'
+                          }
+                        />
+                        <Box>
+                          <Text fontWeight="500">{String(meeting.title || 'Untitled')}</Text>
+                          <HStack spacing={2} mt={1}>
+                            <Badge
+                              colorScheme={
+                                meeting.status === 'completed' ? 'green' :
+                                meeting.status === 'in_progress' ? 'orange' :
+                                meeting.status === 'cancelled' ? 'red' : 'blue'
+                              }
+                              size="sm"
+                            >
+                              {meeting.status === 'in_progress' ? 'In Progress' :
+                               meeting.status?.charAt(0).toUpperCase() + meeting.status?.slice(1)}
+                            </Badge>
+                            {meeting.ai_processed && (
+                              <Badge colorScheme="purple" size="sm" variant="subtle">AI</Badge>
+                            )}
+                            {meeting.project_name && (
+                              <Text fontSize="xs" color="gray.500">{String(meeting.project_name)}</Text>
+                            )}
+                          </HStack>
+                        </Box>
+                      </HStack>
+                      <VStack align="flex-end" spacing={0}>
+                        <Text fontSize="sm" color="gray.500">
+                          {meeting.scheduled_at ? format(new Date(meeting.scheduled_at), 'dd/MM') : ''}
+                        </Text>
+                        <Text fontSize="xs" color="gray.400">
+                          {meeting.participants_count || 0} participants
+                        </Text>
+                      </VStack>
+                    </Flex>
+                  </CardBody>
+                </Card>
+              ))}
+            </VStack>
+          ) : (
+            <Box textAlign="center" py={6}>
+              <Icon as={FiMic} boxSize={8} color="gray.300" mb={2} />
+              <Text color="gray.500">No meetings yet</Text>
+              <Button
+                mt={3}
+                size="sm"
+                colorScheme="purple"
+                leftIcon={<FiPlus />}
+                as={RouterLink}
+                to="/meetings/create"
+              >
+                Create your first meeting
+              </Button>
+            </Box>
+          )}
+        </CardBody>
+      </Card>
 
       {/* Widget IA */}
       <Card

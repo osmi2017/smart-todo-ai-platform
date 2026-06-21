@@ -1,23 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box, Heading, Button, VStack, HStack,
   FormControl, FormLabel, Input, Textarea, Select,
   useToast, useColorModeValue, Icon, Text,
+  Skeleton, Alert, AlertIcon,
 } from '@chakra-ui/react';
-import { FiArrowLeft, FiUpload, FiMic, FiFileText } from 'react-icons/fi';
+import { FiArrowLeft, FiUpload, FiMic, FiFileText, FiSave } from 'react-icons/fi';
 import { useMeetingService } from '../services/meetingService';
 import { useProjectService } from '../services/projectService';
 
 const MeetingForm = () => {
+  const { id } = useParams();
+  const isEditing = Boolean(id);
   const navigate = useNavigate();
-  const { createMeeting } = useMeetingService();
+  const { createMeeting, getMeeting, updateMeeting } = useMeetingService();
   const { getProjects } = useProjectService();
   const toast = useToast();
   const bgColor = useColorModeValue('white', 'gray.800');
 
   const [projects, setProjects] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingMeeting, setLoadingMeeting] = useState(isEditing);
   const [audioFile, setAudioFile] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -26,11 +30,15 @@ const MeetingForm = () => {
     scheduled_at: '',
     raw_notes: '',
     project: '',
+    status: 'scheduled',
   });
 
   useEffect(() => {
     loadProjects();
-  }, []);
+    if (isEditing) {
+      loadMeetingData();
+    }
+  }, [id]);
 
   const loadProjects = async () => {
     try {
@@ -38,6 +46,27 @@ const MeetingForm = () => {
       setProjects(Array.isArray(data) ? data : data.results || []);
     } catch (error) {
       // non-critical
+    }
+  };
+
+  const loadMeetingData = async () => {
+    setLoadingMeeting(true);
+    try {
+      const data = await getMeeting(id);
+      setFormData({
+        title: data.title || '',
+        description: data.description || '',
+        input_type: data.input_type || 'text',
+        scheduled_at: data.scheduled_at ? data.scheduled_at.slice(0, 16) : '',
+        raw_notes: data.raw_notes || '',
+        project: data.project || '',
+        status: data.status || 'scheduled',
+      });
+    } catch (error) {
+      toast({ title: 'Error loading meeting', status: 'error', duration: 3000 });
+      navigate('/meetings');
+    } finally {
+      setLoadingMeeting(false);
     }
   };
 
@@ -65,19 +94,28 @@ const MeetingForm = () => {
 
     setSubmitting(true);
     try {
-      const data = { ...formData };
-      if (audioFile) {
-        data.audio_file = audioFile;
+      if (isEditing) {
+        const data = { ...formData };
+        if (!data.project) delete data.project;
+        if (!data.scheduled_at) delete data.scheduled_at;
+        await updateMeeting(id, data);
+        toast({ title: 'Meeting updated', status: 'success', duration: 2000 });
+        navigate(`/meetings/${id}`);
+      } else {
+        const data = { ...formData };
+        if (audioFile) {
+          data.audio_file = audioFile;
+        }
+        if (!data.project) delete data.project;
+        if (!data.scheduled_at) delete data.scheduled_at;
+        delete data.status;
+        const meeting = await createMeeting(data);
+        toast({ title: 'Meeting created', status: 'success', duration: 2000 });
+        navigate(`/meetings/${meeting.id}`);
       }
-      if (!data.project) delete data.project;
-      if (!data.scheduled_at) delete data.scheduled_at;
-
-      const meeting = await createMeeting(data);
-      toast({ title: 'Meeting created', status: 'success', duration: 2000 });
-      navigate(`/meetings/${meeting.id}`);
     } catch (error) {
       toast({
-        title: 'Error creating meeting',
+        title: isEditing ? 'Error updating meeting' : 'Error creating meeting',
         description: error.response?.data?.detail || 'Unknown error',
         status: 'error',
         duration: 3000,
@@ -87,13 +125,29 @@ const MeetingForm = () => {
     }
   };
 
+  if (loadingMeeting) {
+    return (
+      <Box>
+        <Skeleton height="40px" mb={4} />
+        <Skeleton height="30px" mb={6} />
+        <Box bg={bgColor} borderRadius="lg" shadow="sm" p={6} maxW="600px">
+          <VStack spacing={5}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <Skeleton key={i} height="60px" w="full" />
+            ))}
+          </VStack>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box>
-      <Button leftIcon={<FiArrowLeft />} variant="ghost" mb={4} onClick={() => navigate('/meetings')}>
-        Back to Meetings
+      <Button leftIcon={<FiArrowLeft />} variant="ghost" mb={4} onClick={() => navigate(isEditing ? `/meetings/${id}` : '/meetings')}>
+        {isEditing ? 'Back to Meeting' : 'Back to Meetings'}
       </Button>
 
-      <Heading size="lg" mb={6}>New Meeting</Heading>
+      <Heading size="lg" mb={6}>{isEditing ? 'Edit Meeting' : 'New Meeting'}</Heading>
 
       <Box bg={bgColor} borderRadius="lg" shadow="sm" p={6} maxW="600px">
         <form onSubmit={handleSubmit}>
@@ -118,6 +172,18 @@ const MeetingForm = () => {
                 rows={3}
               />
             </FormControl>
+
+            {isEditing && (
+              <FormControl>
+                <FormLabel>Status</FormLabel>
+                <Select name="status" value={formData.status} onChange={handleChange}>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </Select>
+              </FormControl>
+            )}
 
             <FormControl>
               <FormLabel>Input Type</FormLabel>
@@ -147,7 +213,7 @@ const MeetingForm = () => {
               </Select>
             </FormControl>
 
-            {(formData.input_type === 'audio' || formData.input_type === 'both') && (
+            {(formData.input_type === 'audio' || formData.input_type === 'both') && !isEditing && (
               <FormControl>
                 <FormLabel>Audio File</FormLabel>
                 <Box
@@ -176,6 +242,13 @@ const MeetingForm = () => {
               </FormControl>
             )}
 
+            {isEditing && formData.input_type !== 'audio' && (
+              <Alert status="info" borderRadius="md" fontSize="sm">
+                <AlertIcon />
+                You can edit meeting notes below. To re-upload audio, create a new meeting.
+              </Alert>
+            )}
+
             {(formData.input_type === 'text' || formData.input_type === 'both') && (
               <FormControl>
                 <FormLabel>Meeting Notes</FormLabel>
@@ -190,9 +263,17 @@ const MeetingForm = () => {
             )}
 
             <HStack w="full" justify="flex-end" pt={4}>
-              <Button variant="ghost" onClick={() => navigate('/meetings')}>Cancel</Button>
-              <Button type="submit" colorScheme="blue" isLoading={submitting} loadingText="Creating...">
-                Create Meeting
+              <Button variant="ghost" onClick={() => navigate(isEditing ? `/meetings/${id}` : '/meetings')}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                colorScheme="blue"
+                leftIcon={isEditing ? <FiSave /> : undefined}
+                isLoading={submitting}
+                loadingText={isEditing ? 'Saving...' : 'Creating...'}
+              >
+                {isEditing ? 'Save Changes' : 'Create Meeting'}
               </Button>
             </HStack>
           </VStack>
