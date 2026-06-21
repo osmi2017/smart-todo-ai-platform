@@ -149,6 +149,15 @@ const Milestones = () => {
         });
         handleCloseModal();
       },
+      onError: (error) => {
+        console.error('Erreur création milestone :', error.response?.data);
+        toast({
+          title: 'Erreur',
+          description: error.response?.data?.message || 'Erreur lors de la création',
+          status: 'error',
+          duration: 3000,
+        });
+      },
     }
   );
 
@@ -156,10 +165,8 @@ const Milestones = () => {
   const updateMutation = useMutation(
     ({ id, data }) => milestoneService.updateMilestone(id, data),
     {
-    
       onSuccess: () => {
         queryClient.invalidateQueries('milestones');
-        
         toast({
           title: 'Succès',
           description: 'Jalon mis à jour',
@@ -215,12 +222,13 @@ const Milestones = () => {
 
   const handleOpenModal = (milestone = null) => {
     if (milestone) {
+      console.log('📝 Milestone à éditer:', milestone);
       setSelectedMilestone(milestone);
       setFormData({
         name: milestone.name,
         description: milestone.description || '',
         due_date: milestone.due_date,
-        project_id: milestone.project_id,
+        project_id: milestone.project,  // ← Correction: 'project' pas 'project_id'
         status: milestone.status || 'not_started',
         progress: milestone.progress || 0,
       });
@@ -254,15 +262,28 @@ const Milestones = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     
+    // Vérifier que le projet est sélectionné
+    if (!formData.project_id) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez sélectionner un projet',
+        status: 'error',
+        duration: 3000,
+      });
+      return;
+    }
+    
     // Transformer les données pour le backend
     const milestoneData = {
       name: formData.name,
       description: formData.description,
       due_date: formData.due_date,
-      project: formData.project_id,
+      project: parseInt(formData.project_id, 10),  // ← Convertir en nombre
       status: formData.status,
       progress: parseFloat(formData.progress) || 0,
     };
+    
+    console.log('📦 Données envoyées:', milestoneData);
     
     if (selectedMilestone) {
       updateMutation.mutate({ id: selectedMilestone.id, data: milestoneData });
@@ -714,7 +735,10 @@ const Milestones = () => {
                   <FormLabel>Projet associé</FormLabel>
                   <Select
                     value={formData.project_id}
-                    onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
+                    onChange={(e) => {
+                      console.log('📌 Projet sélectionné:', e.target.value);
+                      setFormData({ ...formData, project_id: e.target.value });
+                    }}
                     placeholder="Sélectionner un projet"
                   >
                     {projects?.map(project => (

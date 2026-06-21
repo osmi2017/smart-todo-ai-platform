@@ -25,13 +25,20 @@ export const useMilestoneService = () => {
 
   const createMilestone = async (milestoneData) => {
     try {
+      console.log('📦 Service - Données reçues:', milestoneData); // LOG
+      
+      // S'assurer que project est un nombre
       const formattedData = {
         name: milestoneData.name,
         description: milestoneData.description || '',
         due_date: milestoneData.due_date,
-        project: milestoneData.project_id,
+        project: parseInt(milestoneData.project, 10),  // ← Utiliser 'project' pas 'project_id'
+        status: milestoneData.status || 'not_started',
+        progress: parseFloat(milestoneData.progress) || 0,
       };
 
+      console.log('📤 Service - Données envoyées:', formattedData); // LOG
+      
       const response = await axiosInstance.post('/milestones/', formattedData);
       return response.data;
     } catch (error) {
@@ -42,10 +49,23 @@ export const useMilestoneService = () => {
 
   const updateMilestone = async (id, milestoneData) => {
     try {
-      const response = await axiosInstance.put(`/milestones/${id}/`, milestoneData);
+      console.log('📦 Service - Update données reçues:', milestoneData);
+      
+      const formattedData = {
+        name: milestoneData.name,
+        description: milestoneData.description || '',
+        due_date: milestoneData.due_date,
+        project: parseInt(milestoneData.project, 10),
+        status: milestoneData.status || 'not_started',
+        progress: parseFloat(milestoneData.progress) || 0,
+      };
+      
+      console.log('📤 Service - Update données envoyées:', formattedData);
+      
+      const response = await axiosInstance.patch(`/milestones/${id}/`, formattedData);  // ← PATCH au lieu de PUT
       return response.data;
     } catch (error) {
-      console.error('Erreur mise à jour milestone:', error);
+      console.error('Erreur mise à jour milestone:', error.response?.data);
       throw error;
     }
   };

@@ -216,6 +216,7 @@ class ProjectViewSet(ActivityLogMixin, viewsets.ModelViewSet):
 
 class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     
+    
     queryset = Milestone.objects.all()
     serializer_class = MilestoneSerializer
     permission_classes = [IsAuthenticated]
@@ -296,10 +297,15 @@ class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             metadata={'name': str(instance)}
         )
         
+    def create(self, request, *args, **kwargs):
+        print("🔍 Données reçues:", request.data)
+        return super().create(request, *args, **kwargs)
+        
 
 
 
 class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
+    print('ici')
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]

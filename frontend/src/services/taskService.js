@@ -29,7 +29,8 @@ export const useTaskService = () => {
     getTasks: service.getAll,
     getTask: service.getOne,
     createTask: service.create,
-    updateTask: service.update,
+    updateTask: service.update,      // PUT (remplacement complet)
+    patchTask: service.patch,        // PATCH (mise à jour partielle) ← AJOUT
     deleteTask: service.remove,
     predictTask: service.predictTask,
     getDashboardStats: service.getDashboardStats,

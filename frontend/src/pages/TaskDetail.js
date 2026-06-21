@@ -11,6 +11,7 @@ import {
   Card,
   CardHeader,
   CardBody,
+  CardHeader,
   Divider,
   useToast,
   Spinner,
@@ -144,7 +145,7 @@ const TaskDetail = () => {
 
   // Mutation pour mettre à jour la tâche
   const updateMutation = useMutation(
-    (data) => taskService.updateTask(id, data),
+    (data) => taskService.patchTask(id, data),
     {
       onSuccess: () => {
         queryClient.invalidateQueries(['task', id]);
