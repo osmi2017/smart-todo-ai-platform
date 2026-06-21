@@ -264,8 +264,6 @@ const Milestones = () => {
       progress: parseFloat(formData.progress) || 0,
     };
     
-    console.log('Données envoyées :', milestoneData);
-    
     if (selectedMilestone) {
       updateMutation.mutate({ id: selectedMilestone.id, data: milestoneData });
     } else {

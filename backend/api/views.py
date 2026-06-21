@@ -6,6 +6,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Count, Avg, Sum
 from django.utils import timezone
 from datetime import timedelta
+import logging
 import requests
 from django.conf import settings
 
@@ -14,8 +15,10 @@ from .serializers import (
     UserSerializer, UserRegisterSerializer, UserLoginSerializer,
     ProjectSerializer, MilestoneSerializer, TaskSerializer, 
     TaskDetailSerializer, ActivityLogSerializer, CommentSerializer,
-    DashboardStatsSerializer
+    DashboardStatsSerializer, UserSimpleSerializer
 )
+
+logger = logging.getLogger(__name__)
 from .permissions import IsAdminOrReadOnly, IsOwnerOrReadOnly
 from .mixins import ActivityLogMixin
 
@@ -221,11 +224,10 @@ class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         user = self.request.user
         
         if user.role == 'admin':
-            print('ici2')
             return Milestone.objects.all()
         return Milestone.objects.filter(
-        project__in=Project.objects.filter(Q(owner=user) | Q(members=user))
-    )
+            project__in=Project.objects.filter(Q(owner=user) | Q(members=user))
+        )
     
     def perform_create(self, serializer):
         milestone = serializer.save()
@@ -278,11 +280,16 @@ class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         
         return Response({'risk_score': milestone.risk_score})
     
-    def update(self, request, *args, **kwargs):
-	    print("Données reçues pour mise à jour:", request.data)
-	    response = super().update(request, *args, **kwargs)
-	    print("Réponse du serveur:", response.data)
-	    return response
+    def _log_activity(self, action, entity_type, instance):
+        ActivityLog.objects.create(
+            user=self.request.user,
+            action=action,
+            entity_type=entity_type,
+            entity_id=instance.id,
+            metadata={'name': str(instance)}
+        )
+        
+
 
 
 class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
@@ -422,6 +429,6 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
                 task.save(update_fields=['predicted_time', 'delay_probability', 'predicted_priority'])
                 
         except requests.RequestException as e:
-            print(f"ML Service error: {e}")
+            logger.warning("ML Service error: %s", e)
     
 

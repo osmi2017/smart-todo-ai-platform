@@ -346,5 +346,166 @@ class Notification(models.Model):
         ]
     
     def __str__(self):
-        return f"Notification pour {self.recipient}: {self.title}"        
+        return f"Notification pour {self.recipient}: {self.title}"
+
+
+class Meeting(models.Model):
+    """AI Meeting model"""
+    STATUS_CHOICES = (
+        ('scheduled', 'Scheduled'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    INPUT_TYPE_CHOICES = (
+        ('audio', 'Audio Upload'),
+        ('text', 'Text Notes'),
+        ('both', 'Audio + Text'),
+    )
+
+    title = models.CharField(max_length=300)
+    description = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='scheduled')
+    input_type = models.CharField(max_length=10, choices=INPUT_TYPE_CHOICES, default='text')
+    scheduled_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    duration_minutes = models.IntegerField(null=True, blank=True)
+
+    # Content
+    audio_file = models.FileField(upload_to='meetings/audio/', null=True, blank=True)
+    raw_notes = models.TextField(blank=True)
+    transcript = models.TextField(blank=True)
+
+    # Relations
+    organizer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='organized_meetings')
+    project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name='meetings')
+
+    # AI processing
+    ai_processed = models.BooleanField(default=False)
+    ai_processing_error = models.TextField(blank=True)
+
+    # External integrations
+    google_calendar_event_id = models.CharField(max_length=255, blank=True)
+    slack_channel_id = models.CharField(max_length=255, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'meetings'
+        ordering = ['-scheduled_at', '-created_at']
+        indexes = [
+            models.Index(fields=['organizer', '-scheduled_at']),
+            models.Index(fields=['status']),
+            models.Index(fields=['project', '-scheduled_at']),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def is_past(self):
+        if self.scheduled_at:
+            return self.scheduled_at < timezone.now()
+        return False
+
+
+class MeetingParticipant(models.Model):
+    """Participants in a meeting"""
+    ROLE_CHOICES = (
+        ('organizer', 'Organizer'),
+        ('presenter', 'Presenter'),
+        ('attendee', 'Attendee'),
+        ('optional', 'Optional'),
+    )
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='participants')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='meeting_participations')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='attendee')
+    attended = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'meeting_participants'
+        unique_together = ['meeting', 'user']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.meeting.title}"
+
+
+class MeetingSummary(models.Model):
+    """AI-generated meeting summary"""
+    meeting = models.OneToOneField(Meeting, on_delete=models.CASCADE, related_name='summary')
+    summary_text = models.TextField()
+    key_points = models.JSONField(default=list, blank=True)
+    decisions = models.JSONField(default=list, blank=True)
+    follow_ups = models.JSONField(default=list, blank=True)
+
+    generated_at = models.DateTimeField(auto_now_add=True)
+    model_used = models.CharField(max_length=50, default='gpt-4')
+
+    class Meta:
+        db_table = 'meeting_summaries'
+
+    def __str__(self):
+        return f"Summary: {self.meeting.title}"
+
+
+class MeetingActionItem(models.Model):
+    """Action items extracted from meetings by AI"""
+    PRIORITY_CHOICES = (
+        (1, 'Low'),
+        (2, 'Medium'),
+        (3, 'High'),
+        (4, 'Critical'),
+    )
+
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('in_progress', 'In Progress'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='action_items')
+    title = models.CharField(max_length=300)
+    description = models.TextField(blank=True)
+    priority = models.IntegerField(choices=PRIORITY_CHOICES, default=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    deadline = models.DateField(null=True, blank=True)
+    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='meeting_action_items')
+
+    # Link to project task if converted
+    linked_task = models.ForeignKey(Task, on_delete=models.SET_NULL, null=True, blank=True, related_name='source_action_item')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'meeting_action_items'
+        ordering = ['priority', 'deadline']
+        indexes = [
+            models.Index(fields=['meeting', 'status']),
+            models.Index(fields=['assigned_to', 'status']),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    def convert_to_task(self, project):
+        """Convert this action item into a project Task"""
+        task = Task.objects.create(
+            title=self.title,
+            description=self.description,
+            priority=self.priority,
+            status='todo',
+            deadline=self.deadline,
+            project=project,
+            assigned_to=self.assigned_to,
+            created_by=self.meeting.organizer,
+        )
+        self.linked_task = task
+        self.save(update_fields=['linked_task'])
+        return task
 
