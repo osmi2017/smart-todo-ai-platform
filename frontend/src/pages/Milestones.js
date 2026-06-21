@@ -76,6 +76,8 @@ import { useProjectService } from '../services/projectService';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { format, formatDistance, isAfter, isBefore, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { MILESTONE_STATUS_COLORS, MILESTONE_STATUS_LABELS } from '../utils/constants';
+import LoadingState from '../components/LoadingState';
 
 const Milestones = () => {
   const [selectedMilestone, setSelectedMilestone] = useState(null);
@@ -274,27 +276,8 @@ const Milestones = () => {
     onDeleteOpen();
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      'not_started': 'gray',
-      'in_progress': 'blue',
-      'completed': 'green',
-      'delayed': 'red',
-      'cancelled': 'purple',
-    };
-    return colors[status] || 'gray';
-  };
-
-  const getStatusLabel = (status) => {
-    const labels = {
-      'not_started': 'Non démarré',
-      'in_progress': 'En cours',
-      'completed': 'Terminé',
-      'delayed': 'En retard',
-      'cancelled': 'Annulé',
-    };
-    return labels[status] || status;
-  };
+  const getStatusColor = (status) => MILESTONE_STATUS_COLORS[status] || 'gray';
+  const getStatusLabel = (status) => MILESTONE_STATUS_LABELS[status] || status;
 
   const getRiskColor = (risk) => {
     if (risk >= 75) return 'red';
@@ -335,12 +318,7 @@ const Milestones = () => {
   };
 
   if (isLoading) {
-    return (
-      <Box textAlign="center" py={10}>
-        <Spinner size="xl" color="blue.500" />
-        <Text mt={4}>Chargement des jalons...</Text>
-      </Box>
-    );
+    return <LoadingState message="Chargement des jalons..." />;
   }
 
   // Statistiques

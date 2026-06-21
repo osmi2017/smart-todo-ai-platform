@@ -20,6 +20,7 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 from .permissions import IsAdminOrReadOnly, IsOwnerOrReadOnly
+from .mixins import ActivityLogMixin
 
 
 class AuthViewSet(viewsets.GenericViewSet):
@@ -51,7 +52,7 @@ class AuthViewSet(viewsets.GenericViewSet):
         return Response({'error': 'Non authentifié'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
-class ProjectViewSet(viewsets.ModelViewSet):
+class ProjectViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
@@ -69,7 +70,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         # Ici on assigne l'utilisateur connecté comme owner
         serializer.save(owner=self.request.user)
-        self._log_activity('create', 'project', serializer.instance)
+        self.log_activity('create', 'project', serializer.instance)
     
     @action(detail=True, methods=['get'])
     def stats(self, request, pk=None):
@@ -93,15 +94,6 @@ class ProjectViewSet(viewsets.ModelViewSet):
         
         return Response(stats)
     
-    def _log_activity(self, action, entity_type, instance):
-        ActivityLog.objects.create(
-            user=self.request.user,
-            action=action,
-            entity_type=entity_type,
-            entity_id=instance.id,
-            metadata={'name': str(instance)}
-        )
-        
     @action(detail=True, methods=['get'])
     def members(self, request, pk=None):
         """Récupère la liste des membres du projet"""
@@ -218,7 +210,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-class MilestoneViewSet(viewsets.ModelViewSet):
+class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     
     queryset = Milestone.objects.all()
     serializer_class = MilestoneSerializer
@@ -239,7 +231,7 @@ class MilestoneViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         milestone = serializer.save()
-        self._log_activity('create', 'milestone', milestone)
+        self.log_activity('create', 'milestone', milestone)
     
     @action(detail=True, methods=['post'])
     def predict_risk(self, request, pk=None):
@@ -300,7 +292,7 @@ class MilestoneViewSet(viewsets.ModelViewSet):
 
 
 
-class TaskViewSet(viewsets.ModelViewSet):
+class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
@@ -329,7 +321,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         
         # Appel au service ML pour prédictions
         self._predict_task_attributes(task)
-        self._log_activity('create', 'task', task)
+        self.log_activity('create', 'task', task)
     
     def perform_update(self, serializer):
         task = serializer.save()
@@ -341,7 +333,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             task.actual_time = time_spent
             task.save()
         
-        self._log_activity('update', 'task', task)
+        self.log_activity('update', 'task', task)
     
     @action(detail=False, methods=['get'])
     def dashboard(self, request):
@@ -439,11 +431,4 @@ class TaskViewSet(viewsets.ModelViewSet):
         except requests.RequestException as e:
             logger.warning("ML Service error: %s", e)
     
-    def _log_activity(self, action, entity_type, instance):
-        ActivityLog.objects.create(
-            user=self.request.user,
-            action=action,
-            entity_type=entity_type,
-            entity_id=instance.id,
-            metadata={'title': instance.title, 'status': instance.status}
-        )
+

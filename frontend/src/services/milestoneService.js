@@ -1,4 +1,4 @@
-import { useAuth } from '../context/AuthContext';
+import { useCrudService } from '../utils/createCrudService';
 
 export const useMilestoneService = () => {
   const { axiosInstance } = useAuth();
@@ -104,11 +104,11 @@ export const useMilestoneService = () => {
   };
 
   return {
-    getMilestones,
-    getMilestone,
-    createMilestone,
-    updateMilestone,
-    deleteMilestone,
-    predictRisk,
+    getMilestones: service.getAll,
+    getMilestone: service.getOne,
+    createMilestone: service.create,
+    updateMilestone: service.update,
+    deleteMilestone: service.remove,
+    predictRisk: service.predictRisk,
   };
 };

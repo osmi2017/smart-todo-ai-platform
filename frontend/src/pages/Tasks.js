@@ -18,7 +18,6 @@ import {
   MenuList,
   MenuItem,
   Avatar,
-  Spinner,
   useToast,
   Flex,
   Progress,
@@ -44,6 +43,16 @@ import { useTaskService } from '../services/taskService';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import {
+  TASK_STATUS_COLORS,
+  TASK_STATUS_LABELS,
+  PRIORITY_COLORS,
+  PRIORITY_LABELS,
+  getPriorityColor,
+  getPriorityLabel,
+} from '../utils/constants';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
 
 const Tasks = () => {
   const [filters, setFilters] = useState({
@@ -71,49 +80,15 @@ const Tasks = () => {
     }
   );
 
-  const getPriorityColor = (priority) => {
-    const colors = { 1: 'gray', 2: 'blue', 3: 'orange', 4: 'red' };
-    return colors[priority] || 'gray';
-  };
-
-  const getPriorityLabel = (priority) => {
-    const labels = { 1: 'Basse', 2: 'Moyenne', 3: 'Haute', 4: 'Critique' };
-    return labels[priority] || priority;
-  };
-
-  const getStatusColor = (status) => {
-    const colors = {
-      'todo': 'gray',
-      'in_progress': 'blue',
-      'review': 'purple',
-      'blocked': 'red',
-      'completed': 'green',
-    };
-    return colors[status] || 'gray';
-  };
-
-  const getStatusLabel = (status) => {
-    const labels = {
-      'todo': 'À faire',
-      'in_progress': 'En cours',
-      'review': 'En révision',
-      'blocked': 'Bloquée',
-      'completed': 'Terminée',
-    };
-    return labels[status] || status;
-  };
+  const getStatusColor = (status) => TASK_STATUS_COLORS[status] || 'gray';
+  const getStatusLabel = (status) => TASK_STATUS_LABELS[status] || status;
 
   const handleTaskClick = (taskId) => {
     navigate(`/tasks/${taskId}`);
   };
 
   if (isLoading) {
-    return (
-      <Box textAlign="center" py={10}>
-        <Spinner size="xl" color="blue.500" />
-        <Text mt={4}>Chargement des tâches...</Text>
-      </Box>
-    );
+    return <LoadingState message="Chargement des tâches..." />;
   }
 
   return (
@@ -317,18 +292,11 @@ const Tasks = () => {
             ))}
           </SimpleGrid>
         ) : (
-          <Box textAlign="center" py={10}>
-            <Text color="gray.500">Aucune tâche trouvée</Text>
-            <Button
-              mt={4}
-              leftIcon={<FiPlus />}
-              colorScheme="blue"
-              as={RouterLink}
-              to="/tasks/create"  // ← CORRIGÉ: /create au lieu de /new
-            >
-              Créer votre première tâche
-            </Button>
-          </Box>
+          <EmptyState
+            message="Aucune tâche trouvée"
+            actionLabel="Créer votre première tâche"
+            actionTo="/tasks/create"
+          />
         )}
       </VStack>
     </Box>
