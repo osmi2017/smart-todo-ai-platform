@@ -79,7 +79,7 @@ class MilestoneAdmin(admin.ModelAdmin):
 # ----------------------------------------------------------------------
 @admin.register(Task)
 class TaskAdmin(admin.ModelAdmin):
-    list_display = ('title', 'project', 'status_colored', 'priority_colored', 'assigned_to', 'deadline', 'is_delayed_display')
+    list_display = ('title', 'project', 'status', 'priority', 'assigned_to', 'deadline', 'is_delayed_display')
     list_filter = ('status', 'priority', 'project', 'assigned_to', 'created_at')
     search_fields = ('title', 'description', 'project__name')
     readonly_fields = ('predicted_time', 'delay_probability', 'predicted_priority', 'created_at', 'updated_at', 'completed_at')
