@@ -12,8 +12,6 @@ import logging
 import requests
 from django.conf import settings
 
-logger = logging.getLogger(__name__)
-
 from .models import User, Project, Milestone, Task, ActivityLog, Comment, Company, CompanyGroup
 from .serializers import (
     UserSerializer, UserRegisterSerializer, UserLoginSerializer,
@@ -22,13 +20,13 @@ from .serializers import (
     DashboardStatsSerializer, UserSimpleSerializer,
     CompanySerializer, CompanyGroupSerializer,
 )
-
-logger = logging.getLogger(__name__)
 from .permissions import (
     IsAdminOrReadOnly, IsOwnerOrReadOnly, IsSuperAdmin,
     IsCompanyAdmin, HasGroupAccess,
 )
 from .mixins import ActivityLogMixin
+
+logger = logging.getLogger(__name__)
 
 
 class AuthViewSet(viewsets.GenericViewSet):
