@@ -84,6 +84,7 @@ const Dashboard = () => {
     () => statsService.getDashboardStats(),
     {
       refetchInterval: 30000,
+      retry: 1,
     }
   );
 

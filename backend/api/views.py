@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count, Avg, Sum
+from django.db.models import Q, Count, Avg, Sum, F
 from django.utils import timezone
 from datetime import timedelta
 import logging
@@ -353,23 +353,70 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         user = request.user
         today = timezone.now().date()
         week_start = today - timedelta(days=today.weekday())
-        
+
         tasks = self.get_queryset()
-        
+        projects = Project.objects.filter(Q(owner=user) | Q(members=user)).distinct()
+
+        total_tasks = tasks.count()
+        completed_tasks = tasks.filter(status='completed').count()
+        in_progress_tasks = tasks.filter(status='in_progress').count()
+        review_tasks = tasks.filter(status='review').count()
+        blocked_tasks = tasks.filter(status='blocked').count()
+        todo_tasks = tasks.filter(status='todo').count()
+
+        delayed_count = tasks.filter(
+            deadline__lt=today,
+            status__in=['todo', 'in_progress', 'blocked']
+        ).count()
+
+        productivity_score = round(
+            (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+        )
+
+        day_names = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+        weekly_activity = []
+        for i in range(7):
+            day_date = week_start + timedelta(days=i)
+            count = tasks.filter(updated_at__date=day_date).count()
+            weekly_activity.append({'day': day_names[i], 'tasks': count})
+
+        project_progress = []
+        for proj in projects[:8]:
+            proj_tasks = proj.tasks.count()
+            proj_completed = proj.tasks.filter(status='completed').count()
+            progress = round((proj_completed / proj_tasks * 100) if proj_tasks > 0 else 0)
+            project_progress.append({
+                'name': proj.name,
+                'progress': progress,
+                'color': proj.color or '#4299E1',
+            })
+
         data = {
-            'total_tasks': tasks.count(),
-            'completed_tasks': tasks.filter(status='completed').count(),
-            'in_progress_tasks': tasks.filter(status='in_progress').count(),
-            'todo_tasks': tasks.filter(status='todo').count(),
-            'blocked_tasks': tasks.filter(status='blocked').count(),
-            
+            'total_projects': projects.count(),
+            'active_projects': projects.filter(
+                status__in=['in_progress', 'not_started']
+            ).count(),
+            'total_tasks': total_tasks,
+            'completed_tasks': completed_tasks,
+            'in_progress_tasks': in_progress_tasks,
+            'delayed_tasks': delayed_count,
+            'productivity_score': productivity_score,
+
             'tasks_by_priority': {
                 'low': tasks.filter(priority=1).count(),
                 'medium': tasks.filter(priority=2).count(),
                 'high': tasks.filter(priority=3).count(),
                 'critical': tasks.filter(priority=4).count(),
             },
-            
+
+            'tasks_by_status': {
+                'todo': todo_tasks,
+                'in_progress': in_progress_tasks,
+                'review': review_tasks,
+                'blocked': blocked_tasks,
+                'completed': completed_tasks,
+            },
+
             'upcoming_deadlines': TaskSerializer(
                 tasks.filter(
                     deadline__gte=today,
@@ -378,31 +425,120 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
                 ).order_by('deadline')[:10],
                 many=True
             ).data,
-            
-            'delayed_tasks': TaskSerializer(
-                tasks.filter(
-                    deadline__lt=today,
-                    status__in=['todo', 'in_progress', 'blocked']
-                )[:10],
-                many=True
-            ).data,
-            
+
             'recent_activities': ActivityLogSerializer(
                 ActivityLog.objects.filter(user=user)[:20],
                 many=True
             ).data,
-            
-            'productivity_stats': {
-                'tasks_completed_this_week': tasks.filter(
-                    status='completed',
-                    updated_at__date__gte=week_start
-                ).count(),
-                'avg_completion_time': tasks.filter(
-                    actual_time__isnull=False
-                ).aggregate(Avg('actual_time'))['actual_time__avg'] or 0,
-            }
+
+            'weekly_activity': weekly_activity,
+            'project_progress': project_progress,
         }
-        
+
+        return Response(data)
+
+    @action(detail=False, methods=['get'])
+    def analytics(self, request):
+        user = request.user
+        today = timezone.now().date()
+        time_range = request.query_params.get('range', 'week')
+
+        if time_range == 'month':
+            start_date = today - timedelta(days=30)
+        elif time_range == 'quarter':
+            start_date = today - timedelta(days=90)
+        elif time_range == 'year':
+            start_date = today - timedelta(days=365)
+        else:
+            start_date = today - timedelta(days=7)
+
+        tasks = self.get_queryset()
+        period_tasks = tasks.filter(created_at__date__gte=start_date)
+        projects = Project.objects.filter(Q(owner=user) | Q(members=user)).distinct()
+
+        total = period_tasks.count()
+        completed = period_tasks.filter(status='completed').count()
+        completion_rate = round((completed / total * 100) if total > 0 else 0)
+
+        avg_time = period_tasks.filter(
+            actual_time__isnull=False
+        ).aggregate(Avg('actual_time'))['actual_time__avg'] or 0
+
+        delayed_count = period_tasks.filter(
+            deadline__lt=today,
+            status__in=['todo', 'in_progress', 'blocked']
+        ).count()
+
+        ml_tasks = period_tasks.filter(predicted_priority__isnull=False)
+        ml_total = ml_tasks.count()
+        if ml_total > 0:
+            ml_correct = ml_tasks.filter(predicted_priority=F('priority')).count()
+            ml_accuracy = round(ml_correct / ml_total * 100)
+        else:
+            ml_accuracy = 0
+
+        num_days = (today - start_date).days + 1
+        trend_data = []
+        for i in range(min(num_days, 30)):
+            day_date = start_date + timedelta(days=i)
+            created = tasks.filter(created_at__date=day_date).count()
+            done = tasks.filter(completed_at__date=day_date).count()
+            trend_data.append({
+                'name': day_date.strftime('%d/%m'),
+                'taches': created,
+                'completees': done,
+            })
+
+        priority_data = [
+            {'name': 'Basse', 'value': period_tasks.filter(priority=1).count(), 'color': '#718096'},
+            {'name': 'Moyenne', 'value': period_tasks.filter(priority=2).count(), 'color': '#4299E1'},
+            {'name': 'Haute', 'value': period_tasks.filter(priority=3).count(), 'color': '#ED8936'},
+            {'name': 'Critique', 'value': period_tasks.filter(priority=4).count(), 'color': '#F56565'},
+        ]
+
+        project_data = []
+        for proj in projects[:10]:
+            proj_total = proj.tasks.count()
+            proj_completed = proj.tasks.filter(status='completed').count()
+            progress = round((proj_completed / proj_total * 100) if proj_total > 0 else 0)
+            project_data.append({
+                'name': proj.name,
+                'completees': proj_completed,
+                'total': proj_total,
+                'progression': progress,
+            })
+
+        members = User.objects.filter(
+            Q(tasks__project__in=projects)
+        ).distinct()
+        user_performance = []
+        for member in members[:20]:
+            member_tasks = period_tasks.filter(assigned_to=member)
+            m_total = member_tasks.count()
+            m_completed = member_tasks.filter(status='completed').count()
+            m_delayed = member_tasks.filter(
+                deadline__lt=today,
+                status__in=['todo', 'in_progress', 'blocked']
+            ).count()
+            if m_total > 0:
+                user_performance.append({
+                    'user': member.full_name or member.username,
+                    'taches': m_total,
+                    'completees': m_completed,
+                    'retard': m_delayed,
+                })
+
+        data = {
+            'completion_rate': completion_rate,
+            'avg_task_time': round(avg_time, 1),
+            'delayed_count': delayed_count,
+            'ml_accuracy': ml_accuracy,
+            'trend_data': trend_data,
+            'priority_data': priority_data,
+            'project_data': project_data,
+            'user_performance': user_performance,
+        }
+
         return Response(data)
     
     @action(detail=True, methods=['post'])
