@@ -1,48 +1,90 @@
 import pytest
 from datetime import date, timedelta
 from django.utils import timezone
-from api.models import User, Project, Milestone, Task, Comment, Notification, ActivityLog
+from api.models import User, Project, Milestone, Task, Comment, Notification, ActivityLog, Company, CompanyGroup
 
 
 @pytest.fixture
-def user(db):
-    return User.objects.create_user(
+def company(db):
+    return Company.objects.create(
+        name='Test Company',
+        slug='test-company',
+        description='A test company',
+    )
+
+
+@pytest.fixture
+def other_company(db):
+    return Company.objects.create(
+        name='Other Company',
+        slug='other-company',
+    )
+
+
+@pytest.fixture
+def company_group(db, company):
+    return CompanyGroup.objects.create(
+        name='Dev Team',
+        company=company,
+    )
+
+
+@pytest.fixture
+def user(db, company, company_group):
+    u = User.objects.create_user(
         username='testuser',
         email='test@example.com',
         password='testpass123',
         first_name='Test',
         last_name='User',
-        role='member',
+        role='user',
+        company=company,
     )
+    company_group.members.add(u)
+    return u
 
 
 @pytest.fixture
-def admin_user(db):
+def admin_user(db, company):
     return User.objects.create_user(
         username='admin',
         email='admin@example.com',
         password='adminpass123',
         role='admin',
+        company=company,
     )
 
 
 @pytest.fixture
-def other_user(db):
+def superadmin_user(db):
+    return User.objects.create_user(
+        username='superadmin',
+        email='superadmin@example.com',
+        password='superpass123',
+        role='superadmin',
+    )
+
+
+@pytest.fixture
+def other_user(db, other_company):
     return User.objects.create_user(
         username='other',
         email='other@example.com',
         password='otherpass123',
-        role='member',
+        role='user',
+        company=other_company,
     )
 
 
 @pytest.fixture
-def project(db, user):
+def project(db, user, company, company_group):
     return Project.objects.create(
         name='Test Project',
         description='A test project',
         status='in_progress',
         owner=user,
+        company=company,
+        group=company_group,
         start_date=date.today(),
         deadline=date.today() + timedelta(days=30),
     )

@@ -26,12 +26,16 @@ import {
   FiClock,
   FiFlag,
   FiMic,
+  FiUsers,
+  FiBriefcase,
+  FiGrid,
+  FiShield,
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isAdmin, isSuperAdmin, company } = useAuth();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.700');
 
@@ -43,6 +47,13 @@ const Sidebar = () => {
     { path: '/milestones', name: 'Jalons', icon: FiCalendar },
     { path: '/meetings', name: 'Meetings', icon: FiMic },
     { path: '/analytics', name: 'Analytics', icon: FiBarChart2 },
+    ...(isAdmin ? [
+      { path: '/admin/users', name: 'Utilisateurs', icon: FiUsers },
+      { path: '/admin/groups', name: 'Groupes', icon: FiGrid },
+    ] : []),
+    ...(isSuperAdmin ? [
+      { path: '/admin/companies', name: 'Entreprises', icon: FiBriefcase },
+    ] : []),
     { path: '/profile', name: 'Profil', icon: FiUser },
     { path: '/settings', name: 'Paramètres', icon: FiSettings },
   ];
@@ -129,8 +140,11 @@ const Sidebar = () => {
               <Text fontWeight="600" fontSize="sm">{user.username}</Text>
               <Text fontSize="xs" color="gray.500">{user.email}</Text>
             </Box>
-            <Badge colorScheme="green" variant="subtle">
-              {user.role || 'Membre'}
+            <Badge
+              colorScheme={isSuperAdmin ? 'purple' : isAdmin ? 'orange' : 'green'}
+              variant="subtle"
+            >
+              {user.role === 'superadmin' ? 'SuperAdmin' : user.role === 'admin' ? 'Admin' : 'User'}
             </Badge>
           </HStack>
         )}

@@ -12,19 +12,21 @@ import logging
 import requests
 from django.conf import settings
 
-logger = logging.getLogger(__name__)
-
-from .models import User, Project, Milestone, Task, ActivityLog, Comment
+from .models import User, Project, Milestone, Task, ActivityLog, Comment, Company, CompanyGroup
 from .serializers import (
     UserSerializer, UserRegisterSerializer, UserLoginSerializer,
     ProjectSerializer, MilestoneSerializer, TaskSerializer, 
     TaskDetailSerializer, ActivityLogSerializer, CommentSerializer,
-    DashboardStatsSerializer, UserSimpleSerializer
+    DashboardStatsSerializer, UserSimpleSerializer,
+    CompanySerializer, CompanyGroupSerializer,
 )
+from .permissions import (
+    IsAdminOrReadOnly, IsOwnerOrReadOnly, IsSuperAdmin,
+    IsCompanyAdmin, HasGroupAccess,
+)
+from .mixins import ActivityLogMixin
 
 logger = logging.getLogger(__name__)
-from .permissions import IsAdminOrReadOnly, IsOwnerOrReadOnly
-from .mixins import ActivityLogMixin
 
 
 class AuthViewSet(viewsets.GenericViewSet):
@@ -40,6 +42,21 @@ class AuthViewSet(viewsets.GenericViewSet):
                 'message': 'Inscription réussie'
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'])
+    def users(self, request):
+        """List users, scoped by company for admins"""
+        if not request.user.is_authenticated:
+            return Response({'error': 'Non authentifié'}, status=status.HTTP_401_UNAUTHORIZED)
+        user = request.user
+        if user.role == 'superadmin':
+            qs = User.objects.all()
+        elif user.role == 'admin' and user.company:
+            qs = User.objects.filter(company=user.company)
+        else:
+            return Response({'error': 'Accès refusé'}, status=status.HTTP_403_FORBIDDEN)
+        serializer = UserSerializer(qs, many=True)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['post'])
     def login(self, request):
@@ -67,13 +84,18 @@ class ProjectViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'admin':
+        if user.role == 'superadmin':
             return Project.objects.all()
-        return Project.objects.filter(Q(owner=user) | Q(members=user)).distinct()
-    
+        if user.role == 'admin' and user.company:
+            return Project.objects.filter(company=user.company)
+        # Regular user: only projects whose group they belong to
+        user_groups = user.company_groups.all()
+        return Project.objects.filter(
+            Q(group__in=user_groups) | Q(owner=user) | Q(members=user)
+        ).filter(company=user.company).distinct() if user.company else Project.objects.none()
+
     def perform_create(self, serializer):
-        # Ici on assigne l'utilisateur connecté comme owner
-        serializer.save(owner=self.request.user)
+        serializer.save(owner=self.request.user, company=self.request.user.company)
         self.log_activity('create', 'project', serializer.instance)
     
     @action(detail=True, methods=['get'])
@@ -200,15 +222,20 @@ class ProjectViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         
         # Recherche optionnelle
         search = request.query_params.get('search', '')
+        # Scope to same company
+        base_qs = User.objects.exclude(id__in=excluded_users)
+        if request.user.company:
+            base_qs = base_qs.filter(company=request.user.company)
+
         if search:
-            users = User.objects.filter(
+            users = base_qs.filter(
                 Q(username__icontains=search) | 
                 Q(email__icontains=search) |
                 Q(first_name__icontains=search) |
                 Q(last_name__icontains=search)
-            ).exclude(id__in=excluded_users)[:10]
+            )[:10]
         else:
-            users = User.objects.exclude(id__in=excluded_users)[:20]
+            users = base_qs[:20]
         
         serializer = UserSimpleSerializer(users, many=True)
         return Response(serializer.data)
@@ -227,12 +254,16 @@ class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        
-        if user.role == 'admin':
+        if user.role == 'superadmin':
             return Milestone.objects.all()
+        if user.role == 'admin' and user.company:
+            return Milestone.objects.filter(project__company=user.company)
+        user_groups = user.company_groups.all()
         return Milestone.objects.filter(
-            project__in=Project.objects.filter(Q(owner=user) | Q(members=user))
-        )
+            Q(project__group__in=user_groups) |
+            Q(project__owner=user) |
+            Q(project__members=user)
+        ).filter(project__company=user.company).distinct() if user.company else Milestone.objects.none()
     
     def perform_create(self, serializer):
         milestone = serializer.save()
@@ -321,13 +352,19 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'admin':
+        if user.role == 'superadmin':
             return Task.objects.all()
-        return Task.objects.filter(
-            Q(project__owner=user) | 
-            Q(project__members=user) | 
-            Q(assigned_to=user)
-        ).distinct()
+        if user.role == 'admin' and user.company:
+            return Task.objects.filter(project__company=user.company)
+        user_groups = user.company_groups.all()
+        if user.company:
+            return Task.objects.filter(
+                Q(project__group__in=user_groups) |
+                Q(project__owner=user) |
+                Q(project__members=user) |
+                Q(assigned_to=user)
+            ).filter(project__company=user.company).distinct()
+        return Task.objects.none()
     
     def perform_create(self, serializer):
         task = serializer.save(created_by=self.request.user)
@@ -355,7 +392,17 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         week_start = today - timedelta(days=today.weekday())
 
         tasks = self.get_queryset()
-        projects = Project.objects.filter(Q(owner=user) | Q(members=user)).distinct()
+        if user.role == 'superadmin':
+            projects = Project.objects.all()
+        elif user.role == 'admin' and user.company:
+            projects = Project.objects.filter(company=user.company)
+        elif user.company:
+            user_groups = user.company_groups.all()
+            projects = Project.objects.filter(
+                Q(group__in=user_groups) | Q(owner=user) | Q(members=user)
+            ).filter(company=user.company).distinct()
+        else:
+            projects = Project.objects.none()
 
         total_tasks = tasks.count()
         completed_tasks = tasks.filter(status='completed').count()
@@ -454,7 +501,17 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
 
         tasks = self.get_queryset()
         period_tasks = tasks.filter(created_at__date__gte=start_date)
-        projects = Project.objects.filter(Q(owner=user) | Q(members=user)).distinct()
+        if user.role == 'superadmin':
+            projects = Project.objects.all()
+        elif user.role == 'admin' and user.company:
+            projects = Project.objects.filter(company=user.company)
+        elif user.company:
+            user_groups = user.company_groups.all()
+            projects = Project.objects.filter(
+                Q(group__in=user_groups) | Q(owner=user) | Q(members=user)
+            ).filter(company=user.company).distinct()
+        else:
+            projects = Project.objects.none()
 
         total = period_tasks.count()
         completed = period_tasks.filter(status='completed').count()
@@ -579,5 +636,112 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
                 
         except requests.RequestException as e:
             logger.warning("ML Service error: %s", e)
-    
+
+
+class CompanyViewSet(viewsets.ModelViewSet):
+    """Only SuperAdmin can create/manage companies."""
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name', 'slug']
+    ordering_fields = ['name', 'created_at']
+
+
+class CompanyGroupViewSet(viewsets.ModelViewSet):
+    """Company groups — admin manages groups within their company."""
+    queryset = CompanyGroup.objects.all()
+    serializer_class = CompanyGroupSerializer
+    permission_classes = [IsAuthenticated, IsCompanyAdmin]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['company']
+    search_fields = ['name']
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'superadmin':
+            return CompanyGroup.objects.all()
+        if user.company:
+            return CompanyGroup.objects.filter(company=user.company)
+        return CompanyGroup.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.role != 'superadmin':
+            serializer.save(company=user.company)
+        else:
+            serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def add_member(self, request, pk=None):
+        group = self.get_object()
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            target_user = User.objects.get(id=user_id, company=group.company)
+        except User.DoesNotExist:
+            return Response({'error': 'Utilisateur non trouvé dans cette entreprise'}, status=status.HTTP_404_NOT_FOUND)
+        group.members.add(target_user)
+        return Response({'status': 'Membre ajouté au groupe'})
+
+    @action(detail=True, methods=['post'])
+    def remove_member(self, request, pk=None):
+        group = self.get_object()
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Utilisateur non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        group.members.remove(target_user)
+        return Response({'status': 'Membre retiré du groupe'})
+
+    @action(detail=True, methods=['get'])
+    def members(self, request, pk=None):
+        group = self.get_object()
+        serializer = UserSimpleSerializer(group.members.all(), many=True)
+        return Response(serializer.data)
+
+
+class UserManagementViewSet(viewsets.ModelViewSet):
+    """Admin manages users within their company; SuperAdmin manages all."""
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated, IsCompanyAdmin]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['role', 'company']
+    search_fields = ['username', 'email', 'first_name', 'last_name']
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.role == 'superadmin':
+            return User.objects.all()
+        if user.company:
+            return User.objects.filter(company=user.company)
+        return User.objects.none()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        password = self.request.data.get('password', 'changeme123')
+        if user.role != 'superadmin':
+            instance = serializer.save(company=user.company)
+        else:
+            instance = serializer.save()
+        instance.set_password(password)
+        instance.save()
+
+    @action(detail=True, methods=['post'])
+    def change_role(self, request, pk=None):
+        target_user = self.get_object()
+        new_role = request.data.get('role')
+        if new_role not in ('admin', 'user'):
+            return Response({'error': 'Role invalide. Choix: admin, user'}, status=status.HTTP_400_BAD_REQUEST)
+        if request.user.role == 'admin' and new_role == 'superadmin':
+            return Response({'error': 'Seul un SuperAdmin peut promouvoir en SuperAdmin'}, status=status.HTTP_403_FORBIDDEN)
+        target_user.role = new_role
+        target_user.save(update_fields=['role'])
+        return Response(UserSerializer(target_user).data)
+
 

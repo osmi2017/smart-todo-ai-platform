@@ -68,3 +68,4 @@ Thumbs.db
 
 # Build artifacts
 *.jar
+backend/db_test.sqlite3

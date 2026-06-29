@@ -5,14 +5,55 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 import json
 
 
+class Company(models.Model):
+    """Modèle Entreprise pour le multi-tenant"""
+    name = models.CharField(max_length=200, unique=True)
+    slug = models.SlugField(max_length=200, unique=True)
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'companies'
+        verbose_name = 'Entreprise'
+        verbose_name_plural = 'Entreprises'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class CompanyGroup(models.Model):
+    """Groupe au sein d'une entreprise pour organiser les utilisateurs et contrôler l'accès aux projets"""
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='groups')
+    members = models.ManyToManyField('User', related_name='company_groups', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'company_groups'
+        verbose_name = 'Groupe'
+        verbose_name_plural = 'Groupes'
+        unique_together = ['name', 'company']
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.company.name})"
+
+
 class User(AbstractUser):
     """Modèle utilisateur étendu"""
     ROLE_CHOICES = (
+        ('superadmin', 'SuperAdmin'),
         ('admin', 'Admin'),
-        ('member', 'Member'),
+        ('user', 'User'),
     )
     
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='member')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='user')
+    company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     bio = models.TextField(max_length=500, blank=True)
     
@@ -32,6 +73,7 @@ class User(AbstractUser):
         indexes = [
             models.Index(fields=['email']),
             models.Index(fields=['role']),
+            models.Index(fields=['company']),
         ]
     
     def __str__(self):
@@ -61,6 +103,8 @@ class Project(models.Model):
     risk_score = models.FloatField(default=0, validators=[MinValueValidator(0), MaxValueValidator(100)])
     
     # Relations
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='projects', null=True, blank=True)
+    group = models.ForeignKey(CompanyGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='projects')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_projects')
     members = models.ManyToManyField(User, related_name='projects', blank=True)
     
@@ -78,6 +122,8 @@ class Project(models.Model):
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['owner', '-created_at']),
+            models.Index(fields=['company']),
+            models.Index(fields=['group']),
         ]
     
     def __str__(self):

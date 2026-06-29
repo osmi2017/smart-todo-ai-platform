@@ -14,6 +14,7 @@ export const useAuth = () => {
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [company, setCompany] = useState(JSON.parse(localStorage.getItem('company') || 'null'));
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const toast = useToast();
@@ -92,6 +93,10 @@ export const AuthProvider = ({ children }) => {
     }
     
     localStorage.setItem('token', token);
+    if (response.data.company) {
+      localStorage.setItem('company', JSON.stringify(response.data.company));
+      setCompany(response.data.company);
+    }
     setToken(token);
     setUser(user);
     
@@ -149,8 +154,10 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('company');
     setToken(null);
     setUser(null);
+    setCompany(null);
     toast({
       title: 'Déconnexion',
       description: 'À bientôt !',
@@ -159,14 +166,20 @@ export const AuthProvider = ({ children }) => {
     });
   };
 
+  const isSuperAdmin = user?.role === 'superadmin';
+  const isAdmin = user?.role === 'admin' || isSuperAdmin;
+
   const value = {
     user,
+    company,
     loading,
     login,
     register,
     logout,
     axiosInstance,
     isAuthenticated: !!user,
+    isSuperAdmin,
+    isAdmin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
