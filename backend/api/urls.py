@@ -6,6 +6,9 @@ from .views_meeting import MeetingViewSet, MeetingActionItemViewSet
 
 router = DefaultRouter()
 router.register(r'auth', views.AuthViewSet, basename='auth')
+router.register(r'companies', views.CompanyViewSet)
+router.register(r'groups', views.CompanyGroupViewSet)
+router.register(r'users', views.UserManagementViewSet, basename='user-management')
 router.register(r'projects', views.ProjectViewSet)
 router.register(r'milestones', views.MilestoneViewSet)
 router.register(r'tasks', views.TaskViewSet)

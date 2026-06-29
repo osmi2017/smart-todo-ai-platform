@@ -18,7 +18,7 @@ class TestUserModel:
 
     def test_default_role(self, db):
         u = User.objects.create_user(username='def', password='pass')
-        assert u.role == 'member'
+        assert u.role == 'user'
 
     def test_default_metrics(self, user):
         assert user.avg_completion_time == 0

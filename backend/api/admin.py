@@ -5,15 +5,40 @@ from .models import (
     User, Project, Milestone, Task, 
     ActivityLog, Comment, Notification,
     Meeting, MeetingParticipant, MeetingSummary, MeetingActionItem,
+    Company, CompanyGroup,
 )
+
+# ----------------------------------------------------------------------
+# Company Admin
+# ----------------------------------------------------------------------
+@admin.register(Company)
+class CompanyAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'is_active', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'slug')
+    prepopulated_fields = {'slug': ('name',)}
+    readonly_fields = ('created_at', 'updated_at')
+
+
+# ----------------------------------------------------------------------
+# CompanyGroup Admin
+# ----------------------------------------------------------------------
+@admin.register(CompanyGroup)
+class CompanyGroupAdmin(admin.ModelAdmin):
+    list_display = ('name', 'company', 'created_at')
+    list_filter = ('company',)
+    search_fields = ('name', 'company__name')
+    filter_horizontal = ('members',)
+    readonly_fields = ('created_at', 'updated_at')
+
 
 # ----------------------------------------------------------------------
 # User Admin
 # ----------------------------------------------------------------------
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ('username', 'email', 'first_name', 'last_name', 'role', 'is_active', 'date_joined')
-    list_filter = ('role', 'is_active', 'is_staff', 'date_joined')
+    list_display = ('username', 'email', 'first_name', 'last_name', 'role', 'company', 'is_active', 'date_joined')
+    list_filter = ('role', 'company', 'is_active', 'is_staff', 'date_joined')
     search_fields = ('username', 'email', 'first_name', 'last_name')
     ordering = ('-date_joined',)
     readonly_fields = ('last_login', 'date_joined')
@@ -21,8 +46,8 @@ class UserAdmin(admin.ModelAdmin):
         ('Informations personnelles', {
             'fields': ('username', 'email', 'first_name', 'last_name', 'avatar', 'bio')
         }),
-        ('Rôle & Permissions', {
-            'fields': ('role', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')
+        ('Entreprise & Rôle', {
+            'fields': ('company', 'role', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')
         }),
         ('Métriques ML', {
             'fields': ('avg_completion_time', 'delay_rate', 'productivity_pattern'),

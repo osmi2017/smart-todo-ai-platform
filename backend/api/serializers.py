@@ -1,17 +1,61 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User, Project, Milestone, Task, ActivityLog, Comment
+from .models import User, Project, Milestone, Task, ActivityLog, Comment, Company, CompanyGroup
 import jwt
 from django.conf import settings
 from datetime import datetime, timedelta
 
 
+class CompanySerializer(serializers.ModelSerializer):
+    users_count = serializers.SerializerMethodField()
+    groups_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Company
+        fields = ('id', 'name', 'slug', 'description', 'is_active',
+                  'users_count', 'groups_count', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_users_count(self, obj):
+        return obj.users.count()
+
+    def get_groups_count(self, obj):
+        return obj.groups.count()
+
+
+class CompanyGroupSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    members_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CompanyGroup
+        fields = ('id', 'name', 'description', 'company', 'company_name',
+                  'members_count', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_members_count(self, obj):
+        return obj.members.count()
+
+
+class CompanyMinimalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = ('id', 'name', 'slug')
+
+
 class UserSerializer(serializers.ModelSerializer):
+    company_detail = CompanyMinimalSerializer(source='company', read_only=True)
+    groups = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role', 
-                 'avatar', 'bio', 'avg_completion_time', 'delay_rate', 'date_joined')
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role',
+                  'company', 'company_detail', 'groups',
+                  'avatar', 'bio', 'avg_completion_time', 'delay_rate', 'date_joined')
         read_only_fields = ('id', 'avg_completion_time', 'delay_rate', 'date_joined')
+
+    def get_groups(self, obj):
+        return list(obj.company_groups.values_list('id', flat=True))
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
@@ -62,7 +106,8 @@ class UserLoginSerializer(serializers.Serializer):
                 return {
                     'user': UserSerializer(user).data,
                     'token': token,
-                    'message': 'Connexion réussie'
+                    'message': 'Connexion réussie',
+                    'company': CompanyMinimalSerializer(user.company).data if user.company else None,
                 }
             raise serializers.ValidationError("Identifiants incorrects")
         raise serializers.ValidationError("Username et password requis")

@@ -32,8 +32,12 @@ class MeetingViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == 'admin':
+        if user.role == 'superadmin':
             return Meeting.objects.all()
+        if user.role == 'admin' and user.company:
+            return Meeting.objects.filter(
+                Q(organizer__company=user.company) | Q(project__company=user.company)
+            ).distinct()
         return Meeting.objects.filter(
             Q(organizer=user) | Q(participants__user=user)
         ).distinct()

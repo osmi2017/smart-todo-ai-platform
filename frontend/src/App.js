@@ -21,6 +21,9 @@ import Analytics from './pages/Analytics';
 import Meetings from './pages/Meetings';
 import MeetingDetail from './pages/MeetingDetail';
 import MeetingForm from './pages/MeetingForm';
+import CompanyManagement from './pages/admin/CompanyManagement';
+import GroupManagement from './pages/admin/GroupManagement';
+import UserManagement from './pages/admin/UserManagement';
 
 // Components
 import Layout from './components/Layout';
@@ -93,6 +96,9 @@ function App() {
                   <Route path="meetings/:id" element={<MeetingDetail />} />
                   <Route path="meetings/:id/edit" element={<MeetingForm />} />
                   <Route path="analytics" element={<Analytics />} />
+                  <Route path="admin/companies" element={<CompanyManagement />} />
+                  <Route path="admin/groups" element={<GroupManagement />} />
+                  <Route path="admin/users" element={<UserManagement />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>
               </Routes>
