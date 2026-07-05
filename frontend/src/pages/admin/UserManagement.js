@@ -14,7 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 const UserManagement = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { user: currentUser, isSuperAdmin } = useAuth();
+  const { user: currentUser, isSuperAdmin, axiosInstance } = useAuth();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({
@@ -127,23 +127,14 @@ const UserManagement = () => {
     const onDone = async (userData) => {
       const userId = editingUser ? editingUser.id : userData?.id;
       if (userId && groupIds.length > 0) {
-        const token = localStorage.getItem('token');
         const currentGroups = editingUser?.groups || [];
         const toAdd = groupIds.filter((id) => !currentGroups.includes(id));
         const toRemove = currentGroups.filter((id) => !groupIds.includes(id));
         for (const gid of toAdd) {
-          await fetch(`/api/groups/${gid}/add_member/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ user_id: userId }),
-          });
+          await axiosInstance.post(`/groups/${gid}/add_member/`, { user_id: userId });
         }
         for (const gid of toRemove) {
-          await fetch(`/api/groups/${gid}/remove_member/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({ user_id: userId }),
-          });
+          await axiosInstance.post(`/groups/${gid}/remove_member/`, { user_id: userId });
         }
       }
     };

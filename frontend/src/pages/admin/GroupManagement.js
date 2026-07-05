@@ -14,7 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 const GroupManagement = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { user: currentUser, isSuperAdmin } = useAuth();
+  const { user: currentUser, isSuperAdmin, axiosInstance } = useAuth();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isMembersOpen, onOpen: onMembersOpen, onClose: onMembersClose } = useDisclosure();
   const [editingGroup, setEditingGroup] = useState(null);
@@ -131,15 +131,7 @@ const GroupManagement = () => {
   const handleAddMember = async () => {
     if (!selectedUserId || !selectedGroup) return;
     try {
-      const { axiosInstance } = require('../../context/AuthContext');
-      await fetch(`/api/groups/${selectedGroup.id}/add_member/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ user_id: parseInt(selectedUserId) }),
-      });
+      await axiosInstance.post(`/groups/${selectedGroup.id}/add_member/`, { user_id: parseInt(selectedUserId) });
       queryClient.invalidateQueries(['group-detail', selectedGroup.id]);
       queryClient.invalidateQueries('groups');
       setSelectedUserId('');
@@ -152,14 +144,7 @@ const GroupManagement = () => {
   const handleRemoveMember = async (userId) => {
     if (!selectedGroup) return;
     try {
-      await fetch(`/api/groups/${selectedGroup.id}/remove_member/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({ user_id: userId }),
-      });
+      await axiosInstance.post(`/groups/${selectedGroup.id}/remove_member/`, { user_id: userId });
       queryClient.invalidateQueries(['group-detail', selectedGroup.id]);
       queryClient.invalidateQueries('groups');
       toast({ title: 'Membre retiré', status: 'info', duration: 2000 });
