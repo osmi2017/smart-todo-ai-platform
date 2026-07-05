@@ -31,13 +31,19 @@ const getMockProjects = () => [
   },
 ];
 
-const formatProjectData = (data) => ({
-  name: data.name,
-  description: data.description || '',
-  status: data.status || 'not_started',
-  start_date: data.start_date || null,
-  deadline: data.deadline || null,
-});
+const formatProjectData = (data) => {
+  const formatted = {
+    name: data.name,
+    description: data.description || '',
+    status: data.status || 'not_started',
+    start_date: data.start_date || null,
+    deadline: data.deadline || null,
+  };
+  if (data.groups !== undefined) formatted.groups = data.groups;
+  if (data.managers !== undefined) formatted.managers = data.managers;
+  if (data.members !== undefined) formatted.members = data.members;
+  return formatted;
+};
 
 export const useProjectService = () => {
   const service = useCrudService('/projects', {

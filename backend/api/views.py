@@ -19,6 +19,7 @@ from .serializers import (
     TaskDetailSerializer, ActivityLogSerializer, CommentSerializer,
     DashboardStatsSerializer, UserSimpleSerializer,
     CompanySerializer, CompanyGroupSerializer, CompanyGroupDetailSerializer,
+    CompanyGroupMinimalSerializer,
 )
 from .permissions import (
     IsAdminOrReadOnly, IsOwnerOrReadOnly, IsSuperAdmin,
@@ -88,10 +89,10 @@ class ProjectViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             return Project.objects.all()
         if user.role == 'admin' and user.company:
             return Project.objects.filter(company=user.company)
-        # Regular user: only projects whose group they belong to
+        # Regular user: only projects whose groups they belong to
         user_groups = user.company_groups.all()
         return Project.objects.filter(
-            Q(group__in=user_groups) | Q(owner=user) | Q(members=user)
+            Q(groups__in=user_groups) | Q(owner=user) | Q(members=user) | Q(managers=user)
         ).filter(company=user.company).distinct() if user.company else Project.objects.none()
 
     def perform_create(self, serializer):
@@ -240,6 +241,72 @@ class ProjectViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         serializer = UserSimpleSerializer(users, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'])
+    def add_group(self, request, pk=None):
+        """Add a group to the project."""
+        project = self.get_object()
+        group_id = request.data.get('group_id')
+        if not group_id:
+            return Response({'error': 'group_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            group = CompanyGroup.objects.get(id=group_id)
+            if project.company and group.company != project.company:
+                return Response({'error': 'Le groupe doit appartenir à la même entreprise'}, status=status.HTTP_400_BAD_REQUEST)
+        except CompanyGroup.DoesNotExist:
+            return Response({'error': 'Groupe non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        project.groups.add(group)
+        return Response({'status': 'Groupe ajouté au projet'})
+
+    @action(detail=True, methods=['post'])
+    def remove_group(self, request, pk=None):
+        """Remove a group from the project."""
+        project = self.get_object()
+        group_id = request.data.get('group_id')
+        if not group_id:
+            return Response({'error': 'group_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        project.groups.remove(group_id)
+        return Response({'status': 'Groupe retiré du projet'})
+
+    @action(detail=True, methods=['get'])
+    def project_groups(self, request, pk=None):
+        """List groups linked to the project."""
+        project = self.get_object()
+        serializer = CompanyGroupMinimalSerializer(project.groups.all(), many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def add_manager(self, request, pk=None):
+        """Add a project manager."""
+        project = self.get_object()
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            target_user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Utilisateur non trouvé'}, status=status.HTTP_404_NOT_FOUND)
+        project.managers.add(target_user)
+        if not project.members.filter(id=target_user.id).exists():
+            project.members.add(target_user)
+        return Response(UserSimpleSerializer(target_user).data)
+
+    @action(detail=True, methods=['post'])
+    def remove_manager(self, request, pk=None):
+        """Remove a project manager."""
+        project = self.get_object()
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response({'error': 'user_id requis'}, status=status.HTTP_400_BAD_REQUEST)
+        project.managers.remove(user_id)
+        return Response({'status': 'Chef de projet retiré'})
+
+    @action(detail=True, methods=['get'])
+    def project_managers(self, request, pk=None):
+        """List project managers."""
+        project = self.get_object()
+        serializer = UserSimpleSerializer(project.managers.all(), many=True)
+        return Response(serializer.data)
+
 
 class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     
@@ -260,7 +327,7 @@ class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             return Milestone.objects.filter(project__company=user.company)
         user_groups = user.company_groups.all()
         return Milestone.objects.filter(
-            Q(project__group__in=user_groups) |
+            Q(project__groups__in=user_groups) |
             Q(project__owner=user) |
             Q(project__members=user)
         ).filter(project__company=user.company).distinct() if user.company else Milestone.objects.none()
@@ -359,7 +426,7 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         user_groups = user.company_groups.all()
         if user.company:
             return Task.objects.filter(
-                Q(project__group__in=user_groups) |
+                Q(project__groups__in=user_groups) |
                 Q(project__owner=user) |
                 Q(project__members=user) |
                 Q(assigned_to=user)
@@ -399,7 +466,7 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         elif user.company:
             user_groups = user.company_groups.all()
             projects = Project.objects.filter(
-                Q(group__in=user_groups) | Q(owner=user) | Q(members=user)
+                Q(groups__in=user_groups) | Q(owner=user) | Q(members=user)
             ).filter(company=user.company).distinct()
         else:
             projects = Project.objects.none()
@@ -508,7 +575,7 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         elif user.company:
             user_groups = user.company_groups.all()
             projects = Project.objects.filter(
-                Q(group__in=user_groups) | Q(owner=user) | Q(members=user)
+                Q(groups__in=user_groups) | Q(owner=user) | Q(members=user)
             ).filter(company=user.company).distinct()
         else:
             projects = Project.objects.none()
@@ -649,18 +716,27 @@ class CompanyViewSet(viewsets.ModelViewSet):
 
 
 class CompanyGroupViewSet(viewsets.ModelViewSet):
-    """Company groups — admin manages groups within their company."""
+    """Company groups — admin/project manager manages groups within their company."""
     queryset = CompanyGroup.objects.all()
     serializer_class = CompanyGroupSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['company']
+    search_fields = ['name']
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return CompanyGroupDetailSerializer
         return CompanyGroupSerializer
-    permission_classes = [IsAuthenticated, IsCompanyAdmin]
-    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['company']
-    search_fields = ['name']
+
+    def check_group_write_permission(self, group):
+        """Project managers can only modify/delete groups they created."""
+        user = self.request.user
+        if user.role in ('superadmin', 'admin'):
+            return True
+        if group.created_by == user:
+            return True
+        return False
 
     def get_queryset(self):
         user = self.request.user
@@ -672,10 +748,27 @@ class CompanyGroupViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
+        if user.role == 'superadmin':
+            serializer.save(created_by=user)
+        else:
+            serializer.save(company=user.company, created_by=user)
+
+    def perform_update(self, serializer):
+        group = self.get_object()
+        user = self.request.user
+        if not self.check_group_write_permission(group):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Vous ne pouvez modifier que les groupes que vous avez créés.')
         if user.role != 'superadmin':
             serializer.save(company=user.company)
         else:
             serializer.save()
+
+    def perform_destroy(self, instance):
+        if not self.check_group_write_permission(instance):
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied('Vous ne pouvez supprimer que les groupes que vous avez créés.')
+        instance.delete()
 
     @action(detail=True, methods=['post'])
     def add_member(self, request, pk=None):

@@ -30,6 +30,7 @@ class CompanyGroup(models.Model):
     description = models.TextField(blank=True)
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='groups')
     members = models.ManyToManyField('User', related_name='company_groups', blank=True)
+    created_by = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, blank=True, related_name='created_groups')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -104,8 +105,9 @@ class Project(models.Model):
     
     # Relations
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='projects', null=True, blank=True)
-    group = models.ForeignKey(CompanyGroup, on_delete=models.SET_NULL, null=True, blank=True, related_name='projects')
+    groups = models.ManyToManyField(CompanyGroup, related_name='projects', blank=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_projects')
+    managers = models.ManyToManyField(User, related_name='managed_projects', blank=True)
     members = models.ManyToManyField(User, related_name='projects', blank=True)
     
     # Métadonnées
@@ -123,7 +125,6 @@ class Project(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['owner', '-created_at']),
             models.Index(fields=['company']),
-            models.Index(fields=['group']),
         ]
     
     def __str__(self):

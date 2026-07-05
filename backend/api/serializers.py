@@ -26,12 +26,17 @@ class CompanySerializer(serializers.ModelSerializer):
 class CompanyGroupSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
     members_count = serializers.SerializerMethodField()
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
+    member_ids = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=User.objects.all(), source='members', required=False, write_only=True
+    )
 
     class Meta:
         model = CompanyGroup
         fields = ('id', 'name', 'description', 'company', 'company_name',
-                  'members_count', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+                  'members_count', 'created_by', 'created_by_name',
+                  'member_ids', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_by', 'created_at', 'updated_at')
 
     def get_members_count(self, obj):
         return obj.members.count()
@@ -48,12 +53,14 @@ class CompanyGroupDetailSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source='company.name', read_only=True)
     members_count = serializers.SerializerMethodField()
     members = MemberMinimalSerializer(many=True, read_only=True)
+    created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
 
     class Meta:
         model = CompanyGroup
         fields = ('id', 'name', 'description', 'company', 'company_name',
-                  'members', 'members_count', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+                  'members', 'members_count', 'created_by', 'created_by_name',
+                  'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_by', 'created_at', 'updated_at')
 
     def get_members_count(self, obj):
         return obj.members.count()
@@ -135,6 +142,12 @@ class UserLoginSerializer(serializers.Serializer):
         raise serializers.ValidationError("Username et password requis")
 
 
+class CompanyGroupMinimalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompanyGroup
+        fields = ('id', 'name')
+
+
 class ProjectSerializer(serializers.ModelSerializer):
     owner_name = serializers.CharField(source='owner.username', read_only=True)
     owner_id = serializers.IntegerField(source='owner.id', read_only=True)
@@ -142,11 +155,13 @@ class ProjectSerializer(serializers.ModelSerializer):
     task_count = serializers.SerializerMethodField()
     completed_task_count = serializers.SerializerMethodField()
     milestones_count = serializers.SerializerMethodField()
+    groups_detail = CompanyGroupMinimalSerializer(source='groups', many=True, read_only=True)
+    managers_detail = MemberMinimalSerializer(source='managers', many=True, read_only=True)
     
     class Meta:
         model = Project
         fields = '__all__'
-        read_only_fields = ('id', 'created_at', 'updated_at', 'progress', 'risk_score', 'owner')  # ← Ajoute 'owner' ici
+        read_only_fields = ('id', 'created_at', 'updated_at', 'progress', 'risk_score', 'owner')
     
     def get_members_count(self, obj):
         return obj.members.count()
