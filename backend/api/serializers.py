@@ -37,6 +37,28 @@ class CompanyGroupSerializer(serializers.ModelSerializer):
         return obj.members.count()
 
 
+class MemberMinimalSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role')
+        read_only_fields = fields
+
+
+class CompanyGroupDetailSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    members_count = serializers.SerializerMethodField()
+    members = MemberMinimalSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = CompanyGroup
+        fields = ('id', 'name', 'description', 'company', 'company_name',
+                  'members', 'members_count', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at')
+
+    def get_members_count(self, obj):
+        return obj.members.count()
+
+
 class CompanyMinimalSerializer(serializers.ModelSerializer):
     class Meta:
         model = Company
