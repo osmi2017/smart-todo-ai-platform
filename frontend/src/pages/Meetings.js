@@ -14,7 +14,7 @@ import {
 import {
   FiPlus, FiSearch, FiMoreVertical, FiCalendar, FiMic,
   FiFileText, FiTrash2, FiEye, FiCpu, FiEdit2, FiUsers,
-  FiPlay, FiCheck, FiXCircle, FiClock,
+  FiPlay, FiCheck, FiXCircle, FiClock, FiVideo,
 } from 'react-icons/fi';
 import { useMeetingService } from '../services/meetingService';
 
@@ -243,19 +243,34 @@ const Meetings = () => {
                     >
                       View Details
                     </Button>
-                    {!meeting.ai_processed && (
-                      <Tooltip label="Process with AI">
-                        <IconButton
-                          as={RouterLink}
-                          to={`/meetings/${meeting.id}`}
-                          icon={<FiCpu />}
-                          size="sm"
-                          variant="ghost"
-                          colorScheme="purple"
-                          aria-label="Process with AI"
-                        />
-                      </Tooltip>
-                    )}
+                    <HStack spacing={1}>
+                      {(meeting.status === 'scheduled' || meeting.status === 'in_progress') && (
+                        <Tooltip label="Join Video Call">
+                          <IconButton
+                            as={RouterLink}
+                            to={`/meetings/${meeting.id}/video`}
+                            icon={<FiVideo />}
+                            size="sm"
+                            variant="ghost"
+                            colorScheme="green"
+                            aria-label="Join Video Call"
+                          />
+                        </Tooltip>
+                      )}
+                      {!meeting.ai_processed && (
+                        <Tooltip label="Process with AI">
+                          <IconButton
+                            as={RouterLink}
+                            to={`/meetings/${meeting.id}`}
+                            icon={<FiCpu />}
+                            size="sm"
+                            variant="ghost"
+                            colorScheme="purple"
+                            aria-label="Process with AI"
+                          />
+                        </Tooltip>
+                      )}
+                    </HStack>
                   </Flex>
                 </Box>
               </Box>

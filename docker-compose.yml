@@ -61,6 +61,22 @@ services:
     networks:
       - todo_ai_network
 
+  meeting-service:
+    build:
+      context: ./meeting-service
+      dockerfile: Dockerfile
+    container_name: todo_ai_meeting
+    environment:
+      PORT: 4000
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./meeting-service:/app
+      - /app/node_modules
+    networks:
+      - todo_ai_network
+
   frontend:
     build:
       context: ./frontend
@@ -69,10 +85,12 @@ services:
     environment:
       REACT_APP_API_URL: http://localhost:8000/api
       REACT_APP_ML_URL: http://localhost:5001
+      REACT_APP_MEETING_SERVICE_URL: http://localhost:4000
     ports:
       - "3000:3000"
     depends_on:
       - backend
+      - meeting-service
     volumes:
       - ./frontend:/app
       - /app/node_modules

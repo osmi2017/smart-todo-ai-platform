@@ -17,7 +17,7 @@ import {
   FiMic, FiCpu, FiCheck, FiClock, FiAlertTriangle,
   FiArrowLeft, FiShare2, FiCalendar, FiUser, FiEdit2,
   FiPlay, FiXCircle, FiRefreshCw, FiFileText, FiTrash2,
-  FiExternalLink,
+  FiExternalLink, FiVideo,
 } from 'react-icons/fi';
 import { useMeetingService } from '../services/meetingService';
 import { useProjectService } from '../services/projectService';
@@ -192,6 +192,17 @@ const MeetingDetail = () => {
               {meeting.description && <Text color="gray.500" fontSize="md">{meeting.description}</Text>}
             </VStack>
             <HStack spacing={2}>
+              {(meeting.status === 'scheduled' || meeting.status === 'in_progress') && (
+                <Button
+                  as={RouterLink}
+                  to={`/meetings/${id}/video`}
+                  leftIcon={<FiVideo />}
+                  colorScheme="green"
+                  size="sm"
+                >
+                  Join Video Call
+                </Button>
+              )}
               <Tooltip label="Edit meeting">
                 <IconButton
                   as={RouterLink}
