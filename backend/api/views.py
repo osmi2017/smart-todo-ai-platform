@@ -737,6 +737,17 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         instance.set_password(password)
         instance.save()
 
+    def perform_update(self, serializer):
+        user = self.request.user
+        password = self.request.data.get('password')
+        if user.role != 'superadmin':
+            instance = serializer.save(company=user.company)
+        else:
+            instance = serializer.save()
+        if password:
+            instance.set_password(password)
+            instance.save()
+
     @action(detail=True, methods=['post'])
     def change_role(self, request, pk=None):
         target_user = self.get_object()
