@@ -66,10 +66,16 @@ g2.members.add(u2)
 g3 = CompanyGroup.objects.create(name='Engineering', company=c2)
 g3.members.add(u3)
 
-# Projects (each belongs to a group)
-Project.objects.create(name='Acme Frontend App', status='in_progress', owner=u1, company=c1, group=g1, start_date=date.today(), deadline=date.today()+timedelta(days=30))
-Project.objects.create(name='Acme Backend API', status='planning', owner=u2, company=c1, group=g2, start_date=date.today(), deadline=date.today()+timedelta(days=60))
-Project.objects.create(name='Globex Platform', status='in_progress', owner=u3, company=c2, group=g3, start_date=date.today(), deadline=date.today()+timedelta(days=45))
+# Projects (groups M2M, managers M2M)
+p1 = Project.objects.create(name='Acme Frontend App', status='in_progress', owner=u1, company=c1, start_date=date.today(), deadline=date.today()+timedelta(days=30))
+p1.groups.add(g1)
+p1.managers.add(u1)
+p2 = Project.objects.create(name='Acme Backend API', status='planning', owner=u2, company=c1, start_date=date.today(), deadline=date.today()+timedelta(days=60))
+p2.groups.add(g2)
+p2.managers.add(u2)
+p3 = Project.objects.create(name='Globex Platform', status='in_progress', owner=u3, company=c2, start_date=date.today(), deadline=date.today()+timedelta(days=45))
+p3.groups.add(g3)
+p3.managers.add(u3)
 "
 ```
 
@@ -105,6 +111,14 @@ Project.objects.create(name='Globex Platform', status='in_progress', owner=u3, c
 
 ### 5. Company CRUD (SuperAdmin only)
 - Navigate to `/admin/companies`, create a new company, verify it appears in the table.
+
+### 6. User-Company Linking (Create/Edit)
+- **Admin creating user**: Entreprise field should be a read-only `<Input>` showing their company name (gray background). User is auto-linked to admin's company on save.
+- **SuperAdmin creating user**: Entreprise field should be an editable `<Select>` dropdown listing all companies. SuperAdmin must select a company.
+- **Admin editing user**: Entreprise field remains read-only. Backend enforces `company=admin.company` regardless of what the frontend sends.
+- **SuperAdmin editing user**: Entreprise dropdown pre-selects the user's current company. SuperAdmin can change it to any company.
+- Key files: `frontend/src/pages/admin/UserManagement.js` (UI), `backend/api/views.py` `UserManagementViewSet.perform_update()` (backend enforcement).
+- The companies query (`GET /companies`) is only enabled for SuperAdmin via `useQuery`'s `enabled: isSuperAdmin` flag.
 
 ## API Verification (curl)
 You can verify backend isolation independently:
