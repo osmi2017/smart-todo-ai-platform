@@ -18,7 +18,7 @@ from .serializers import (
     ProjectSerializer, MilestoneSerializer, TaskSerializer, 
     TaskDetailSerializer, ActivityLogSerializer, CommentSerializer,
     DashboardStatsSerializer, UserSimpleSerializer,
-    CompanySerializer, CompanyGroupSerializer,
+    CompanySerializer, CompanyGroupSerializer, CompanyGroupDetailSerializer,
 )
 from .permissions import (
     IsAdminOrReadOnly, IsOwnerOrReadOnly, IsSuperAdmin,
@@ -652,6 +652,11 @@ class CompanyGroupViewSet(viewsets.ModelViewSet):
     """Company groups — admin manages groups within their company."""
     queryset = CompanyGroup.objects.all()
     serializer_class = CompanyGroupSerializer
+
+    def get_serializer_class(self):
+        if self.action == 'retrieve':
+            return CompanyGroupDetailSerializer
+        return CompanyGroupSerializer
     permission_classes = [IsAuthenticated, IsCompanyAdmin]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['company']
