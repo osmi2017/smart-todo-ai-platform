@@ -18,9 +18,17 @@ const UserManagement = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({
-    username: '', email: '', first_name: '', last_name: '', role: 'user', password: '',
+    username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: '',
   });
   const userService = useCrudService('/users', { resourceName: 'utilisateurs' });
+  const companyService = useCrudService('/companies', { resourceName: 'entreprises' });
+
+  const { data: companies = [] } = useQuery(
+    'companies',
+    () => companyService.getAll(),
+    { enabled: isSuperAdmin }
+  );
+  const companyList = Array.isArray(companies) ? companies : companies.results || [];
 
   const { data: users = [], isLoading, error } = useQuery(
     'managed-users',
@@ -75,17 +83,18 @@ const UserManagement = () => {
         last_name: user.last_name || '',
         role: user.role,
         password: '',
+        company: user.company || '',
       });
     } else {
       setEditingUser(null);
-      setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '' });
+      setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || '') });
     }
     onOpen();
   };
 
   const handleClose = () => {
     setEditingUser(null);
-    setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '' });
+    setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || '') });
     onClose();
   };
 
@@ -186,6 +195,26 @@ const UserManagement = () => {
                 <option value="admin">Admin</option>
                 {isSuperAdmin && <option value="superadmin">SuperAdmin</option>}
               </Select>
+            </FormControl>
+            <FormControl mb={4}>
+              <FormLabel>Entreprise{!isSuperAdmin ? '' : ' *'}</FormLabel>
+              {isSuperAdmin ? (
+                <Select
+                  value={form.company}
+                  onChange={(e) => setForm({ ...form, company: e.target.value })}
+                  placeholder="Sélectionner une entreprise"
+                >
+                  {companyList.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </Select>
+              ) : (
+                <Input
+                  value={currentUser?.company_detail?.name || ''}
+                  isReadOnly
+                  bg="gray.100"
+                />
+              )}
             </FormControl>
             <FormControl mb={4} isRequired={!editingUser}>
               <FormLabel>Mot de passe{editingUser ? ' (laisser vide pour ne pas changer)' : ''}</FormLabel>
