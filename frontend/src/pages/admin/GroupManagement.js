@@ -112,14 +112,13 @@ const GroupManagement = () => {
 
   const handleSubmit = () => {
     const data = { ...form };
-    if (!isSuperAdmin) {
-      delete data.company;
-    }
+    
     if (editingGroup) {
       updateMutation.mutate({ id: editingGroup.id, data });
     } else {
       createMutation.mutate(data);
     }
+    
   };
 
   const handleManageMembers = (group) => {

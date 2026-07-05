@@ -105,7 +105,10 @@ const Projects = () => {
   const userService = useCrudService('/users', { resourceName: 'utilisateurs' });
 
   const { data: allGroups = [] } = useQuery('groups', () => groupService.getAll());
-  const availableGroups = Array.isArray(allGroups) ? allGroups : allGroups.results || [];
+ const availableGroups = Array.isArray(allGroups) 
+  ? allGroups 
+  : (allGroups?.results || []);
+
   const { data: allUsers = [] } = useQuery('managed-users', () => userService.getAll());
   const availableUsers = Array.isArray(allUsers) ? allUsers : allUsers.results || [];
 
@@ -254,6 +257,8 @@ const Projects = () => {
     } else {
       createMutation.mutate(formData);
     }
+    console.log('📦 Données à envoyer:', formData);
+    alert('la')
   };
 
   const addToList = (field, selectedId, setSelectedId) => {

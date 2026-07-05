@@ -54,7 +54,7 @@ const Sidebar = () => {
     ...(isSuperAdmin ? [
       { path: '/admin/companies', name: 'Entreprises', icon: FiBriefcase },
     ] : []),
-    { path: '/profile', name: 'Profil', icon: FiUser },
+   /* { path: '/profile', name: 'Profil', icon: FiUser },*/
     { path: '/settings', name: 'Paramètres', icon: FiSettings },
   ];
 

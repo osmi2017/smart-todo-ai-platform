@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Heading,
@@ -24,12 +24,15 @@ import {
   Wrap,
   WrapItem,
   FormErrorMessage,
+  Spinner,
+  Text,
 } from '@chakra-ui/react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useTaskService } from '../services/taskService';
 import { useProjectService } from '../services/projectService';
 import { useMilestoneService } from '../services/milestoneService';
+import { useAuth } from '../context/AuthContext';
 
 const TaskForm = () => {
   const [searchParams] = useSearchParams();
@@ -39,6 +42,7 @@ const TaskForm = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const queryClient = useQueryClient();
+  const { axiosInstance } = useAuth();
   
   const [formData, setFormData] = useState({
     title: '',
@@ -56,6 +60,8 @@ const TaskForm = () => {
   
   const [tagInput, setTagInput] = useState('');
   const [errors, setErrors] = useState({});
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
   const taskService = useTaskService();
   const projectService = useProjectService();
@@ -68,6 +74,13 @@ const TaskForm = () => {
   const { data: milestones } = useQuery(
     ['milestones', formData.project],
     () => milestoneService.getMilestones({ project: formData.project }),
+    { enabled: !!formData.project }
+  );
+
+  // Charger les détails du projet pour avoir le propriétaire
+  const { data: projectDetail } = useQuery(
+    ['project', formData.project],
+    () => projectService.getProject(formData.project),
     { enabled: !!formData.project }
   );
 
@@ -96,6 +109,75 @@ const TaskForm = () => {
       }
     }
   );
+
+  // Charger les membres du projet sélectionné
+  useEffect(() => {
+    const loadProjectMembers = async () => {
+      if (!formData.project) {
+        setProjectMembers([]);
+        return;
+      }
+      
+      setIsLoadingMembers(true);
+      try {
+        const response = await axiosInstance.get(`/projects/${formData.project}/members/`);
+        // S'assurer que les données sont un tableau
+        const members = Array.isArray(response.data) ? response.data : 
+                       (response.data?.results || []);
+        setProjectMembers(members);
+        console.log('👥 Membres du projet:', members);
+      } catch (error) {
+        console.error('Erreur chargement membres:', error);
+        setProjectMembers([]);
+      } finally {
+        setIsLoadingMembers(false);
+      }
+    };
+
+    loadProjectMembers();
+  }, [formData.project, axiosInstance]);
+
+  // Combiner les utilisateurs assignables (propriétaire + membres)
+  const assignableUsers = useMemo(() => {
+    const users = [];
+    const existingIds = new Set();
+    
+    // Ajouter le propriétaire
+    if (projectDetail?.owner) {
+      const ownerId = typeof projectDetail.owner === 'object' 
+        ? projectDetail.owner.id 
+        : projectDetail.owner;
+      
+      const ownerName = projectDetail.owner_name || 
+                       (projectDetail.owner?.username) || 
+                       'Propriétaire';
+      
+      if (!existingIds.has(ownerId)) {
+        users.push({
+          id: ownerId,
+          username: ownerName
+        });
+        existingIds.add(ownerId);
+      }
+    }
+    
+    // Ajouter les membres
+    if (projectMembers.length > 0) {
+      projectMembers.forEach(member => {
+        const memberId = member.id || member.user_id;
+        if (memberId && !existingIds.has(memberId)) {
+          users.push({
+            id: memberId,
+            username: member.username || member.name || `User #${memberId}`
+          });
+          existingIds.add(memberId);
+        }
+      });
+    }
+    
+    console.log('👤 Utilisateurs assignables:', users);
+    return users;
+  }, [projectDetail, projectMembers]);
 
   // Mutation pour créer une tâche
   const createMutation = useMutation(
@@ -179,6 +261,8 @@ const TaskForm = () => {
       assigned_to: formData.assigned_to || null,
     };
     
+    console.log('📦 Données envoyées:', taskData);
+    
     if (id) {
       // Mode édition
       updateMutation.mutate({ id, data: taskData });
@@ -258,7 +342,8 @@ const TaskForm = () => {
                   onChange={(e) => setFormData({ 
                     ...formData, 
                     project: e.target.value,
-                    milestone: '' // Reset milestone when project changes
+                    milestone: '', // Reset milestone when project changes
+                    assigned_to: '', // Reset assigned_to when project changes
                   })}
                   isDisabled={!!projectIdFromUrl}
                 >
@@ -345,15 +430,27 @@ const TaskForm = () => {
                 </FormControl>
               </HStack>
 
+              {/* Champ "Assigné à" mis à jour avec les membres du projet */}
               <FormControl>
                 <FormLabel>Assigné à</FormLabel>
                 <Select
                   value={formData.assigned_to}
                   onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
+                  isLoading={isLoadingMembers}
+                  placeholder={isLoadingMembers ? "Chargement des membres..." : "Sélectionner un membre"}
                 >
                   <option value="">Non assigné</option>
-                  <option value="1">Moi</option>
+                  {assignableUsers.map(user => (
+                    <option key={user.id} value={user.id}>
+                      {user.username} {user.id === projectDetail?.owner ? '⭐' : ''}
+                    </option>
+                  ))}
                 </Select>
+                {assignableUsers.length === 0 && formData.project && !isLoadingMembers && (
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    Aucun membre disponible dans ce projet
+                  </Text>
+                )}
               </FormControl>
 
               <FormControl>

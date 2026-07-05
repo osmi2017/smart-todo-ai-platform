@@ -745,6 +745,25 @@ class CompanyGroupViewSet(viewsets.ModelViewSet):
         if user.company:
             return CompanyGroup.objects.filter(company=user.company)
         return CompanyGroup.objects.none()
+        
+    def create(self, request, *args, **kwargs):
+        """Override create to log incoming data."""
+        print("=" * 60)
+        print("📥 REQUÊTE POST REÇUE")
+        print(f"👤 Utilisateur: {request.user} (ID: {request.user.id})")
+        print(f"📦 Données reçues: {request.data}")
+        print(f"🔑 Clés du payload: {list(request.data.keys())}")
+        print(f"📋 Type de données: {type(request.data)}")
+        print("-" * 60)
+        
+        # Imprimer les valeurs individuelles
+        for key, value in request.data.items():
+            print(f"  {key}: {value} (type: {type(value).__name__})")
+        
+        print("=" * 60)
+        
+        # Continuer avec le traitement normal
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         user = self.request.user

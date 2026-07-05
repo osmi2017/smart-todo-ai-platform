@@ -101,7 +101,7 @@ function App() {
                   <Route path="admin/companies" element={<CompanyManagement />} />
                   <Route path="admin/groups" element={<GroupManagement />} />
                   <Route path="admin/users" element={<UserManagement />} />
-                  <Route path="profile" element={<Profile />} />
+                  /*<Route path="profile" element={<Profile />} />*/
                 </Route>
               </Routes>
             </div>
