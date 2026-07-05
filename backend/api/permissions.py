@@ -33,7 +33,7 @@ class IsAdminOrReadOnly(permissions.BasePermission):
 
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
-    """Permission: Propriétaire peut modifier, les autres en lecture seule"""
+    """Permission: Propriétaire ou chef de projet peut modifier, les autres en lecture seule"""
 
     def has_object_permission(self, request, view, obj):
         if request.method in permissions.SAFE_METHODS:
@@ -43,13 +43,27 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         if request.user.role == 'superadmin':
             return True
 
+        # Admin of the same company
+        if request.user.role == 'admin':
+            if hasattr(obj, 'company') and obj.company == request.user.company:
+                return True
+
         # Vérifier si l'utilisateur est le propriétaire
         if hasattr(obj, 'owner'):
-            return obj.owner == request.user
-        elif hasattr(obj, 'created_by'):
-            return obj.created_by == request.user
+            if obj.owner == request.user:
+                return True
+
+        # Vérifier si l'utilisateur est chef de projet
+        if hasattr(obj, 'managers'):
+            if obj.managers.filter(id=request.user.id).exists():
+                return True
+
+        if hasattr(obj, 'created_by'):
+            if obj.created_by == request.user:
+                return True
         elif hasattr(obj, 'author'):
-            return obj.author == request.user
+            if obj.author == request.user:
+                return True
 
         return False
 
@@ -92,9 +106,9 @@ class HasGroupAccess(permissions.BasePermission):
             return obj.company == user.company
 
         # For projects: check group membership
-        project = obj if hasattr(obj, 'group') else getattr(obj, 'project', None)
-        if project and project.group:
-            return project.group.members.filter(id=user.id).exists()
+        project = obj if hasattr(obj, 'groups') else getattr(obj, 'project', None)
+        if project and project.groups.exists():
+            return project.groups.filter(members=user).exists()
 
         # Fallback: same company
         if hasattr(obj, 'company'):

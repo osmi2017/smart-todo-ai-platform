@@ -4,7 +4,7 @@ import {
   useDisclosure, Modal, ModalOverlay, ModalContent, ModalHeader,
   ModalBody, ModalFooter, ModalCloseButton, FormControl, FormLabel,
   Input, Select, useToast, IconButton, HStack, Spinner, Alert, AlertIcon,
-  Text,
+  Text, Tag, TagLabel, TagCloseButton, Wrap, WrapItem,
 } from '@chakra-ui/react';
 import { FiPlus, FiEdit2, FiTrash2, FiShield } from 'react-icons/fi';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
@@ -18,10 +18,12 @@ const UserManagement = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({
-    username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: '',
+    username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: '', group_ids: [],
   });
+  const [selectedGroupId, setSelectedGroupId] = useState('');
   const userService = useCrudService('/users', { resourceName: 'utilisateurs' });
   const companyService = useCrudService('/companies', { resourceName: 'entreprises' });
+  const groupService = useCrudService('/groups', { resourceName: 'groupes' });
 
   const { data: companies = [] } = useQuery(
     'companies',
@@ -29,6 +31,9 @@ const UserManagement = () => {
     { enabled: isSuperAdmin }
   );
   const companyList = Array.isArray(companies) ? companies : companies.results || [];
+
+  const { data: groups = [] } = useQuery('groups', () => groupService.getAll());
+  const groupList = Array.isArray(groups) ? groups : groups.results || [];
 
   const { data: users = [], isLoading, error } = useQuery(
     'managed-users',
@@ -84,27 +89,73 @@ const UserManagement = () => {
         role: user.role,
         password: '',
         company: user.company || '',
+        group_ids: user.groups || [],
       });
     } else {
       setEditingUser(null);
-      setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || '') });
+      setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || ''), group_ids: [] });
     }
     onOpen();
   };
 
   const handleClose = () => {
     setEditingUser(null);
-    setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || '') });
+    setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || ''), group_ids: [] });
+    setSelectedGroupId('');
     onClose();
   };
 
-  const handleSubmit = () => {
+  const addGroupToForm = () => {
+    if (!selectedGroupId) return;
+    const id = parseInt(selectedGroupId);
+    if (!form.group_ids.includes(id)) {
+      setForm({ ...form, group_ids: [...form.group_ids, id] });
+    }
+    setSelectedGroupId('');
+  };
+
+  const removeGroupFromForm = (groupId) => {
+    setForm({ ...form, group_ids: form.group_ids.filter((id) => id !== groupId) });
+  };
+
+  const handleSubmit = async () => {
+    const data = { ...form };
+    const groupIds = data.group_ids;
+    delete data.group_ids;
+    if (!data.password) delete data.password;
+
+    const onDone = async (userData) => {
+      const userId = editingUser ? editingUser.id : userData?.id;
+      if (userId && groupIds.length > 0) {
+        const token = localStorage.getItem('token');
+        const currentGroups = editingUser?.groups || [];
+        const toAdd = groupIds.filter((id) => !currentGroups.includes(id));
+        const toRemove = currentGroups.filter((id) => !groupIds.includes(id));
+        for (const gid of toAdd) {
+          await fetch(`/api/groups/${gid}/add_member/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ user_id: userId }),
+          });
+        }
+        for (const gid of toRemove) {
+          await fetch(`/api/groups/${gid}/remove_member/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ user_id: userId }),
+          });
+        }
+      }
+    };
+
     if (editingUser) {
-      const data = { ...form };
-      if (!data.password) delete data.password;
-      updateMutation.mutate({ id: editingUser.id, data });
+      updateMutation.mutate({ id: editingUser.id, data }, {
+        onSuccess: () => onDone(),
+      });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(data, {
+        onSuccess: (result) => onDone(result),
+      });
     }
   };
 
@@ -136,6 +187,7 @@ const UserManagement = () => {
             <Th>Nom complet</Th>
             <Th>R\u00f4le</Th>
             <Th>Entreprise</Th>
+            <Th>Groupes</Th>
             <Th>Actions</Th>
           </Tr>
         </Thead>
@@ -147,6 +199,20 @@ const UserManagement = () => {
               <Td>{u.first_name} {u.last_name}</Td>
               <Td>{getRoleBadge(u.role)}</Td>
               <Td>{u.company_detail?.name || '-'}</Td>
+              <Td>
+                {u.groups && u.groups.length > 0 ? (
+                  <Wrap>
+                    {u.groups.map((gid) => {
+                      const g = groupList.find((gr) => gr.id === gid);
+                      return (
+                        <WrapItem key={gid}>
+                          <Badge colorScheme="purple" fontSize="xs">{g ? g.name : `#${gid}`}</Badge>
+                        </WrapItem>
+                      );
+                    })}
+                  </Wrap>
+                ) : '-'}
+              </Td>
               <Td>
                 <HStack spacing={2}>
                   <IconButton size="sm" icon={<FiEdit2 />} onClick={() => handleOpen(u)} aria-label="Modifier" />
@@ -214,6 +280,39 @@ const UserManagement = () => {
                   isReadOnly
                   bg="gray.100"
                 />
+              )}
+            </FormControl>
+            <FormControl mb={4}>
+              <FormLabel>Groupes</FormLabel>
+              <HStack mb={2}>
+                <Select
+                  value={selectedGroupId}
+                  onChange={(e) => setSelectedGroupId(e.target.value)}
+                  placeholder="Sélectionner un groupe"
+                  flex={1}
+                >
+                  {groupList
+                    .filter((g) => !form.group_ids.includes(g.id))
+                    .map((g) => (
+                      <option key={g.id} value={g.id}>{g.name} ({g.company_name})</option>
+                    ))}
+                </Select>
+                <Button size="sm" onClick={addGroupToForm} colorScheme="purple">Ajouter</Button>
+              </HStack>
+              {form.group_ids.length > 0 && (
+                <Wrap>
+                  {form.group_ids.map((id) => {
+                    const g = groupList.find((gr) => gr.id === id);
+                    return (
+                      <WrapItem key={id}>
+                        <Tag size="md" colorScheme="purple" borderRadius="full">
+                          <TagLabel>{g ? g.name : `#${id}`}</TagLabel>
+                          <TagCloseButton onClick={() => removeGroupFromForm(id)} />
+                        </Tag>
+                      </WrapItem>
+                    );
+                  })}
+                </Wrap>
               )}
             </FormControl>
             <FormControl mb={4} isRequired={!editingUser}>

@@ -393,6 +393,26 @@ const ProjectDetail = () => {
           </HStack>
         </HStack>
 
+        {/* Groupes et Chefs de projet */}
+        <HStack spacing={6} flexWrap="wrap">
+          {project.groups_detail && project.groups_detail.length > 0 && (
+            <HStack>
+              <Text fontSize="sm" fontWeight="600" color="gray.600">Groupes:</Text>
+              {project.groups_detail.map((g) => (
+                <Badge key={g.id} colorScheme="purple">{g.name}</Badge>
+              ))}
+            </HStack>
+          )}
+          {project.managers_detail && project.managers_detail.length > 0 && (
+            <HStack>
+              <Text fontSize="sm" fontWeight="600" color="gray.600">Chefs de projet:</Text>
+              {project.managers_detail.map((m) => (
+                <Badge key={m.id} colorScheme="orange">{m.username}</Badge>
+              ))}
+            </HStack>
+          )}
+        </HStack>
+
         <Divider />
 
         {/* Tabs */}

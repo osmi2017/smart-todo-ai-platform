@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Heading,
@@ -48,6 +48,11 @@ import {
   StatNumber,
   StatHelpText,
   StatArrow,
+  Tag,
+  TagLabel,
+  TagCloseButton,
+  Wrap,
+  WrapItem,
 } from '@chakra-ui/react';
 import {
   FiPlus,
@@ -60,6 +65,8 @@ import {
 } from 'react-icons/fi';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useProjectService } from '../services/projectService';
+import { useCrudService } from '../utils/createCrudService';
+import { useAuth } from '../context/AuthContext';
 import { Link as RouterLink } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -74,7 +81,13 @@ const Projects = () => {
     status: 'not_started',
     start_date: '',
     deadline: '',
+    groups: [],
+    managers: [],
+    members: [],
   });
+  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [selectedManagerId, setSelectedManagerId] = useState('');
+  const [selectedMemberId, setSelectedMemberId] = useState('');
   
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { 
@@ -87,6 +100,14 @@ const Projects = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const projectService = useProjectService();
+  const { user: currentUser, axiosInstance } = useAuth();
+  const groupService = useCrudService('/groups', { resourceName: 'groupes' });
+  const userService = useCrudService('/users', { resourceName: 'utilisateurs' });
+
+  const { data: allGroups = [] } = useQuery('groups', () => groupService.getAll());
+  const availableGroups = Array.isArray(allGroups) ? allGroups : allGroups.results || [];
+  const { data: allUsers = [] } = useQuery('managed-users', () => userService.getAll());
+  const availableUsers = Array.isArray(allUsers) ? allUsers : allUsers.results || [];
 
   // Charger les projets
   const { data: projects, isLoading, error } = useQuery(
@@ -188,6 +209,9 @@ const Projects = () => {
         status: project.status,
         start_date: project.start_date || '',
         deadline: project.deadline || '',
+        groups: project.groups || [],
+        managers: project.managers || [],
+        members: project.members ? (Array.isArray(project.members) ? project.members : []) : [],
       });
     } else {
       setSelectedProject(null);
@@ -197,6 +221,9 @@ const Projects = () => {
         status: 'not_started',
         start_date: '',
         deadline: '',
+        groups: [],
+        managers: [],
+        members: [],
       });
     }
     onOpen();
@@ -210,7 +237,13 @@ const Projects = () => {
       status: 'not_started',
       start_date: '',
       deadline: '',
+      groups: [],
+      managers: [],
+      members: [],
     });
+    setSelectedGroupId('');
+    setSelectedManagerId('');
+    setSelectedMemberId('');
     onClose();
   };
 
@@ -221,6 +254,19 @@ const Projects = () => {
     } else {
       createMutation.mutate(formData);
     }
+  };
+
+  const addToList = (field, selectedId, setSelectedId) => {
+    if (!selectedId) return;
+    const id = parseInt(selectedId);
+    if (!formData[field].includes(id)) {
+      setFormData({ ...formData, [field]: [...formData[field], id] });
+    }
+    setSelectedId('');
+  };
+
+  const removeFromList = (field, id) => {
+    setFormData({ ...formData, [field]: formData[field].filter((v) => v !== id) });
   };
 
   const handleDelete = (project) => {
@@ -317,7 +363,8 @@ const Projects = () => {
               <Th>Nom</Th>
               <Th>Statut</Th>
               <Th>Progression</Th>
-              <Th>Date début</Th>
+              <Th>Groupes</Th>
+              <Th>Chefs de projet</Th>
               <Th>Deadline</Th>
               <Th>Actions</Th>
             </Tr>
@@ -350,13 +397,27 @@ const Projects = () => {
                     </HStack>
                   </Td>
                   <Td>
-                    {project.start_date ? (
-                      <HStack>
-                        <FiCalendar size={14} />
-                        <Text fontSize="sm">
-                          {format(new Date(project.start_date), 'dd/MM/yyyy')}
-                        </Text>
-                      </HStack>
+                    {project.groups_detail && project.groups_detail.length > 0 ? (
+                      <Wrap>
+                        {project.groups_detail.map((g) => (
+                          <WrapItem key={g.id}>
+                            <Badge colorScheme="purple" fontSize="xs">{g.name}</Badge>
+                          </WrapItem>
+                        ))}
+                      </Wrap>
+                    ) : (
+                      <Text fontSize="sm" color="gray.400">-</Text>
+                    )}
+                  </Td>
+                  <Td>
+                    {project.managers_detail && project.managers_detail.length > 0 ? (
+                      <Wrap>
+                        {project.managers_detail.map((m) => (
+                          <WrapItem key={m.id}>
+                            <Badge colorScheme="orange" fontSize="xs">{m.username}</Badge>
+                          </WrapItem>
+                        ))}
+                      </Wrap>
                     ) : (
                       <Text fontSize="sm" color="gray.400">-</Text>
                     )}
@@ -415,7 +476,7 @@ const Projects = () => {
               ))
             ) : (
               <Tr>
-                <Td colSpan={6} textAlign="center" py={8}>
+                <Td colSpan={7} textAlign="center" py={8}>
                   <Text color="gray.500">Aucun projet trouvé</Text>
                   <Button
                     mt={4}
@@ -491,6 +552,114 @@ const Projects = () => {
                     value={formData.deadline}
                     onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                   />
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Groupes</FormLabel>
+                  <HStack mb={2}>
+                    <Select
+                      value={selectedGroupId}
+                      onChange={(e) => setSelectedGroupId(e.target.value)}
+                      placeholder="Sélectionner un groupe"
+                      flex={1}
+                    >
+                      {availableGroups
+                        .filter((g) => !formData.groups.includes(g.id))
+                        .map((g) => (
+                          <option key={g.id} value={g.id}>{g.name} ({g.company_name})</option>
+                        ))}
+                    </Select>
+                    <Button size="sm" colorScheme="purple" onClick={() => addToList('groups', selectedGroupId, setSelectedGroupId)}>
+                      Ajouter
+                    </Button>
+                  </HStack>
+                  {formData.groups.length > 0 && (
+                    <Wrap>
+                      {formData.groups.map((id) => {
+                        const g = availableGroups.find((gr) => gr.id === id);
+                        return (
+                          <WrapItem key={id}>
+                            <Tag size="md" colorScheme="purple" borderRadius="full">
+                              <TagLabel>{g ? g.name : `#${id}`}</TagLabel>
+                              <TagCloseButton onClick={() => removeFromList('groups', id)} />
+                            </Tag>
+                          </WrapItem>
+                        );
+                      })}
+                    </Wrap>
+                  )}
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Chefs de projet</FormLabel>
+                  <HStack mb={2}>
+                    <Select
+                      value={selectedManagerId}
+                      onChange={(e) => setSelectedManagerId(e.target.value)}
+                      placeholder="Sélectionner un chef de projet"
+                      flex={1}
+                    >
+                      {availableUsers
+                        .filter((u) => !formData.managers.includes(u.id))
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>{u.username} ({u.email})</option>
+                        ))}
+                    </Select>
+                    <Button size="sm" colorScheme="orange" onClick={() => addToList('managers', selectedManagerId, setSelectedManagerId)}>
+                      Ajouter
+                    </Button>
+                  </HStack>
+                  {formData.managers.length > 0 && (
+                    <Wrap>
+                      {formData.managers.map((id) => {
+                        const u = availableUsers.find((usr) => usr.id === id);
+                        return (
+                          <WrapItem key={id}>
+                            <Tag size="md" colorScheme="orange" borderRadius="full">
+                              <TagLabel>{u ? u.username : `#${id}`}</TagLabel>
+                              <TagCloseButton onClick={() => removeFromList('managers', id)} />
+                            </Tag>
+                          </WrapItem>
+                        );
+                      })}
+                    </Wrap>
+                  )}
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Membres</FormLabel>
+                  <HStack mb={2}>
+                    <Select
+                      value={selectedMemberId}
+                      onChange={(e) => setSelectedMemberId(e.target.value)}
+                      placeholder="Sélectionner un membre"
+                      flex={1}
+                    >
+                      {availableUsers
+                        .filter((u) => !formData.members.includes(u.id))
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>{u.username} ({u.email})</option>
+                        ))}
+                    </Select>
+                    <Button size="sm" colorScheme="blue" onClick={() => addToList('members', selectedMemberId, setSelectedMemberId)}>
+                      Ajouter
+                    </Button>
+                  </HStack>
+                  {formData.members.length > 0 && (
+                    <Wrap>
+                      {formData.members.map((id) => {
+                        const u = availableUsers.find((usr) => usr.id === id);
+                        return (
+                          <WrapItem key={id}>
+                            <Tag size="md" colorScheme="blue" borderRadius="full">
+                              <TagLabel>{u ? u.username : `#${id}`}</TagLabel>
+                              <TagCloseButton onClick={() => removeFromList('members', id)} />
+                            </Tag>
+                          </WrapItem>
+                        );
+                      })}
+                    </Wrap>
+                  )}
                 </FormControl>
               </VStack>
             </ModalBody>
