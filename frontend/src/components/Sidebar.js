@@ -121,7 +121,7 @@ const Sidebar = () => {
                   <Text fontWeight={isActive ? '600' : '400'}>{item.name}</Text>
                   {item.name === 'Tâches' && (
                     <Badge colorScheme="red" ml="auto" borderRadius="full">
-                      3
+                      4
                     </Badge>
                   )}
                 </HStack>
