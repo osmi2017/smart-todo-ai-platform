@@ -24,6 +24,7 @@ class CompanySerializer(serializers.ModelSerializer):
 
 
 class CompanyGroupSerializer(serializers.ModelSerializer):
+    company = serializers.PrimaryKeyRelatedField(queryset=Company.objects.all(), required=False, allow_null=True)
     company_name = serializers.CharField(source='company.name', read_only=True)
     members_count = serializers.SerializerMethodField()
     created_by_name = serializers.CharField(source='created_by.username', read_only=True, allow_null=True)
@@ -37,9 +38,23 @@ class CompanyGroupSerializer(serializers.ModelSerializer):
                   'members_count', 'created_by', 'created_by_name',
                   'member_ids', 'created_at', 'updated_at')
         read_only_fields = ('id', 'created_by', 'created_at', 'updated_at')
+        validators = []
 
     def get_members_count(self, obj):
         return obj.members.count()
+
+    def validate(self, data):
+        name = data.get('name', getattr(self.instance, 'name', None))
+        company = data.get('company', getattr(self.instance, 'company', None))
+        if name and company:
+            qs = CompanyGroup.objects.filter(name=name, company=company)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {'name': 'Un groupe avec ce nom existe déjà dans cette entreprise.'}
+                )
+        return data
 
 
 class MemberMinimalSerializer(serializers.ModelSerializer):
