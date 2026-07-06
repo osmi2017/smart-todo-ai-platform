@@ -30,6 +30,7 @@ import {
   FiBriefcase,
   FiGrid,
   FiShield,
+  FiHardDrive,
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 
@@ -46,6 +47,7 @@ const Sidebar = () => {
     { path: '/kanban', name: 'Kanban', icon: FiColumns },
     { path: '/milestones', name: 'Jalons', icon: FiCalendar },
     { path: '/meetings', name: 'Meetings', icon: FiMic },
+    { path: '/files', name: 'Fichiers', icon: FiHardDrive },
     { path: '/analytics', name: 'Analytics', icon: FiBarChart2 },
     ...(isAdmin ? [
       { path: '/admin/users', name: 'Utilisateurs', icon: FiUsers },

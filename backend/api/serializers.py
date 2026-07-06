@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User, Project, Milestone, Task, ActivityLog, Comment, Company, CompanyGroup
+from django.db import models
+from .models import User, Project, Milestone, Task, ActivityLog, Comment, Company, CompanyGroup, File, FileShare, StorageNotification
 import jwt
 from django.conf import settings
 from datetime import datetime, timedelta
@@ -10,11 +11,18 @@ class CompanySerializer(serializers.ModelSerializer):
     users_count = serializers.SerializerMethodField()
     groups_count = serializers.SerializerMethodField()
 
+    storage_tier = serializers.CharField(required=False)
+    storage_used = serializers.IntegerField(read_only=True)
+    storage_limit_bytes = serializers.IntegerField(read_only=True)
+    storage_percent_used = serializers.FloatField(read_only=True)
+
     class Meta:
         model = Company
         fields = ('id', 'name', 'slug', 'description', 'is_active',
-                  'users_count', 'groups_count', 'created_at', 'updated_at')
-        read_only_fields = ('id', 'created_at', 'updated_at')
+                  'users_count', 'groups_count',
+                  'storage_tier', 'storage_used', 'storage_limit_bytes', 'storage_percent_used',
+                  'created_at', 'updated_at')
+        read_only_fields = ('id', 'created_at', 'updated_at', 'storage_used')
 
     def get_users_count(self, obj):
         return obj.users.count()
@@ -298,3 +306,73 @@ class UserSimpleSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'first_name', 'last_name', 'avatar']
+
+
+class FileShareSerializer(serializers.ModelSerializer):
+    shared_with_user_name = serializers.CharField(source='shared_with_user.username', read_only=True, allow_null=True)
+    shared_with_user_email = serializers.EmailField(source='shared_with_user.email', read_only=True, allow_null=True)
+    shared_with_group_name = serializers.CharField(source='shared_with_group.name', read_only=True, allow_null=True)
+    shared_by_name = serializers.CharField(source='shared_by.username', read_only=True)
+
+    class Meta:
+        model = FileShare
+        fields = ('id', 'file', 'shared_with_user', 'shared_with_user_name', 'shared_with_user_email',
+                  'shared_with_group', 'shared_with_group_name',
+                  'can_edit', 'can_delete', 'shared_by', 'shared_by_name', 'shared_at')
+        read_only_fields = ('id', 'shared_by', 'shared_at')
+
+
+class FileSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.CharField(source='uploaded_by.username', read_only=True)
+    uploaded_by_email = serializers.EmailField(source='uploaded_by.email', read_only=True)
+    is_previewable = serializers.BooleanField(read_only=True)
+    shares_count = serializers.SerializerMethodField()
+    user_permissions = serializers.SerializerMethodField()
+
+    class Meta:
+        model = File
+        fields = ('id', 'name', 'file', 'mime_type', 'size_bytes', 'company',
+                  'uploaded_by', 'uploaded_by_name', 'uploaded_by_email',
+                  'description', 'is_previewable', 'shares_count', 'user_permissions',
+                  'created_at', 'updated_at')
+        read_only_fields = ('id', 'mime_type', 'size_bytes', 'company', 'uploaded_by',
+                            'created_at', 'updated_at')
+
+    def get_shares_count(self, obj):
+        return obj.shares.count()
+
+    def get_user_permissions(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user:
+            return {'can_edit': False, 'can_delete': False, 'is_owner': False}
+        user = request.user
+        if user.role == 'superadmin' or obj.uploaded_by == user:
+            return {'can_edit': True, 'can_delete': True, 'is_owner': obj.uploaded_by == user}
+        if user.role == 'admin' and user.company == obj.company:
+            return {'can_edit': True, 'can_delete': True, 'is_owner': False}
+        shares = FileShare.objects.filter(
+            file=obj
+        ).filter(
+            models.Q(shared_with_user=user) |
+            models.Q(shared_with_group__members=user)
+        ).distinct()
+        can_edit = shares.filter(can_edit=True).exists()
+        can_delete = shares.filter(can_delete=True).exists()
+        return {'can_edit': can_edit, 'can_delete': can_delete, 'is_owner': False}
+
+
+class FileDetailSerializer(FileSerializer):
+    shares = FileShareSerializer(many=True, read_only=True)
+
+    class Meta(FileSerializer.Meta):
+        fields = FileSerializer.Meta.fields + ('shares',)
+
+
+class StorageNotificationSerializer(serializers.ModelSerializer):
+    company_name = serializers.CharField(source='company.name', read_only=True)
+
+    class Meta:
+        model = StorageNotification
+        fields = ('id', 'company', 'company_name', 'notification_type', 'message',
+                  'is_read', 'created_at')
+        read_only_fields = ('id', 'company', 'notification_type', 'message', 'created_at')
