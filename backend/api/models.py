@@ -7,10 +7,34 @@ import json
 
 class Company(models.Model):
     """Modèle Entreprise pour le multi-tenant"""
+    STORAGE_TIER_CHOICES = (
+        ('100MB', '100 Mo'),
+        ('500MB', '500 Mo'),
+        ('1GB', '1 Go'),
+        ('5GB', '5 Go'),
+        ('10GB', '10 Go'),
+        ('50GB', '50 Go'),
+        ('100GB', '100 Go'),
+        ('unlimited', 'Illimité'),
+    )
+
+    STORAGE_TIER_BYTES = {
+        '100MB': 100 * 1024 * 1024,
+        '500MB': 500 * 1024 * 1024,
+        '1GB': 1 * 1024 * 1024 * 1024,
+        '5GB': 5 * 1024 * 1024 * 1024,
+        '10GB': 10 * 1024 * 1024 * 1024,
+        '50GB': 50 * 1024 * 1024 * 1024,
+        '100GB': 100 * 1024 * 1024 * 1024,
+        'unlimited': None,
+    }
+
     name = models.CharField(max_length=200, unique=True)
     slug = models.SlugField(max_length=200, unique=True)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
+    storage_tier = models.CharField(max_length=20, choices=STORAGE_TIER_CHOICES, default='1GB')
+    storage_used = models.BigIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -22,6 +46,32 @@ class Company(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def storage_limit_bytes(self):
+        return self.STORAGE_TIER_BYTES.get(self.storage_tier)
+
+    @property
+    def storage_remaining(self):
+        limit = self.storage_limit_bytes
+        if limit is None:
+            return None
+        return max(0, limit - self.storage_used)
+
+    @property
+    def storage_percent_used(self):
+        limit = self.storage_limit_bytes
+        if limit is None:
+            return 0
+        if limit == 0:
+            return 100
+        return round(self.storage_used / limit * 100, 1)
+
+    def can_upload(self, file_size):
+        limit = self.storage_limit_bytes
+        if limit is None:
+            return True
+        return (self.storage_used + file_size) <= limit
 
 
 class CompanyGroup(models.Model):
@@ -555,4 +605,103 @@ class MeetingActionItem(models.Model):
         self.linked_task = task
         self.save(update_fields=['linked_task'])
         return task
+
+
+def file_upload_path(instance, filename):
+    return f'files/company_{instance.company_id}/{filename}'
+
+
+class File(models.Model):
+    """Fichier uploadé dans une entreprise"""
+    ALLOWED_MIME_PREFIXES = ('application/pdf', 'image/', 'video/', 'text/', 'application/')
+
+    name = models.CharField(max_length=500)
+    file = models.FileField(upload_to=file_upload_path)
+    mime_type = models.CharField(max_length=255)
+    size_bytes = models.BigIntegerField()
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='files')
+    uploaded_by = models.ForeignKey('User', on_delete=models.CASCADE, related_name='uploaded_files')
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'files'
+        verbose_name = 'Fichier'
+        verbose_name_plural = 'Fichiers'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['company', 'uploaded_by']),
+            models.Index(fields=['mime_type']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def is_previewable(self):
+        if not self.mime_type:
+            return False
+        return (
+            self.mime_type.startswith('image/')
+            or self.mime_type.startswith('video/')
+            or self.mime_type == 'application/pdf'
+        )
+
+    def delete(self, *args, **kwargs):
+        company = self.company
+        file_size = self.size_bytes
+        self.file.delete(save=False)
+        super().delete(*args, **kwargs)
+        company.storage_used = max(0, company.storage_used - file_size)
+        company.save(update_fields=['storage_used'])
+
+
+class FileShare(models.Model):
+    """Partage d'un fichier avec un utilisateur ou un groupe"""
+    file = models.ForeignKey(File, on_delete=models.CASCADE, related_name='shares')
+    shared_with_user = models.ForeignKey(
+        'User', on_delete=models.CASCADE, null=True, blank=True, related_name='shared_files'
+    )
+    shared_with_group = models.ForeignKey(
+        CompanyGroup, on_delete=models.CASCADE, null=True, blank=True, related_name='shared_files'
+    )
+    can_edit = models.BooleanField(default=False)
+    can_delete = models.BooleanField(default=False)
+    shared_by = models.ForeignKey('User', on_delete=models.CASCADE, related_name='file_shares_given')
+    shared_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'file_shares'
+        verbose_name = 'Partage de fichier'
+        verbose_name_plural = 'Partages de fichiers'
+        ordering = ['-shared_at']
+
+    def __str__(self):
+        target = self.shared_with_user or self.shared_with_group
+        return f'{self.file.name} -> {target}'
+
+
+class StorageNotification(models.Model):
+    """Notification envoyée quand le quota de stockage est atteint"""
+    NOTIFICATION_TYPES = (
+        ('warning_80', 'Avertissement 80%'),
+        ('warning_90', 'Avertissement 90%'),
+        ('quota_reached', 'Quota atteint'),
+    )
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='storage_notifications')
+    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'storage_notifications'
+        verbose_name = 'Notification de stockage'
+        verbose_name_plural = 'Notifications de stockage'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.company.name} - {self.notification_type}'
 
