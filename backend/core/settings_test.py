@@ -18,3 +18,10 @@ PASSWORD_HASHERS = [
 ]
 
 ML_SERVICE_URL = 'http://localhost:5001'
+
+# Pendant les tests, les tâches Celery s'exécutent en synchrone dans le même
+# processus : pas besoin de Redis ni de worker, et les résultats sont immédiats.
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_BROKER_URL = 'memory://'
+CELERY_RESULT_BACKEND = 'cache+memory://'

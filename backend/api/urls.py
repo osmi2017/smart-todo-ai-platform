@@ -4,6 +4,7 @@ from . import views
 from .views_comment import CommentViewSet
 from .views_meeting import MeetingViewSet, MeetingActionItemViewSet
 from .views_file import FileViewSet, StorageNotificationViewSet
+from .views_tasks import task_status
 
 router = DefaultRouter()
 router.register(r'auth', views.AuthViewSet, basename='auth')
@@ -20,5 +21,8 @@ router.register(r'files', FileViewSet)
 router.register(r'storage-notifications', StorageNotificationViewSet)
 
 urlpatterns = [
+    # Suivi des tâches Celery en arrière-plan (polling de secours ; le
+    # temps réel passe par WebSocket, cf. api/consumers.py)
+    path('jobs/<str:task_id>/', task_status, name='task-status'),
     path('', include(router.urls)),
 ]

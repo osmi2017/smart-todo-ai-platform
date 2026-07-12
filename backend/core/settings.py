@@ -222,6 +222,44 @@ GOOGLE_CALENDAR_CREDENTIALS = None
 # Slack (stub - configure with bot token)
 SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN', '')
 
-# Celery settings
-CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+# Celery settings — délégation des tâches lourdes/asynchrones en arrière-plan
+# (rappels de meetings en masse, génération de rapports, traitement audio/vidéo)
+CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
+CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
+
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = True
+
+# Garde une trace de l'état "STARTED" (utile pour les barres de progression UI)
+CELERY_TASK_TRACK_STARTED = True
+
+# Une tâche bloquée ne doit jamais geler un worker indéfiniment
+CELERY_TASK_TIME_LIMIT = 15 * 60        # kill dur après 15 min
+CELERY_TASK_SOFT_TIME_LIMIT = 12 * 60   # exception soft après 12 min (cleanup possible)
+
+# Les résultats expirent pour ne pas saturer Redis
+CELERY_RESULT_EXPIRES = 60 * 60 * 24  # 24h
+
+# Un worker ne prend une nouvelle tâche qu'après avoir fini la précédente :
+# évite qu'un traitement audio/vidéo long ne monopolise un worker sur plusieurs tâches à la fois.
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+
+# Files d'attente dédiées : les gros traitements (audio/vidéo, rapports) ne bloquent pas
+# les tâches légères et rapides (rappels, notifications).
+CELERY_TASK_ROUTES = {
+    'api.tasks.process_meeting_ai': {'queue': 'heavy'},
+    'api.tasks.transcribe_meeting_audio': {'queue': 'heavy'},
+    'api.tasks.generate_project_report': {'queue': 'heavy'},
+    'api.tasks.send_bulk_meeting_reminders': {'queue': 'default'},
+    'api.tasks.send_meeting_reminder': {'queue': 'default'},
+    'api.tasks.send_milestone_deadline_reminders': {'queue': 'default'},
+    'api.tasks.cleanup_stale_notifications': {'queue': 'default'},
+}
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+
+# En environnement de test, les tâches s'exécutent en synchrone (pas de worker/Redis requis)
+CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', 'False') == 'True'
+CELERY_TASK_EAGER_PROPAGATES = True

@@ -15,8 +15,8 @@ from .serializers_meeting import (
     MeetingParticipantSerializer, MeetingSummarySerializer,
     MeetingActionItemSerializer,
 )
-from .services.ai_service import transcribe_audio, summarize_meeting, extract_action_items
 from .services.integrations import GoogleCalendarService, SlackService
+from .tasks import transcribe_meeting_audio, process_meeting_ai
 
 
 class MeetingViewSet(viewsets.ModelViewSet):
@@ -103,7 +103,10 @@ class MeetingViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def transcribe(self, request, pk=None):
-        """Transcribe the meeting's audio file using OpenAI Whisper"""
+        """Délègue la transcription de l'audio de la réunion à Celery (Whisper).
+        Ne bloque jamais la requête HTTP : renvoie immédiatement l'ID de la
+        tâche en arrière-plan, la transcription arrivant ensuite par notification
+        WebSocket temps réel."""
         meeting = self.get_object()
 
         if not meeting.audio_file:
@@ -112,90 +115,34 @@ class MeetingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        result = transcribe_audio(meeting.audio_file.path)
+        task = transcribe_meeting_audio.delay(meeting.id, request.user.id)
 
-        if result['transcript']:
-            meeting.transcript = result['transcript']
-            meeting.save(update_fields=['transcript'])
-
-        if result['error']:
-            return Response(
-                {'transcript': result['transcript'], 'error': result['error']},
-                status=status.HTTP_200_OK if result['transcript'] else status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        return Response({'transcript': meeting.transcript})
+        return Response(
+            {'status': 'processing', 'task_id': task.id, 'meeting_id': meeting.id},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     @action(detail=True, methods=['post'])
     def process(self, request, pk=None):
-        """Run full AI processing: transcribe (if audio), summarize, extract action items"""
+        """Délègue le pipeline IA complet (transcription + résumé + actions)
+        à Celery. Répond instantanément avec un task_id ; le frontend reçoit
+        ensuite la progression et le résultat via WebSocket sans avoir à
+        garder la connexion HTTP ouverte pendant tout le traitement."""
         meeting = self.get_object()
 
-        # Step 1: Transcribe audio if present and no transcript yet
-        if meeting.audio_file and not meeting.transcript:
-            result = transcribe_audio(meeting.audio_file.path)
-            if result['transcript']:
-                meeting.transcript = result['transcript']
-                meeting.save(update_fields=['transcript'])
-
         content = meeting.transcript or meeting.raw_notes
-        if not content:
+        if not content and not meeting.audio_file:
             return Response(
                 {'error': 'No content to process. Upload audio or add notes first.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Step 2: Generate summary
-        participant_names = list(
-            meeting.participants.values_list('user__username', flat=True)
+        task = process_meeting_ai.delay(meeting.id, request.user.id)
+
+        return Response(
+            {'status': 'processing', 'task_id': task.id, 'meeting_id': meeting.id},
+            status=status.HTTP_202_ACCEPTED,
         )
-        summary_result = summarize_meeting(content, meeting.raw_notes)
-
-        MeetingSummary.objects.update_or_create(
-            meeting=meeting,
-            defaults={
-                'summary_text': summary_result['summary_text'],
-                'key_points': summary_result['key_points'],
-                'decisions': summary_result['decisions'],
-                'follow_ups': summary_result['follow_ups'],
-                'model_used': summary_result.get('model_used', 'fallback'),
-            },
-        )
-
-        # Step 3: Extract action items
-        action_result = extract_action_items(content, meeting.raw_notes, participant_names)
-
-        created_items = []
-        for item_data in action_result.get('action_items', []):
-            assigned_user = None
-            assigned_name = item_data.get('assigned_to')
-            if assigned_name:
-                from .models import User
-                assigned_user = User.objects.filter(username__iexact=assigned_name).first()
-
-            action_item = MeetingActionItem.objects.create(
-                meeting=meeting,
-                title=item_data.get('title', 'Untitled'),
-                description=item_data.get('description', ''),
-                priority=item_data.get('priority', 2),
-                assigned_to=assigned_user,
-                deadline=item_data.get('deadline'),
-            )
-            created_items.append(action_item)
-
-        # Mark as processed
-        error = summary_result.get('error', '') or action_result.get('error', '')
-        meeting.ai_processed = True
-        meeting.ai_processing_error = error
-        meeting.save(update_fields=['ai_processed', 'ai_processing_error'])
-
-        self._log_activity('update', 'meeting', meeting)
-
-        return Response({
-            'summary': MeetingSummarySerializer(meeting.summary).data,
-            'action_items': MeetingActionItemSerializer(created_items, many=True).data,
-            'processing_error': error,
-        })
 
     @action(detail=True, methods=['post'], url_path='action-items/(?P<item_id>[0-9]+)/convert')
     def convert_action_item(self, request, pk=None, item_id=None):

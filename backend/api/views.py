@@ -26,6 +26,7 @@ from .permissions import (
     IsCompanyAdmin, HasGroupAccess,
 )
 from .mixins import ActivityLogMixin
+from .tasks import generate_project_report
 
 logger = logging.getLogger(__name__)
 
@@ -299,6 +300,19 @@ class ProjectViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             return Response({'error': 'user_id requis'}, status=status.HTTP_400_BAD_REQUEST)
         project.managers.remove(user_id)
         return Response({'status': 'Chef de projet retiré'})
+
+    @action(detail=True, methods=['post'])
+    def generate_report(self, request, pk=None):
+        """Déclenche la génération (en arrière-plan, via Celery) d'un rapport
+        complet du projet. Répond instantanément avec un task_id ; le rapport
+        généré est ensuite disponible en téléchargement (File) et son achèvement
+        est signalé en temps réel via notification WebSocket."""
+        project = self.get_object()
+        task = generate_project_report.delay(project.id, request.user.id)
+        return Response(
+            {'status': 'processing', 'task_id': task.id, 'project_id': project.id},
+            status=status.HTTP_202_ACCEPTED,
+        )
 
     @action(detail=True, methods=['get'])
     def project_managers(self, request, pk=None):

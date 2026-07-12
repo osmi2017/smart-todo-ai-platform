@@ -78,16 +78,17 @@ def other_user(db, other_company):
 
 @pytest.fixture
 def project(db, user, company, company_group):
-    return Project.objects.create(
+    p = Project.objects.create(
         name='Test Project',
         description='A test project',
         status='in_progress',
         owner=user,
         company=company,
-        group=company_group,
         start_date=date.today(),
         deadline=date.today() + timedelta(days=30),
     )
+    p.groups.add(company_group)
+    return p
 
 
 @pytest.fixture

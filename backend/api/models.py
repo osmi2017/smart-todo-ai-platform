@@ -424,6 +424,12 @@ class Notification(models.Model):
         ('comment_added', 'Commentaire ajouté'),
         ('member_added', 'Membre ajouté'),
         ('milestone_due', 'Jalon à échéance'),
+        ('meeting_reminder', 'Rappel de réunion'),
+        ('meeting_processing', 'Traitement de réunion en cours'),
+        ('meeting_processed', 'Réunion traitée par l\'IA'),
+        ('report_processing', 'Génération de rapport en cours'),
+        ('report_ready', 'Rapport de projet prêt'),
+        ('task_failed', 'Échec d\'une tâche en arrière-plan'),
     )
     
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
@@ -486,6 +492,9 @@ class Meeting(models.Model):
     # External integrations
     google_calendar_event_id = models.CharField(max_length=255, blank=True)
     slack_channel_id = models.CharField(max_length=255, blank=True)
+
+    # Rappels (gérés par Celery Beat, cf. api/tasks.py)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
