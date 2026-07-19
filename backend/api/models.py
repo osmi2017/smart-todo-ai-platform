@@ -1,8 +1,9 @@
-from django.db import models
+import uuid
+
 from django.contrib.auth.models import AbstractUser
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 from django.utils import timezone
-from django.core.validators import MinValueValidator, MaxValueValidator
-import json
 
 
 class Company(models.Model):
@@ -425,6 +426,9 @@ class Notification(models.Model):
         ('member_added', 'Membre ajouté'),
         ('milestone_due', 'Jalon à échéance'),
         ('meeting_reminder', 'Rappel de réunion'),
+        ('meeting_started', 'Réunion démarrée'),
+        ('meeting_completed', 'Réunion terminée'),
+        ('project_created', 'Projet créé'),
         ('meeting_processing', 'Traitement de réunion en cours'),
         ('meeting_processed', 'Réunion traitée par l\'IA'),
         ('report_processing', 'Génération de rapport en cours'),

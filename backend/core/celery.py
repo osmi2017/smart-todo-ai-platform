@@ -37,6 +37,10 @@ app.conf.beat_schedule = {
         'task': 'api.tasks.cleanup_stale_notifications',
         'schedule': crontab(hour=3, minute=0),
     },
+    'publish-pending-domain-events-every-minute': {
+        'task': 'api.tasks.publish_pending_domain_events',
+        'schedule': 60.0,
+    },
 }
 
 
