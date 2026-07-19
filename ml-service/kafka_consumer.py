@@ -1,66 +1,81 @@
-"""
-Consommateur Kafka du service de statistiques (ml-service).
-
-S'abonne uniquement au topic "tasks" (le seul qui le concerne) et met à jour
-des statistiques cumulées à chaque "task_completed" — totalement découplé du
-backend Django : celui-ci n'a jamais besoin d'appeler ce service en HTTP pour
-lui signaler qu'une tâche est terminée, il publie sur Kafka et poursuit sa
-route.
-
-Tourne comme process séparé (cf. docker-compose service "ml-stats-consumer"),
-indépendant du serveur Flask de prédiction : une forte charge de statistiques
-ne ralentit jamais les endpoints de prédiction, et inversement.
-"""
+import base64
 import json
 import logging
 import os
 import signal
-import sys
+from datetime import datetime, timezone
 
 from stats_store import load_stats, save_stats, update_stats_with_task_completed
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
 
-TOPIC_TASKS = 'smarttodo.tasks.events'
-CONSUMER_GROUP_ID = 'ml-stats-service'
+TOPIC_EVENTS = os.getenv('KAFKA_TOPIC', 'smart-todo.events')
+TOPIC_DLQ = os.getenv('KAFKA_DLQ_TOPIC', 'smart-todo.events.dlq')
+CONSUMER_GROUP_ID = 'smart-todo.ml-statistics'
 
 _running = True
 
 
 def _handle_shutdown(signum, frame):
     global _running
-    logger.info('Arrêt demandé, fin après le message en cours...')
+    logger.info('Shutdown requested; finishing the current message.')
     _running = False
 
 
+def _kafka_enabled():
+    value = os.getenv('KAFKA_ENABLED', os.getenv('KAFKA_EVENTS_ENABLED', 'true'))
+    return value.lower() != 'false'
+
+
+def _publish_dlq(producer, message, error):
+    payload = {
+        'service': 'ml-statistics',
+        'failed_at': datetime.now(timezone.utc).isoformat(),
+        'error': str(error),
+        'source_topic': message.topic,
+        'source_partition': message.partition,
+        'source_offset': message.offset,
+        'original_message_base64': base64.b64encode(message.value).decode('ascii'),
+    }
+    producer.send(
+        TOPIC_DLQ,
+        key=message.key,
+        value=json.dumps(payload).encode('utf-8'),
+    ).get(timeout=10)
+
+
 def main():
-    kafka_enabled = os.getenv('KAFKA_EVENTS_ENABLED', 'true').lower() != 'false'
-    if not kafka_enabled:
-        logger.warning('KAFKA_EVENTS_ENABLED=false : le consommateur de statistiques ne démarre pas.')
+    if not _kafka_enabled():
+        logger.warning('KAFKA_ENABLED=false: statistics consumer is disabled.')
         return
 
-    from kafka import KafkaConsumer
+    from kafka import KafkaConsumer, KafkaProducer
 
     bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092').split(',')
-
     consumer = KafkaConsumer(
-        TOPIC_TASKS,
+        TOPIC_EVENTS,
         bootstrap_servers=bootstrap_servers,
         group_id=CONSUMER_GROUP_ID,
-        # Commit manuel après écriture des stats sur disque : en cas de crash
-        # entre la lecture et l'écriture, le message est re-livré au
-        # redémarrage plutôt que silencieusement ignoré.
         enable_auto_commit=False,
         auto_offset_reset='earliest',
-        key_deserializer=lambda k: k.decode('utf-8') if k else None,
-        value_deserializer=lambda v: json.loads(v.decode('utf-8')),
+        isolation_level='read_committed',
+        key_deserializer=lambda key: key.decode('utf-8') if key else None,
+    )
+    producer = KafkaProducer(
+        bootstrap_servers=bootstrap_servers,
+        acks='all',
+        retries=10,
     )
 
     signal.signal(signal.SIGTERM, _handle_shutdown)
     signal.signal(signal.SIGINT, _handle_shutdown)
 
-    logger.info('Consommateur de statistiques démarré (topic=%s, group=%s)', TOPIC_TASKS, CONSUMER_GROUP_ID)
+    logger.info(
+        'Statistics consumer started (topic=%s, group=%s)',
+        TOPIC_EVENTS,
+        CONSUMER_GROUP_ID,
+    )
 
     processed = 0
     try:
@@ -68,27 +83,31 @@ def main():
             if not _running:
                 break
 
-            event = message.value
-            if event.get('event_type') != 'task_completed':
-                consumer.commit()
-                continue
-
             try:
+                event = json.loads(message.value.decode('utf-8'))
+                if event.get('type') != 'task.completed':
+                    consumer.commit()
+                    continue
+
                 stats = load_stats()
-                updated = update_stats_with_task_completed(stats, event)
-                save_stats(updated)
-            except Exception:
+                save_stats(update_stats_with_task_completed(stats, event))
+            except Exception as error:
                 logger.exception(
-                    'Échec de mise à jour des statistiques (offset=%s) — pas de commit, re-livraison au redémarrage.',
+                    'Statistics processing failed at offset %s; preserving the message in the DLQ.',
                     message.offset,
                 )
-                continue
+                try:
+                    _publish_dlq(producer, message, error)
+                except Exception:
+                    logger.exception('DLQ publication failed; source offset will not be committed.')
+                    continue
 
             consumer.commit()
             processed += 1
     finally:
         consumer.close()
-        logger.info('Consommateur de statistiques arrêté (%d événement(s) traité(s)).', processed)
+        producer.close()
+        logger.info('Statistics consumer stopped (%d relevant message(s) handled).', processed)
 
 
 if __name__ == '__main__':

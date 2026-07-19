@@ -17,8 +17,6 @@ from .serializers_meeting import (
 )
 from .events import EventTypes, emit_event, event_actor
 from .services.integrations import GoogleCalendarService, SlackService
-from .tasks import transcribe_meeting_audio, process_meeting_ai
-from .events import emit_meeting_started, emit_meeting_ended
 
 
 class MeetingViewSet(viewsets.ModelViewSet):
@@ -66,52 +64,6 @@ class MeetingViewSet(viewsets.ModelViewSet):
         with event_actor(self.request.user):
             meeting = serializer.save(**timestamps)
         self._log_activity('update', 'meeting', meeting)
-
-    @action(detail=True, methods=['post'])
-    def start(self, request, pk=None):
-        """Démarre la réunion et publie l'événement "meeting_started" sur
-        Kafka. C'est ce qui permet, par exemple, au service audio (meeting
-        service) de pré-provisionner sa salle WebRTC de façon totalement
-        découplée, sans que ce backend ait besoin de connaître ni d'appeler
-        directement ce service."""
-        meeting = self.get_object()
-
-        if meeting.status == 'in_progress':
-            return Response(
-                {'error': 'La réunion est déjà en cours'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        meeting.status = 'in_progress'
-        meeting.started_at = timezone.now()
-        meeting.save(update_fields=['status', 'started_at'])
-
-        emit_meeting_started(meeting)
-        self._log_activity('update', 'meeting', meeting)
-
-        return Response(MeetingDetailSerializer(meeting).data)
-
-    @action(detail=True, methods=['post'])
-    def end(self, request, pk=None):
-        """Termine la réunion et publie l'événement "meeting_ended" sur Kafka."""
-        meeting = self.get_object()
-
-        if meeting.status == 'completed':
-            return Response(
-                {'error': 'La réunion est déjà terminée'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        meeting.status = 'completed'
-        meeting.ended_at = timezone.now()
-        if meeting.started_at:
-            meeting.duration_minutes = int((meeting.ended_at - meeting.started_at).total_seconds() // 60)
-        meeting.save(update_fields=['status', 'ended_at', 'duration_minutes'])
-
-        emit_meeting_ended(meeting)
-        self._log_activity('update', 'meeting', meeting)
-
-        return Response(MeetingDetailSerializer(meeting).data)
 
     @action(detail=True, methods=['post'])
     def add_participant(self, request, pk=None):

@@ -720,21 +720,18 @@ class StorageNotification(models.Model):
 
 
 class AuditEvent(models.Model):
-    """Trace persistée de chaque événement majeur consommé depuis Kafka.
-
-    Alimenté exclusivement par le consommateur d'audit (cf. management
-    command consume_audit_events), totalement découplé des services qui
-    produisent les événements : même si ce consommateur est arrêté un moment,
-    Kafka conserve les événements et l'audit reprend sans perte dès son
-    redémarrage (rejeu depuis le dernier offset commité).
-    """
     event_id = models.UUIDField(unique=True)
     event_type = models.CharField(max_length=100)
     topic = models.CharField(max_length=150)
     source_service = models.CharField(max_length=100, blank=True)
     payload = models.JSONField(default=dict, blank=True)
-    occurred_at = models.DateTimeField(help_text="Horodatage d'émission de l'événement (côté producteur)")
-    consumed_at = models.DateTimeField(auto_now_add=True, help_text="Horodatage de consommation (côté audit)")
+    occurred_at = models.DateTimeField(
+        help_text="Horodatage d'émission de l'événement (côté producteur)"
+    )
+    consumed_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text='Horodatage de consommation (côté audit)',
+    )
 
     class Meta:
         db_table = 'audit_events'
@@ -748,4 +745,110 @@ class AuditEvent(models.Model):
 
     def __str__(self):
         return f'{self.event_type} ({self.event_id})'
+
+
+class EventOutbox(models.Model):
+    STATUS_CHOICES = (
+        ('pending', 'Pending'),
+        ('published', 'Published'),
+    )
+
+    event_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    event_type = models.CharField(max_length=120)
+    aggregate_type = models.CharField(max_length=80)
+    aggregate_id = models.CharField(max_length=120)
+    company = models.ForeignKey(
+        Company, on_delete=models.SET_NULL, null=True, blank=True, related_name='event_outbox'
+    )
+    company_id_snapshot = models.PositiveBigIntegerField(null=True, blank=True)
+    actor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='emitted_events'
+    )
+    actor_id_snapshot = models.PositiveBigIntegerField(null=True, blank=True)
+    payload = models.JSONField(default=dict)
+    schema_version = models.PositiveSmallIntegerField(default=1)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'event_outbox'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['event_type', 'created_at']),
+            models.Index(fields=['company', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.event_type} ({self.event_id})'
+
+
+class ProcessedEvent(models.Model):
+    service = models.CharField(max_length=80)
+    event_id = models.UUIDField()
+    processed_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'processed_events'
+        constraints = [
+            models.UniqueConstraint(fields=['service', 'event_id'], name='unique_service_event'),
+        ]
+        indexes = [models.Index(fields=['service', '-processed_at'])]
+
+    def __str__(self):
+        return f'{self.service}: {self.event_id}'
+
+
+class EventAuditLog(models.Model):
+    event_id = models.UUIDField(unique=True)
+    event_type = models.CharField(max_length=120)
+    aggregate_type = models.CharField(max_length=80)
+    aggregate_id = models.CharField(max_length=120)
+    company = models.ForeignKey(
+        Company, on_delete=models.SET_NULL, null=True, blank=True, related_name='event_audit_logs'
+    )
+    actor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='event_audit_logs'
+    )
+    payload = models.JSONField(default=dict)
+    occurred_at = models.DateTimeField()
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'event_audit_logs'
+        ordering = ['-occurred_at']
+        indexes = [
+            models.Index(fields=['event_type', '-occurred_at']),
+            models.Index(fields=['company', '-occurred_at']),
+            models.Index(fields=['aggregate_type', 'aggregate_id']),
+        ]
+
+    def __str__(self):
+        return f'{self.event_type} ({self.event_id})'
+
+
+class EventMetric(models.Model):
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, null=True, blank=True, related_name='event_metrics'
+    )
+    tenant_key = models.CharField(max_length=40)
+    event_type = models.CharField(max_length=120)
+    date = models.DateField()
+    count = models.PositiveBigIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'event_metrics'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant_key', 'event_type', 'date'], name='unique_tenant_event_metric'
+            ),
+        ]
+        indexes = [models.Index(fields=['date', 'event_type'])]
+
+    def __str__(self):
+        return f'{self.event_type}: {self.count} ({self.date})'
 
