@@ -1,6 +1,7 @@
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from .models import Task, Comment, Project, Notification
+from .events import emit_task_completed
 from datetime import date
 
 # Vérifier si channels est disponible
@@ -37,6 +38,27 @@ def send_websocket_notification(recipient_id, notification_type, title, message,
             )
         except Exception as e:
             print(f"⚠️ Erreur WebSocket: {e}")
+
+@receiver(pre_save, sender=Task)
+def task_track_previous_status(sender, instance, **kwargs):
+    """Mémorise le statut précédent avant sauvegarde, pour ne détecter la
+    transition vers 'completed' qu'une seule fois (et non à chaque save())."""
+    if instance.pk:
+        previous = Task.objects.filter(pk=instance.pk).values_list('status', flat=True).first()
+        instance._previous_status = previous
+    else:
+        instance._previous_status = None
+
+
+@receiver(post_save, sender=Task)
+def task_completed_event(sender, instance, created, **kwargs):
+    """Publie l'événement Kafka 'task_completed' uniquement lors de la
+    transition réelle vers 'completed', jamais sur les sauvegardes suivantes
+    (idempotence côté producteur)."""
+    previous_status = getattr(instance, '_previous_status', None)
+    if not created and previous_status != 'completed' and instance.status == 'completed':
+        emit_task_completed(instance)
+
 
 @receiver(post_save, sender=Task)
 def task_notification(sender, instance, created, **kwargs):

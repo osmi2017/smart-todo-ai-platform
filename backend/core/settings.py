@@ -186,10 +186,10 @@ JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', SECRET_KEY)
 JWT_EXPIRATION_DELTA = timedelta(days=7)
 
 # CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
+CORS_ALLOWED_ORIGINS = os.getenv(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:3000,http://127.0.0.1:3000',
+).split(',')
 
 # Only allow all origins in development — never in production
 CORS_ALLOW_ALL_ORIGINS = DEBUG
@@ -257,8 +257,24 @@ CELERY_TASK_ROUTES = {
     'api.tasks.send_meeting_reminder': {'queue': 'default'},
     'api.tasks.send_milestone_deadline_reminders': {'queue': 'default'},
     'api.tasks.cleanup_stale_notifications': {'queue': 'default'},
+    # File dédiée aux publications Kafka : un pic d'événements (ex: fin de
+    # sprint, beaucoup de tâches complétées d'un coup) ne doit jamais retarder
+    # les rappels ou les rapports, et inversement.
+    'api.tasks.publish_kafka_event': {'queue': 'events'},
 }
 CELERY_TASK_DEFAULT_QUEUE = 'default'
+
+# Bus d'événements Kafka — capture, historisation et distribution temps réel
+# des événements majeurs (réunion démarrée, tâche complétée, utilisateur
+# connecté, ...) pour découpler les services (audio, notifications,
+# statistiques, audit). Cf. api/events.py et api/tasks.py::publish_kafka_event.
+KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+
+# Coupe-circuit : permet de désactiver la publication d'événements sans
+# redéployer (maintenance Kafka, environnement de test sans broker, etc.).
+# Les événements ne sont alors simplement pas émis (aucune tentative de
+# connexion), plutôt que de faire échouer les tâches Celery en boucle.
+KAFKA_EVENTS_ENABLED = os.getenv('KAFKA_EVENTS_ENABLED', 'True') == 'True'
 
 # En environnement de test, les tâches s'exécutent en synchrone (pas de worker/Redis requis)
 CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', 'False') == 'True'

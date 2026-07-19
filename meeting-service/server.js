@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
 require('dotenv').config();
+const { createKafkaConsumer } = require('./kafkaConsumer');
 
 const app = express();
 const server = http.createServer(app);
@@ -25,16 +26,12 @@ app.use(express.json());
 // In-memory room state
 const rooms = new Map();
 
-// ---- REST endpoints ----
-
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok' });
-});
-
-app.post('/rooms', (req, res) => {
-  const { meetingId, title, createdBy } = req.body;
+// Extrait de la logique de POST /rooms pour être réutilisable à la fois par
+// la route REST (appel direct du frontend) et par le consommateur Kafka
+// (réaction découplée à l'événement "meeting_started" publié par le backend).
+function getOrCreateRoom({ meetingId, title, createdBy }) {
   if (!meetingId) {
-    return res.status(400).json({ error: 'meetingId is required' });
+    throw new Error('meetingId is required');
   }
 
   const roomId = `meeting-${meetingId}`;
@@ -49,7 +46,22 @@ app.post('/rooms', (req, res) => {
     });
   }
 
-  const room = rooms.get(roomId);
+  return rooms.get(roomId);
+}
+
+// ---- REST endpoints ----
+
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
+
+app.post('/rooms', (req, res) => {
+  const { meetingId, title, createdBy } = req.body;
+  if (!meetingId) {
+    return res.status(400).json({ error: 'meetingId is required' });
+  }
+
+  const room = getOrCreateRoom({ meetingId, title, createdBy });
   res.json({
     roomId: room.roomId,
     meetingId: room.meetingId,
@@ -270,3 +282,20 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`Meeting service running on port ${PORT}`);
 });
+
+// Démarre le consommateur Kafka en parallèle du serveur HTTP/Socket.IO :
+// aucune dépendance entre les deux, un souci de connexion Kafka ne doit
+// jamais empêcher le signaling WebRTC de fonctionner (et inversement).
+const kafkaConsumer = createKafkaConsumer({ getOrCreateRoom });
+kafkaConsumer.start().catch((err) => {
+  console.error('Impossible de démarrer le consommateur Kafka (audio):', err);
+});
+
+async function shutdown() {
+  console.log('Arrêt en cours...');
+  await kafkaConsumer.stop().catch(() => {});
+  server.close(() => process.exit(0));
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

@@ -160,3 +160,9 @@ def activity_log(db, user):
         entity_id=1,
         metadata={'title': 'Test'},
     )
+
+
+@pytest.fixture
+def api_client():
+    from rest_framework.test import APIClient
+    return APIClient()

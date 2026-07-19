@@ -66,6 +66,7 @@ import {
 } from '@dnd-kit/modifiers';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useKanbanService } from '../services/kanbanService';
+import { useProjectService } from '../services/projectService';
 import { useAuth } from '../context/AuthContext';
 import { Link as RouterLink } from 'react-router-dom';
 import { format, isAfter, isBefore } from 'date-fns';
@@ -92,6 +93,7 @@ const Kanban = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const kanbanService = useKanbanService();
+  const projectService = useProjectService();
   const { user } = useAuth();
 
   // Configuration des capteurs pour le drag & drop
@@ -120,7 +122,7 @@ const Kanban = () => {
   // Charger les projets pour le filtre
   const { data: projectsData } = useQuery(
     'projects',
-    () => fetch('/api/projects/').then(res => res.json()),
+    () => projectService.getAll(),
     {
       onError: () => {
         // Données mockées

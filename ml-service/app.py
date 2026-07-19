@@ -63,6 +63,20 @@ def load_models():
 def health():
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
+@app.route('/stats/kafka', methods=['GET'])
+def kafka_stats():
+    """Statistiques alimentées en temps réel par le consommateur Kafka
+    (kafka_consumer.py), lui-même découplé de ce process Flask.
+    Lecture seule : ce endpoint ne fait qu'exposer l'état déjà calculé,
+    jamais de traitement lourd dans le cycle requête/réponse."""
+    from stats_store import load_stats
+
+    stats = load_stats()
+    # Champs internes de calcul incrémental, pas utiles au consommateur de l'API
+    stats.pop('_actual_time_sum', None)
+    stats.pop('_actual_time_count', None)
+    return jsonify(stats)
+
 @app.route('/predict/task', methods=['POST'])
 def predict_task():
     """Prédit le temps, délai et priorité pour une tâche"""

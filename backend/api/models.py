@@ -714,3 +714,34 @@ class StorageNotification(models.Model):
     def __str__(self):
         return f'{self.company.name} - {self.notification_type}'
 
+
+class AuditEvent(models.Model):
+    """Trace persistée de chaque événement majeur consommé depuis Kafka.
+
+    Alimenté exclusivement par le consommateur d'audit (cf. management
+    command consume_audit_events), totalement découplé des services qui
+    produisent les événements : même si ce consommateur est arrêté un moment,
+    Kafka conserve les événements et l'audit reprend sans perte dès son
+    redémarrage (rejeu depuis le dernier offset commité).
+    """
+    event_id = models.UUIDField(unique=True)
+    event_type = models.CharField(max_length=100)
+    topic = models.CharField(max_length=150)
+    source_service = models.CharField(max_length=100, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField(help_text="Horodatage d'émission de l'événement (côté producteur)")
+    consumed_at = models.DateTimeField(auto_now_add=True, help_text="Horodatage de consommation (côté audit)")
+
+    class Meta:
+        db_table = 'audit_events'
+        verbose_name = "Événement d'audit"
+        verbose_name_plural = "Événements d'audit"
+        ordering = ['-occurred_at']
+        indexes = [
+            models.Index(fields=['event_type', '-occurred_at']),
+            models.Index(fields=['topic', '-occurred_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.event_type} ({self.event_id})'
+

@@ -27,6 +27,7 @@ from .permissions import (
 )
 from .mixins import ActivityLogMixin
 from .tasks import generate_project_report
+from .events import emit_user_connected
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,13 @@ class AuthViewSet(viewsets.GenericViewSet):
     def login(self, request):
         serializer = UserLoginSerializer(data=request.data)
         if serializer.is_valid():
-            return Response(serializer.validated_data, status=status.HTTP_200_OK)
+            data = serializer.validated_data
+            user = User.objects.filter(id=data['user']['id']).first()
+            if user:
+                ip_address = request.META.get('HTTP_X_FORWARDED_FOR', '').split(',')[0].strip() \
+                    or request.META.get('REMOTE_ADDR')
+                emit_user_connected(user, ip_address=ip_address)
+            return Response(data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=False, methods=['get'])
