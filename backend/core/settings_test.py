@@ -26,7 +26,5 @@ CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BROKER_URL = 'memory://'
 CELERY_RESULT_BACKEND = 'cache+memory://'
 
-# Pas de broker Kafka en environnement de test : les événements sont
-# construits et la tâche de publication s'exécute (grâce à CELERY_TASK_ALWAYS_EAGER)
-# mais sans tenter de connexion réseau réelle.
-KAFKA_EVENTS_ENABLED = False
+KAFKA_ENABLED = False
+KAFKA_BOOTSTRAP_SERVERS = 'localhost:9092'

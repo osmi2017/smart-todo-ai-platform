@@ -16,7 +16,10 @@ import os
 import threading
 from datetime import datetime, timezone
 
-STATS_FILE = os.path.join(os.path.dirname(__file__), 'kafka_stats_state.json')
+STATS_FILE = os.getenv(
+    'KAFKA_STATS_FILE',
+    os.path.join(os.path.dirname(__file__), 'kafka_stats_state.json'),
+)
 
 _lock = threading.Lock()
 
@@ -31,6 +34,7 @@ def _default_stats():
         '_actual_time_count': 0,
         'last_event_at': None,
         'last_updated_at': None,
+        '_processed_event_ids': [],
     }
 
 
@@ -52,6 +56,9 @@ def load_stats(path=None):
 def save_stats(stats, path=None):
     path = path or STATS_FILE
     with _lock:
+        parent = os.path.dirname(path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         tmp_path = f'{path}.tmp'
         with open(tmp_path, 'w', encoding='utf-8') as f:
             json.dump(stats, f, indent=2)
@@ -64,10 +71,19 @@ def update_stats_with_task_completed(stats, event):
     Retourne un nouveau dict de stats (ne mute pas l'argument reçu), pour
     faciliter les tests et éviter les effets de bord surprenants.
     """
-    payload = event.get('payload', {})
+    event_id = event.get('id') or event.get('event_id')
+    if not event_id:
+        raise ValueError('Task completion event is missing its id')
+
+    processed_event_ids = list(stats.get('_processed_event_ids', []))
+    if event_id in processed_event_ids:
+        return dict(stats)
+
+    payload = event.get('data', event.get('payload', {}))
     updated = dict(stats)
 
     updated['total_tasks_completed'] = stats.get('total_tasks_completed', 0) + 1
+    updated['_processed_event_ids'] = [*processed_event_ids, event_id]
 
     project_id = payload.get('project_id')
     if project_id is not None:
@@ -89,7 +105,7 @@ def update_stats_with_task_completed(stats, event):
         updated['_actual_time_count'] = actual_count
         updated['avg_actual_time_minutes'] = round(actual_sum / actual_count, 2)
 
-    updated['last_event_at'] = event.get('occurred_at')
+    updated['last_event_at'] = event.get('time') or event.get('occurred_at')
     updated['last_updated_at'] = datetime.now(timezone.utc).isoformat()
 
     return updated

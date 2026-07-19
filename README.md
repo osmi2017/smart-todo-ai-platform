@@ -33,14 +33,14 @@ Une plateforme intelligente de gestion de tâches, projets et réunions, avec pr
                        ┌──────▼──────┐        ┌───────────────┐
                        │   Backend   │───────▶│   ml-service   │  Flask + TensorFlow (5001)
                        │   Django    │        └───────┬───────┘
-                       │  (8000)     │                │ consomme "tasks"
+                       │  (8000)     │                │ consomme task.completed
                        └──┬───┬──┬───┘        ┌────────▼────────────┐
                           │   │  │            │ ml-stats-consumer    │
              Celery tasks │   │  └────────────┴──────────────────────┘
                           │   │  publie des événements
                  ┌────────▼┐  └─────────────┐
                  │  Redis  │        ┌────────▼────────┐
-                 │ (6379)  │        │      Kafka       │  (9092 interne / 9094 externe)
+                 │ (6379)  │        │      Kafka       │  (9092 interne / 29092 externe)
                  └─────────┘        │  (event bus)      │
                                     └──┬────────┬───────┘
                     ┌───────────────┐  │        │  ┌─────────────────────┐
@@ -52,10 +52,10 @@ Une plateforme intelligente de gestion de tâches, projets et réunions, avec pr
 - **backend** (Django/DRF) : API REST, WebSocket (Channels), authentification JWT.
 - **celery-worker** / **celery-beat** : exécutent et planifient les tâches lourdes (rappels de réunions, traitement IA audio/vidéo, génération de rapports, publication Kafka) sans jamais bloquer l'API.
 - **ml-service** (Flask + TensorFlow) : prédictions de délais/risques.
-- **ml-stats-consumer** : consomme les événements `task_completed` pour maintenir des statistiques cumulées, indépendamment du serveur de prédiction.
-- **meeting-service** (Node/Socket.IO) : signaling WebRTC pour les réunions vidéo, et consomme `meeting_started` pour pré-provisionner les salles.
-- **audit-consumer** : persiste tous les événements Kafka majeurs pour une traçabilité complète.
-- **Kafka** : bus d'événements centralisé (réunion démarrée, tâche complétée, utilisateur connecté), avec rétention de 14 jours et 3 partitions par topic.
+- **ml-stats-consumer** : consomme les événements `task.completed` du topic centralisé pour maintenir des statistiques cumulées, indépendamment du serveur de prédiction.
+- **meeting-service** (Node/Socket.IO) : signaling WebRTC pour les réunions vidéo, et consomme `meeting.started` pour pré-provisionner les salles.
+- **kafka-audit-consumer** / **kafka-statistics-consumer** / **kafka-notifications-consumer** / **kafka-audio-consumer** : groupes de consommateurs backend indépendants (audit persisté, métriques, notifications temps réel, dispatch audio via Celery).
+- **Kafka** : bus d'événements centralisé (`smart-todo.events` + DLQ `smart-todo.events.dlq`, six partitions) capturant réunion démarrée, tâche complétée, utilisateur connecté, etc.
 - **Redis** : broker et backend de résultats pour Celery.
 - **PostgreSQL** : base de données principale.
 
@@ -81,8 +81,10 @@ cp .env.example .env
 | `JWT_SECRET_KEY` | Clé de signature des JWT | *(à définir)* |
 | `DB_NAME` / `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` | Connexion PostgreSQL | `todo_ai` / `todo_user` / — / `localhost` / `5432` |
 | `REDIS_URL` | Broker/backend Celery | `redis://localhost:6379/0` |
-| `KAFKA_BOOTSTRAP_SERVERS` | Adresse du broker Kafka | `localhost:9092` |
-| `KAFKA_EVENTS_ENABLED` | Coupe-circuit du bus d'événements | `True` |
+| `KAFKA_BOOTSTRAP_SERVERS` | Adresse du broker Kafka | `localhost:29092` |
+| `KAFKA_ENABLED` | Coupe-circuit du bus d'événements | `True` |
+| `KAFKA_EVENTS_TOPIC` / `KAFKA_TOPIC` | Topic centralisé des événements | `smart-todo.events` |
+| `KAFKA_DEAD_LETTER_TOPIC` / `KAFKA_DLQ_TOPIC` | Topic de dead-letter | `smart-todo.events.dlq` |
 | `ML_SERVICE_URL` | URL du service ML appelée par le backend | `http://localhost:5001` |
 | `CORS_ORIGINS` | Origines autorisées à appeler l'API Flask du ml-service | `http://localhost:8000` |
 | `ML_TRAIN_SECRET` | Jeton requis pour ré-entraîner via `POST /train` | *(à définir)* |

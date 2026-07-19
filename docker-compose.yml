@@ -1,18 +1,7 @@
-# ----------------------------------------------------------------------------
-# Toutes les URLs et secrets appelés par les services (base de données,
-# Redis, Kafka, service ML, clés API tierces, ...) viennent du fichier `.env`
-# à la racine (voir .env.example) via `env_file`. Seules les valeurs qui
-# DOIVENT différer entre Docker et un lancement local (les noms d'hôtes
-# internes au réseau Docker : "postgres", "redis", "kafka", "ml-service")
-# sont surchargées explicitement dans `environment:` de chaque service.
-# ----------------------------------------------------------------------------
-
 services:
   postgres:
     image: postgres:14
     container_name: todo_ai_db
-    env_file:
-      - .env
     environment:
       POSTGRES_DB: ${DB_NAME:-todo_ai}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -90,104 +79,42 @@ services:
     networks:
       - todo_ai_network
 
-  # Broker Kafka — bus d'événements centralisé pour capturer, historiser et
-  # distribuer en temps réel tous les événements majeurs du système (réunion
-  # démarrée, tâche complétée, utilisateur connecté, ...). Mode KRaft : pas
-  # de Zookeeper nécessaire (broker = son propre contrôleur de métadonnées).
-  #
-  # Image officielle Apache Kafka (apache/kafka), et non bitnami/kafka :
-  # Bitnami a retiré en août 2025 tous les tags versionnés de son catalogue
-  # public gratuit (voir https://github.com/bitnami/containers/issues/83267),
-  # ne laissant plus que des images non maintenues sous bitnamilegacy/kafka.
-  # apache/kafka est l'image officielle du projet, activement maintenue.
-  kafka:
-    image: apache/kafka:3.7.0
-    container_name: todo_ai_kafka
-    environment:
-      KAFKA_NODE_ID: 1
-      KAFKA_PROCESS_ROLES: broker,controller
-      # Identifiant de cluster KRaft fixe (généré une fois, format base64
-      # requis par Kafka) : évite un reformatage du volume à chaque restart.
-      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      # Un seul broker en dev : réplication à 1. En production, on veut au
-      # moins 3 brokers et un facteur de réplication >= 2 pour survivre à la
-      # panne d'un nœud sans perdre de données (tolérance de panne réelle).
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      # La création auto de topics reste activée en dev pour plus de
-      # souplesse, mais kafka-init (ci-dessous) définit explicitement les
-      # topics attendus avec leurs propres partitions/rétention.
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    ports:
-      - "9094:9094"  # accès externe (hors réseau docker), ex: outils de debug
-    volumes:
-      - kafka_data:/var/lib/kafka/data
-    networks:
-      - todo_ai_network
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
-      interval: 10s
-      timeout: 10s
-      retries: 15
-      start_period: 30s
-
-  # Créé une fois les topics avec leurs paramètres explicites (partitions
-  # pour le parallélisme, rétention pour l'historisation), puis s'arrête.
-  # Sans ce service, KAFKA_AUTO_CREATE_TOPICS_ENABLE créerait les topics
-  # à la première publication, mais avec des valeurs par défaut non maîtrisées.
-  kafka-init:
-    image: apache/kafka:3.7.0
-    container_name: todo_ai_kafka_init
-    depends_on:
-      kafka:
-        condition: service_healthy
-    entrypoint: ["/bin/bash", "-c"]
-    command: >
-      "
-      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists
-        --topic smarttodo.meetings.events --partitions 3 --replication-factor 1
-        --config retention.ms=1209600000 &&
-      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists
-        --topic smarttodo.tasks.events --partitions 3 --replication-factor 1
-        --config retention.ms=1209600000 &&
-      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists
-        --topic smarttodo.users.events --partitions 3 --replication-factor 1
-        --config retention.ms=1209600000 &&
-      echo 'Topics Kafka initialisés.'
-      "
-    networks:
-      - todo_ai_network
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: todo_ai_backend
-    env_file:
-      - .env
+    command: sh -c "python manage.py migrate --noinput && gunicorn --bind 0.0.0.0:8000 core.wsgi:application"
     environment:
+      DEBUG: ${DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
       DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-todo_ai}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
       REDIS_URL: redis://redis:6379/0
       KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_EVENTS_TOPIC: ${KAFKA_EVENTS_TOPIC:-smart-todo.events}
       KAFKA_DEAD_LETTER_TOPIC: ${KAFKA_DEAD_LETTER_TOPIC:-smart-todo.events.dlq}
       ML_SERVICE_URL: http://ml-service:5001
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - redis
-      - ml-service
-      - kafka
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      ml-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
     volumes:
       - ./backend:/app
     networks:
@@ -195,28 +122,60 @@ services:
 
   # Worker Celery : exécute en arrière-plan toutes les opérations lourdes
   # (rappels de meetings en masse, transcription/traitement IA audio-vidéo,
-  # génération de rapports de projet, publication d'événements Kafka) sans
-  # jamais bloquer l'API/l'UI.
+  # génération de rapports de projet) sans jamais bloquer l'API/l'UI.
   celery-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: todo_ai_celery_worker
-    # -Q default,heavy,events : la file "events" (publication Kafka) est
-    # isolée des deux autres, pour qu'un pic d'événements (ex: beaucoup de
-    # tâches complétées d'un coup) ne retarde jamais un rappel ou un rapport.
-    command: celery -A core worker -l info -Q default,heavy,events --concurrency=4
-    env_file:
-      - .env
+    # -Q default,heavy : écoute la file rapide (rappels/notifications) et la
+    # file lourde (audio/vidéo, rapports). En prod, on peut scinder ces deux
+    # files sur des workers/containers séparés pour isoler la charge lourde.
+    command: celery -A core worker -l info -Q default,heavy --concurrency=4
     environment:
+      DEBUG: ${DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
       DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-todo_ai}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
       REDIS_URL: redis://redis:6379/0
       ML_SERVICE_URL: http://ml-service:5001
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
-      - postgres
-      - redis
-      - kafka
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    networks:
+      - todo_ai_network
+
+  celery-events:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: celery -A core worker -l info -Q events --concurrency=2
+    environment:
+      DEBUG: ${DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-todo_ai}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_ENABLED: "True"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_EVENTS_TOPIC: ${KAFKA_EVENTS_TOPIC:-smart-todo.events}
+      KAFKA_DEAD_LETTER_TOPIC: ${KAFKA_DEAD_LETTER_TOPIC:-smart-todo.events.dlq}
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     volumes:
       - ./backend:/app
     networks:
@@ -230,13 +189,15 @@ services:
       dockerfile: Dockerfile
     container_name: todo_ai_celery_beat
     command: celery -A core beat -l info
-    env_file:
-      - .env
     environment:
+      DEBUG: ${DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
       DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-todo_ai}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
       REDIS_URL: redis://redis:6379/0
       ML_SERVICE_URL: http://ml-service:5001
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     depends_on:
       backend:
         condition: service_healthy
@@ -258,7 +219,7 @@ services:
       DB_HOST: postgres
       DB_NAME: ${DB_NAME:-todo_ai}
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_PASSWORD: ${DB_PASSWORD}
       REDIS_URL: redis://redis:6379/0
       KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -285,7 +246,7 @@ services:
       DB_HOST: postgres
       DB_NAME: ${DB_NAME:-todo_ai}
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_PASSWORD: ${DB_PASSWORD}
       REDIS_URL: redis://redis:6379/0
       KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -312,7 +273,7 @@ services:
       DB_HOST: postgres
       DB_NAME: ${DB_NAME:-todo_ai}
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_PASSWORD: ${DB_PASSWORD}
       REDIS_URL: redis://redis:6379/0
       KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -341,7 +302,7 @@ services:
       DB_HOST: postgres
       DB_NAME: ${DB_NAME:-todo_ai}
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      DB_PASSWORD: ${DB_PASSWORD}
       REDIS_URL: redis://redis:6379/0
       KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -362,68 +323,43 @@ services:
     networks:
       - todo_ai_network
 
-  # Consommateur d'audit : persiste TOUS les événements Kafka majeurs
-  # (meetings, tasks, users) dans la base pour une traçabilité complète,
-  # totalement indépendant des autres consommateurs (audio, statistiques).
-  audit-consumer:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: todo_ai_audit_consumer
-    command: python manage.py consume_audit_events
-    env_file:
-      - .env
-    environment:
-      DB_HOST: postgres
-      REDIS_URL: redis://redis:6379/0
-      ML_SERVICE_URL: http://ml-service:5001
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-    depends_on:
-      kafka:
-        condition: service_healthy
-      postgres:
-        condition: service_started
-    volumes:
-      - ./backend:/app
-    networks:
-      - todo_ai_network
-
   ml-service:
     build:
       context: ./ml-service
       dockerfile: Dockerfile
     container_name: todo_ai_ml
-    env_file:
-      - .env
     environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_STATS_FILE: /app/stats/kafka_stats_state.json
     ports:
       - "5001:5001"
     volumes:
       - ./ml-service:/app
       - ml_models:/app/models
+      - ml_stats:/app/stats
     networks:
       - todo_ai_network
 
-  # Consommateur de statistiques : réagit à "task_completed" pour maintenir
-  # des compteurs cumulés (par projet, par utilisateur, temps moyen), sans
-  # jamais ralentir les endpoints de prédiction du service ml-service.
+  # Consommateur de statistiques ML : groupe de consommateurs indépendant
+  # (smart-todo.ml-statistics) qui agrège les tâches complétées sans jamais
+  # ralentir le serveur de prédiction Flask.
   ml-stats-consumer:
     build:
       context: ./ml-service
       dockerfile: Dockerfile
-    container_name: todo_ai_ml_stats_consumer
+    restart: unless-stopped
     command: python kafka_consumer.py
-    env_file:
-      - .env
     environment:
+      KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: ${KAFKA_EVENTS_TOPIC:-smart-todo.events}
+      KAFKA_DLQ_TOPIC: ${KAFKA_DEAD_LETTER_TOPIC:-smart-todo.events.dlq}
+      KAFKA_STATS_FILE: /app/stats/kafka_stats_state.json
     depends_on:
-      kafka:
-        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     volumes:
       - ./ml-service:/app
-      - ml_models:/app/models
+      - ml_stats:/app/stats
     networks:
       - todo_ai_network
 
@@ -432,15 +368,18 @@ services:
       context: ./meeting-service
       dockerfile: Dockerfile
     container_name: todo_ai_meeting
-    env_file:
-      - .env
     environment:
+      PORT: 4000
+      FRONTEND_URL: http://localhost:3000
+      KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: ${KAFKA_EVENTS_TOPIC:-smart-todo.events}
+      KAFKA_DLQ_TOPIC: ${KAFKA_DEAD_LETTER_TOPIC:-smart-todo.events.dlq}
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
     ports:
       - "4000:4000"
-    depends_on:
-      kafka:
-        condition: service_healthy
     volumes:
       - ./meeting-service:/app
       - /app/node_modules
@@ -452,8 +391,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: todo_ai_frontend
-    env_file:
-      - .env
+    environment:
+      REACT_APP_API_URL: http://localhost:8000/api
+      REACT_APP_ML_URL: http://localhost:5001
+      REACT_APP_MEETING_SERVICE_URL: http://localhost:4000
     ports:
       - "3000:3000"
     depends_on:
@@ -470,7 +411,7 @@ volumes:
   redis_data:
   kafka_data:
   ml_models:
-  kafka_data:
+  ml_stats:
 
 networks:
   todo_ai_network:

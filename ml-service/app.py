@@ -4,8 +4,6 @@ from datetime import datetime
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import numpy as np
-import pandas as pd
 import joblib
 import tensorflow as tf
 from dotenv import load_dotenv
@@ -75,6 +73,7 @@ def kafka_stats():
     # Champs internes de calcul incrémental, pas utiles au consommateur de l'API
     stats.pop('_actual_time_sum', None)
     stats.pop('_actual_time_count', None)
+    stats.pop('_processed_event_ids', None)
     return jsonify(stats)
 
 @app.route('/predict/task', methods=['POST'])
