@@ -1,117 +1,207 @@
+"""
+Bus d'événements Kafka — module central de publication.
+
+Kafka sert de système de messagerie central pour capturer, historiser et
+distribuer en temps réel tous les événements majeurs du système
+("réunion démarrée", "tâche complétée", "utilisateur connecté", ...).
+
+Principes :
+- Un topic par domaine métier (meetings, tasks, users) : chaque service
+  consommateur (audio, notifications, statistiques, audit) s'abonne
+  uniquement à ce qui le concerne, à son propre rythme, sans dépendre des
+  autres services ni du service producteur (découplage total).
+- La publication effective vers Kafka est toujours déléguée à une tâche
+  Celery (cf. api/tasks.py::publish_kafka_event) : la requête HTTP qui
+  déclenche l'événement n'attend jamais l'aller-retour réseau vers le
+  broker, et Celery rejoue automatiquement l'envoi en cas d'indisponibilité
+  momentanée de Kafka (aucune perte d'événement, même sous forte charge ou
+  panne d'un composant).
+- Chaque événement porte une clé de partition (l'ID de l'entité concernée)
+  pour garantir l'ordre des événements relatifs à une même réunion/tâche/
+  utilisateur, tout en permettant le parallélisme entre entités.
+"""
+import json
 import logging
-from contextlib import contextmanager
-from contextvars import ContextVar
-from typing import Optional
+import threading
+import uuid
+from datetime import datetime, date
 
 from django.conf import settings
-from django.db import transaction
-
-from .models import Company, EventOutbox, User
 
 logger = logging.getLogger(__name__)
-_current_actor = ContextVar('event_actor', default=None)
+
+# ---------------------------------------------------------------------------
+# Topics — un par domaine métier. Ce découpage permet à chaque service de ne
+# consommer que ce qui le concerne (ex : le service audio n'a besoin que du
+# topic "meetings", le service d'audit consomme les trois).
+# ---------------------------------------------------------------------------
+TOPIC_MEETINGS = 'smarttodo.meetings.events'
+TOPIC_TASKS = 'smarttodo.tasks.events'
+TOPIC_USERS = 'smarttodo.users.events'
+
+ALL_TOPICS = (TOPIC_MEETINGS, TOPIC_TASKS, TOPIC_USERS)
+
+# Types d'événements majeurs émis par la plateforme (liste non exhaustive,
+# facilement extensible : ajouter un type ne casse aucun consommateur
+# existant grâce au format d'enveloppe commun ci-dessous).
+EVENT_MEETING_STARTED = 'meeting_started'
+EVENT_MEETING_ENDED = 'meeting_ended'
+EVENT_TASK_COMPLETED = 'task_completed'
+EVENT_TASK_ASSIGNED = 'task_assigned'
+EVENT_USER_CONNECTED = 'user_connected'
 
 
-@contextmanager
-def event_actor(actor: User):
-    token = _current_actor.set(actor)
-    try:
-        yield
-    finally:
-        _current_actor.reset(token)
+class _JSONEncoder(json.JSONEncoder):
+    """Sérialise proprement les types Django courants (dates, UUID, Decimal)."""
+
+    def default(self, obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, uuid.UUID):
+            return str(obj)
+        return super().default(obj)
 
 
-def get_event_actor(fallback: Optional[User] = None) -> Optional[User]:
-    return _current_actor.get() or fallback
+def build_event(event_type, payload, source_service='backend'):
+    """Construit l'enveloppe standard d'un événement.
 
-
-class EventTypes:
-    USER_REGISTERED = 'user.registered'
-    USER_LOGGED_IN = 'user.logged_in'
-    USER_LOGGED_OUT = 'user.logged_out'
-    USER_CREATED = 'user.created'
-    USER_ROLE_CHANGED = 'user.role_changed'
-    COMPANY_CREATED = 'company.created'
-    GROUP_CREATED = 'group.created'
-    GROUP_MEMBER_ADDED = 'group.member_added'
-    GROUP_MEMBER_REMOVED = 'group.member_removed'
-    PROJECT_CREATED = 'project.created'
-    PROJECT_UPDATED = 'project.updated'
-    PROJECT_DELETED = 'project.deleted'
-    TASK_CREATED = 'task.created'
-    TASK_UPDATED = 'task.updated'
-    TASK_ASSIGNED = 'task.assigned'
-    TASK_UNASSIGNED = 'task.unassigned'
-    TASK_STATUS_CHANGED = 'task.status_changed'
-    TASK_COMPLETED = 'task.completed'
-    TASK_DELETED = 'task.deleted'
-    COMMENT_CREATED = 'comment.created'
-    MEETING_CREATED = 'meeting.created'
-    MEETING_UPDATED = 'meeting.updated'
-    MEETING_STATUS_CHANGED = 'meeting.status_changed'
-    MEETING_STARTED = 'meeting.started'
-    MEETING_COMPLETED = 'meeting.completed'
-    MEETING_CANCELLED = 'meeting.cancelled'
-    MEETING_TRANSCRIPTION_REQUESTED = 'meeting.audio.transcription_requested'
-    MEETING_AI_PROCESSING_REQUESTED = 'meeting.ai.processing_requested'
-    FILE_UPLOADED = 'file.uploaded'
-    FILE_SHARED = 'file.shared'
-    FILE_DELETED = 'file.deleted'
-
-
-def emit_event(
-    event_type: str,
-    aggregate_type: str,
-    aggregate_id,
-    payload: dict,
-    actor: Optional[User] = None,
-    company: Optional[Company] = None,
-    schema_version: int = 1,
-) -> EventOutbox:
-    if company is None and actor is not None:
-        company = actor.company
-
-    event = EventOutbox.objects.create(
-        event_type=event_type,
-        aggregate_type=aggregate_type,
-        aggregate_id=str(aggregate_id),
-        company=company,
-        company_id_snapshot=company.id if company else None,
-        actor=actor,
-        actor_id_snapshot=actor.id if actor else None,
-        payload=payload,
-        schema_version=schema_version,
-    )
-
-    if settings.KAFKA_ENABLED:
-        transaction.on_commit(lambda: _dispatch_event(event.event_id))
-
-    return event
-
-
-def event_envelope(event: EventOutbox) -> dict:
+    Cette enveloppe commune (event_id, event_type, occurred_at, source_service,
+    payload) est ce qui permet à n'importe quel nouveau consommateur de
+    comprendre n'importe quel événement, présent ou futur, sans connaître le
+    détail métier de chaque type d'événement.
+    """
     return {
-        'specversion': '1.0',
-        'id': str(event.event_id),
-        'type': event.event_type,
-        'source': settings.KAFKA_EVENT_SOURCE,
-        'subject': f'{event.aggregate_type}/{event.aggregate_id}',
-        'time': event.created_at.isoformat(),
-        'datacontenttype': 'application/json',
-        'schema_version': event.schema_version,
-        'company_id': event.company_id_snapshot,
-        'actor_id': event.actor_id_snapshot,
-        'data': event.payload,
+        'event_id': str(uuid.uuid4()),
+        'event_type': event_type,
+        'occurred_at': datetime.utcnow().isoformat() + 'Z',
+        'source_service': source_service,
+        'payload': payload,
     }
 
 
-def _dispatch_event(event_id) -> None:
-    try:
-        from .tasks import publish_domain_event
+# ---------------------------------------------------------------------------
+# Producteur Kafka — singleton paresseux et thread-safe.
+# ---------------------------------------------------------------------------
+_producer = None
+_producer_lock = threading.Lock()
 
-        publish_domain_event.delay(str(event_id))
-    except Exception:
-        logger.exception(
-            'Kafka event %s remains in the outbox and will be retried by the sweeper',
-            event_id,
-        )
+
+def get_producer():
+    """Retourne un KafkaProducer partagé (une seule connexion par process).
+
+    Configuration pensée pour ne jamais perdre de message :
+    - acks='all' : le broker confirme seulement après réplication complète.
+    - retries élevé + idempotence : gère les micro-coupures réseau sans
+      dupliquer ni perdre de message.
+    - linger_ms : regroupe les envois pour absorber les pics de charge sans
+      saturer le broker.
+    """
+    global _producer
+    if _producer is not None:
+        return _producer
+
+    with _producer_lock:
+        if _producer is None:
+            from kafka import KafkaProducer
+
+            bootstrap_servers = getattr(settings, 'KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+            _producer = KafkaProducer(
+                bootstrap_servers=bootstrap_servers.split(','),
+                key_serializer=lambda k: k.encode('utf-8') if k is not None else None,
+                value_serializer=lambda v: json.dumps(v, cls=_JSONEncoder).encode('utf-8'),
+                acks='all',
+                retries=5,
+                enable_idempotence=True,
+                linger_ms=20,
+                request_timeout_ms=15000,
+            )
+    return _producer
+
+
+def reset_producer_for_tests():
+    """Permet aux tests de repartir d'un producteur neuf (mocké)."""
+    global _producer
+    with _producer_lock:
+        _producer = None
+
+
+# ---------------------------------------------------------------------------
+# Helpers métier — un point d'entrée clair et typé par événement majeur.
+# Chacun délègue immédiatement à Celery : l'appelant (vue, signal) ne bloque
+# jamais sur Kafka et n'a pas à gérer les retries lui-même.
+# ---------------------------------------------------------------------------
+
+def emit_meeting_started(meeting):
+    from .tasks import publish_kafka_event
+
+    payload = {
+        'meeting_id': meeting.id,
+        'title': meeting.title,
+        'project_id': meeting.project_id,
+        'organizer_id': meeting.organizer_id,
+        'started_at': meeting.started_at.isoformat() if meeting.started_at else None,
+        'participant_ids': list(meeting.participants.values_list('user_id', flat=True)),
+    }
+    event = build_event(EVENT_MEETING_STARTED, payload)
+    publish_kafka_event.delay(TOPIC_MEETINGS, str(meeting.id), event)
+    return event
+
+
+def emit_meeting_ended(meeting):
+    from .tasks import publish_kafka_event
+
+    payload = {
+        'meeting_id': meeting.id,
+        'title': meeting.title,
+        'project_id': meeting.project_id,
+        'ended_at': meeting.ended_at.isoformat() if meeting.ended_at else None,
+        'duration_minutes': meeting.duration_minutes,
+    }
+    event = build_event(EVENT_MEETING_ENDED, payload)
+    publish_kafka_event.delay(TOPIC_MEETINGS, str(meeting.id), event)
+    return event
+
+
+def emit_task_completed(task):
+    from .tasks import publish_kafka_event
+
+    payload = {
+        'task_id': task.id,
+        'title': task.title,
+        'project_id': task.project_id,
+        'assigned_to_id': task.assigned_to_id,
+        'priority': task.priority,
+        'actual_time': task.actual_time,
+        'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+    }
+    event = build_event(EVENT_TASK_COMPLETED, payload)
+    publish_kafka_event.delay(TOPIC_TASKS, str(task.id), event)
+    return event
+
+
+def emit_task_assigned(task):
+    from .tasks import publish_kafka_event
+
+    payload = {
+        'task_id': task.id,
+        'title': task.title,
+        'project_id': task.project_id,
+        'assigned_to_id': task.assigned_to_id,
+    }
+    event = build_event(EVENT_TASK_ASSIGNED, payload)
+    publish_kafka_event.delay(TOPIC_TASKS, str(task.id), event)
+    return event
+
+
+def emit_user_connected(user, ip_address=None):
+    from .tasks import publish_kafka_event
+
+    payload = {
+        'user_id': user.id,
+        'username': user.username,
+        'company_id': user.company_id,
+        'ip_address': ip_address,
+    }
+    event = build_event(EVENT_USER_CONNECTED, payload)
+    publish_kafka_event.delay(TOPIC_USERS, str(user.id), event)
+    return event

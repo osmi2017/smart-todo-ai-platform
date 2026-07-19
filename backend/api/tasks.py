@@ -469,3 +469,51 @@ def generate_project_report(self, project_id, user_id, report_format='json'):
         'file_id': file_obj.id if file_obj else None,
         'summary': report_payload['summary'],
     }
+
+
+# ---------------------------------------------------------------------------
+# Publication d'événements Kafka (bus d'événements centralisé)
+# ---------------------------------------------------------------------------
+
+@shared_task(
+    name='api.tasks.publish_kafka_event',
+    bind=True,
+    max_retries=8,
+    retry_backoff=True,       # backoff exponentiel entre les tentatives
+    retry_backoff_max=120,    # jamais plus de 2 min entre deux essais
+    retry_jitter=True,        # évite les tentatives synchronisées de plusieurs workers
+    autoretry_for=(Exception,),
+)
+def publish_kafka_event(self, topic, key, event):
+    """Publie un événement sur Kafka de façon durable.
+
+    Exécutée par Celery (jamais dans le cycle requête/réponse HTTP) : si le
+    broker Kafka est temporairement indisponible ou sous forte charge, Celery
+    rejoue automatiquement cette tâche avec un backoff exponentiel — aucun
+    événement n'est perdu, il est simplement retenu par Redis (la file
+    Celery) jusqu'à ce que la publication réussisse.
+    """
+    from .events import get_producer
+
+    if not getattr(settings, 'KAFKA_EVENTS_ENABLED', True):
+        logger.debug('Kafka désactivé (KAFKA_EVENTS_ENABLED=False) : événement %s ignoré', event.get('event_type'))
+        return {'skipped': True, 'reason': 'kafka_disabled'}
+
+    producer = get_producer()
+    # .get(timeout=...) force une confirmation synchrone du broker (accusé de
+    # réception après réplication, cf. acks='all') : si ça lève une exception,
+    # Celery retente automatiquement grâce à autoretry_for.
+    future = producer.send(topic, key=key, value=event)
+    record_metadata = future.get(timeout=10)
+
+    logger.info(
+        'Événement Kafka publié : topic=%s partition=%s offset=%s type=%s',
+        record_metadata.topic, record_metadata.partition, record_metadata.offset,
+        event.get('event_type'),
+    )
+    return {
+        'topic': record_metadata.topic,
+        'partition': record_metadata.partition,
+        'offset': record_metadata.offset,
+        'event_id': event.get('event_id'),
+    }

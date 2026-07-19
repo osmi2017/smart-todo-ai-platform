@@ -15,7 +15,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN DEBUG=True DJANGO_SECRET_KEY=build-only-secret python manage.py collectstatic --noinput
+# collectstatic n'a besoin d'aucun secret réel, seulement que Django puisse
+# charger settings.py. Aucune variable d'environnement n'est disponible au
+# moment du `docker build` (env_file/environment ne s'appliquent qu'au
+# démarrage du conteneur) : DEBUG=True ici contourne uniquement la
+# vérification de SECRET_KEY pour cette étape de build, et sera écrasé par
+# la vraie valeur de .env au démarrage du conteneur (docker-compose).
+ENV DEBUG=True
+RUN python manage.py collectstatic --noinput
 
 EXPOSE 8000
 

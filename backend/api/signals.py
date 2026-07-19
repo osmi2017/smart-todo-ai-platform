@@ -1,20 +1,63 @@
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from .models import Task, Comment, Project, Notification
+from .events import emit_task_completed
+from datetime import date
 
-from .events import EventTypes, emit_event, get_event_actor
-from .models import Comment, Meeting, Project, Task
+# Vérifier si channels est disponible
+try:
+    from channels.layers import get_channel_layer
+    from asgiref.sync import async_to_sync
+    CHANNELS_AVAILABLE = True
+except ImportError:
+    CHANNELS_AVAILABLE = False
 
+# Vérifier si Redis est disponible
+try:
+    import redis
+    r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+    r.ping()
+    REDIS_AVAILABLE = True
+except:
+    REDIS_AVAILABLE = False
+
+def send_websocket_notification(recipient_id, notification_type, title, message, data=None):
+    """Envoie une notification WebSocket si disponible"""
+    if CHANNELS_AVAILABLE and REDIS_AVAILABLE:
+        try:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                f'notifications_{recipient_id}',
+                {
+                    'type': 'send_notification',
+                    'notification_type': notification_type,
+                    'title': title,
+                    'message': message,
+                    'data': data or {},
+                }
+            )
+        except Exception as e:
+            print(f"⚠️ Erreur WebSocket: {e}")
 
 @receiver(pre_save, sender=Task)
-def capture_task_changes(sender, instance, **kwargs):
-    if not instance.pk:
+def task_track_previous_status(sender, instance, **kwargs):
+    """Mémorise le statut précédent avant sauvegarde, pour ne détecter la
+    transition vers 'completed' qu'une seule fois (et non à chaque save())."""
+    if instance.pk:
+        previous = Task.objects.filter(pk=instance.pk).values_list('status', flat=True).first()
+        instance._previous_status = previous
+    else:
         instance._previous_status = None
-        instance._previous_assigned_to_id = None
-        return
 
-    previous = sender.objects.filter(pk=instance.pk).values('status', 'assigned_to_id').first()
-    instance._previous_status = previous['status'] if previous else None
-    instance._previous_assigned_to_id = previous['assigned_to_id'] if previous else None
+
+@receiver(post_save, sender=Task)
+def task_completed_event(sender, instance, created, **kwargs):
+    """Publie l'événement Kafka 'task_completed' uniquement lors de la
+    transition réelle vers 'completed', jamais sur les sauvegardes suivantes
+    (idempotence côté producteur)."""
+    previous_status = getattr(instance, '_previous_status', None)
+    if not created and previous_status != 'completed' and instance.status == 'completed':
+        emit_task_completed(instance)
 
 
 @receiver(post_save, sender=Task)
