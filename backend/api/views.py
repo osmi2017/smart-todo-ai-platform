@@ -1,30 +1,30 @@
 import logging
+from datetime import timedelta
 
-from rest_framework import viewsets, status, generics, filters
+import requests
+from django.conf import settings
+from django.db import transaction
+from django.db.models import Avg, F, Q, Sum
+from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
-from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, Count, Avg, Sum, F
-from django.utils import timezone
-from datetime import timedelta
-import logging
-import requests
-from django.conf import settings
 
-from .models import User, Project, Milestone, Task, ActivityLog, Comment, Company, CompanyGroup
+from .models import User, Project, Milestone, Task, ActivityLog, Company, CompanyGroup
 from .serializers import (
     UserSerializer, UserRegisterSerializer, UserLoginSerializer,
     ProjectSerializer, MilestoneSerializer, TaskSerializer, 
-    TaskDetailSerializer, ActivityLogSerializer, CommentSerializer,
-    DashboardStatsSerializer, UserSimpleSerializer,
+    TaskDetailSerializer, ActivityLogSerializer, UserSimpleSerializer,
     CompanySerializer, CompanyGroupSerializer, CompanyGroupDetailSerializer,
     CompanyGroupMinimalSerializer,
 )
 from .permissions import (
-    IsAdminOrReadOnly, IsOwnerOrReadOnly, IsSuperAdmin,
-    IsCompanyAdmin, HasGroupAccess,
+    IsOwnerOrReadOnly, IsSuperAdmin,
+    IsCompanyAdmin,
 )
+from .events import EventTypes, emit_event, event_actor
 from .mixins import ActivityLogMixin
 from .tasks import generate_project_report
 
@@ -38,7 +38,16 @@ class AuthViewSet(viewsets.GenericViewSet):
     def register(self, request):
         serializer = UserRegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()
+            with transaction.atomic():
+                user = serializer.save()
+                emit_event(
+                    EventTypes.USER_REGISTERED,
+                    'user',
+                    user.id,
+                    {'user_id': user.id, 'username': user.username, 'role': user.role},
+                    actor=user,
+                    company=user.company,
+                )
             return Response({
                 'user': UserSerializer(user).data,
                 'message': 'Inscription réussie'
@@ -64,9 +73,32 @@ class AuthViewSet(viewsets.GenericViewSet):
     def login(self, request):
         serializer = UserLoginSerializer(data=request.data)
         if serializer.is_valid():
+            user = User.objects.get(id=serializer.validated_data['user']['id'])
+            emit_event(
+                EventTypes.USER_LOGGED_IN,
+                'user',
+                user.id,
+                {'user_id': user.id, 'username': user.username, 'role': user.role},
+                actor=user,
+                company=user.company,
+            )
             return Response(serializer.validated_data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+    @action(detail=False, methods=['post'])
+    def logout(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Non authentifié'}, status=status.HTTP_401_UNAUTHORIZED)
+        emit_event(
+            EventTypes.USER_LOGGED_OUT,
+            'user',
+            request.user.id,
+            {'user_id': request.user.id, 'username': request.user.username},
+            actor=request.user,
+            company=request.user.company,
+        )
+        return Response({'message': 'Déconnexion enregistrée'}, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=['get'])
     def me(self, request):
         if request.user.is_authenticated:
@@ -96,9 +128,37 @@ class ProjectViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             Q(groups__in=user_groups) | Q(owner=user) | Q(members=user) | Q(managers=user)
         ).filter(company=user.company).distinct() if user.company else Project.objects.none()
 
+    @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(owner=self.request.user, company=self.request.user.company)
+        with event_actor(self.request.user):
+            serializer.save(owner=self.request.user, company=self.request.user.company)
         self.log_activity('create', 'project', serializer.instance)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        with event_actor(self.request.user):
+            project = serializer.save()
+        emit_event(
+            EventTypes.PROJECT_UPDATED,
+            'project',
+            project.id,
+            {'project_id': project.id, 'name': project.name, 'status': project.status},
+            actor=self.request.user,
+            company=project.company,
+        )
+        self.log_activity('update', 'project', project)
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        emit_event(
+            EventTypes.PROJECT_DELETED,
+            'project',
+            instance.id,
+            {'project_id': instance.id, 'name': instance.name},
+            actor=self.request.user,
+            company=instance.company,
+        )
+        instance.delete()
     
     @action(detail=True, methods=['get'])
     def stats(self, request, pk=None):
@@ -408,16 +468,9 @@ class MilestoneViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             entity_id=instance.id,
             metadata={'name': str(instance)}
         )
-        
-    def create(self, request, *args, **kwargs):
-        print("🔍 Données reçues:", request.data)
-        return super().create(request, *args, **kwargs)
-        
-
 
 
 class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
-    print('ici')
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [IsAuthenticated]
@@ -447,15 +500,19 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             ).filter(project__company=user.company).distinct()
         return Task.objects.none()
     
+    @transaction.atomic
     def perform_create(self, serializer):
-        task = serializer.save(created_by=self.request.user)
-        
+        with event_actor(self.request.user):
+            task = serializer.save(created_by=self.request.user)
+
         # Appel au service ML pour prédictions
         self._predict_task_attributes(task)
         self.log_activity('create', 'task', task)
-    
+
+    @transaction.atomic
     def perform_update(self, serializer):
-        task = serializer.save()
+        with event_actor(self.request.user):
+            task = serializer.save()
         
         # Si la tâche est marquée comme terminée, enregistrer le temps réel
         if task.status == 'completed' and not task.actual_time:
@@ -464,8 +521,33 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             task.actual_time = time_spent
             task.save()
         
+        emit_event(
+            EventTypes.TASK_UPDATED,
+            'task',
+            task.id,
+            {
+                'task_id': task.id,
+                'title': task.title,
+                'project_id': task.project_id,
+                'status': task.status,
+            },
+            actor=self.request.user,
+            company=task.project.company,
+        )
         self.log_activity('update', 'task', task)
-    
+
+    @transaction.atomic
+    def perform_destroy(self, instance):
+        emit_event(
+            EventTypes.TASK_DELETED,
+            'task',
+            instance.id,
+            {'task_id': instance.id, 'title': instance.title, 'project_id': instance.project_id},
+            actor=self.request.user,
+            company=instance.project.company,
+        )
+        instance.delete()
+
     @action(detail=False, methods=['get'])
     def dashboard(self, request):
         user = request.user
@@ -728,6 +810,18 @@ class CompanyViewSet(viewsets.ModelViewSet):
     search_fields = ['name', 'slug']
     ordering_fields = ['name', 'created_at']
 
+    @transaction.atomic
+    def perform_create(self, serializer):
+        company = serializer.save()
+        emit_event(
+            EventTypes.COMPANY_CREATED,
+            'company',
+            company.id,
+            {'company_id': company.id, 'name': company.name, 'slug': company.slug},
+            actor=self.request.user,
+            company=company,
+        )
+
 
 class CompanyGroupViewSet(viewsets.ModelViewSet):
     """Company groups — admin/project manager manages groups within their company."""
@@ -760,31 +854,21 @@ class CompanyGroupViewSet(viewsets.ModelViewSet):
             return CompanyGroup.objects.filter(company=user.company)
         return CompanyGroup.objects.none()
         
-    def create(self, request, *args, **kwargs):
-        """Override create to log incoming data."""
-        print("=" * 60)
-        print("📥 REQUÊTE POST REÇUE")
-        print(f"👤 Utilisateur: {request.user} (ID: {request.user.id})")
-        print(f"📦 Données reçues: {request.data}")
-        print(f"🔑 Clés du payload: {list(request.data.keys())}")
-        print(f"📋 Type de données: {type(request.data)}")
-        print("-" * 60)
-        
-        # Imprimer les valeurs individuelles
-        for key, value in request.data.items():
-            print(f"  {key}: {value} (type: {type(value).__name__})")
-        
-        print("=" * 60)
-        
-        # Continuer avec le traitement normal
-        return super().create(request, *args, **kwargs)
-
+    @transaction.atomic
     def perform_create(self, serializer):
         user = self.request.user
         if user.role == 'superadmin':
-            serializer.save(created_by=user)
+            group = serializer.save(created_by=user)
         else:
-            serializer.save(company=user.company, created_by=user)
+            group = serializer.save(company=user.company, created_by=user)
+        emit_event(
+            EventTypes.GROUP_CREATED,
+            'group',
+            group.id,
+            {'group_id': group.id, 'name': group.name},
+            actor=user,
+            company=group.company,
+        )
 
     def perform_update(self, serializer):
         group = self.get_object()
@@ -804,6 +888,7 @@ class CompanyGroupViewSet(viewsets.ModelViewSet):
         instance.delete()
 
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def add_member(self, request, pk=None):
         group = self.get_object()
         user_id = request.data.get('user_id')
@@ -814,19 +899,36 @@ class CompanyGroupViewSet(viewsets.ModelViewSet):
         except User.DoesNotExist:
             return Response({'error': 'Utilisateur non trouvé dans cette entreprise'}, status=status.HTTP_404_NOT_FOUND)
         group.members.add(target_user)
+        emit_event(
+            EventTypes.GROUP_MEMBER_ADDED,
+            'group',
+            group.id,
+            {'group_id': group.id, 'group_name': group.name, 'user_id': target_user.id},
+            actor=request.user,
+            company=group.company,
+        )
         return Response({'status': 'Membre ajouté au groupe'})
 
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def remove_member(self, request, pk=None):
         group = self.get_object()
         user_id = request.data.get('user_id')
         if not user_id:
             return Response({'error': 'user_id requis'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            target_user = User.objects.get(id=user_id)
+            target_user = User.objects.get(id=user_id, company=group.company)
         except User.DoesNotExist:
             return Response({'error': 'Utilisateur non trouvé'}, status=status.HTTP_404_NOT_FOUND)
         group.members.remove(target_user)
+        emit_event(
+            EventTypes.GROUP_MEMBER_REMOVED,
+            'group',
+            group.id,
+            {'group_id': group.id, 'group_name': group.name, 'user_id': target_user.id},
+            actor=request.user,
+            company=group.company,
+        )
         return Response({'status': 'Membre retiré du groupe'})
 
     @action(detail=True, methods=['get'])
@@ -853,6 +955,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             return User.objects.filter(company=user.company)
         return User.objects.none()
 
+    @transaction.atomic
     def perform_create(self, serializer):
         user = self.request.user
         password = self.request.data.get('password', 'changeme123')
@@ -862,9 +965,19 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             instance = serializer.save()
         instance.set_password(password)
         instance.save()
+        emit_event(
+            EventTypes.USER_CREATED,
+            'user',
+            instance.id,
+            {'user_id': instance.id, 'username': instance.username, 'role': instance.role},
+            actor=user,
+            company=instance.company,
+        )
 
+    @transaction.atomic
     def perform_update(self, serializer):
         user = self.request.user
+        previous_role = serializer.instance.role
         password = self.request.data.get('password')
         if user.role != 'superadmin':
             instance = serializer.save(company=user.company)
@@ -873,17 +986,35 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         if password:
             instance.set_password(password)
             instance.save()
+        if previous_role != instance.role:
+            emit_event(
+                EventTypes.USER_ROLE_CHANGED,
+                'user',
+                instance.id,
+                {'user_id': instance.id, 'previous_role': previous_role, 'new_role': instance.role},
+                actor=user,
+                company=instance.company,
+            )
 
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def change_role(self, request, pk=None):
         target_user = self.get_object()
         new_role = request.data.get('role')
-        if new_role not in ('admin', 'user'):
-            return Response({'error': 'Role invalide. Choix: admin, user'}, status=status.HTTP_400_BAD_REQUEST)
-        if request.user.role == 'admin' and new_role == 'superadmin':
-            return Response({'error': 'Seul un SuperAdmin peut promouvoir en SuperAdmin'}, status=status.HTTP_403_FORBIDDEN)
+        allowed_roles = ('superadmin', 'admin', 'user') if request.user.role == 'superadmin' else ('admin', 'user')
+        if new_role not in allowed_roles:
+            return Response({'error': 'Role invalide'}, status=status.HTTP_400_BAD_REQUEST)
+        previous_role = target_user.role
         target_user.role = new_role
         target_user.save(update_fields=['role'])
+        emit_event(
+            EventTypes.USER_ROLE_CHANGED,
+            'user',
+            target_user.id,
+            {'user_id': target_user.id, 'previous_role': previous_role, 'new_role': new_role},
+            actor=request.user,
+            company=target_user.company,
+        )
         return Response(UserSerializer(target_user).data)
 
 

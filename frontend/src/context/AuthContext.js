@@ -153,6 +153,12 @@ export const AuthProvider = ({ children }) => {
 };
 
   const logout = () => {
+    const currentToken = localStorage.getItem('token');
+    if (currentToken) {
+      axios.post(`${API_URL}/auth/logout/`, {}, {
+        headers: { Authorization: `Bearer ${currentToken}` },
+      }).catch(() => null);
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('company');
     setToken(null);

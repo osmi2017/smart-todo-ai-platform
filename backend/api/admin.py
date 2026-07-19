@@ -1,11 +1,10 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from django.utils import timezone
 from .models import (
     User, Project, Milestone, Task, 
     ActivityLog, Comment, Notification,
     Meeting, MeetingParticipant, MeetingSummary, MeetingActionItem,
-    Company, CompanyGroup,
+    Company, CompanyGroup, EventAuditLog, EventMetric, EventOutbox, ProcessedEvent,
 )
 
 # ----------------------------------------------------------------------
@@ -223,3 +222,34 @@ class MeetingActionItemAdmin(admin.ModelAdmin):
     list_filter = ('status', 'priority')
     search_fields = ('title', 'description')
     list_select_related = ('meeting', 'assigned_to', 'linked_task')
+
+
+@admin.register(EventOutbox)
+class EventOutboxAdmin(admin.ModelAdmin):
+    list_display = ('event_id', 'event_type', 'aggregate_type', 'aggregate_id', 'status', 'attempts', 'created_at')
+    list_filter = ('status', 'event_type', 'aggregate_type')
+    search_fields = ('event_id', 'aggregate_id')
+    readonly_fields = ('event_id', 'created_at', 'published_at')
+
+
+@admin.register(ProcessedEvent)
+class ProcessedEventAdmin(admin.ModelAdmin):
+    list_display = ('service', 'event_id', 'processed_at')
+    list_filter = ('service',)
+    search_fields = ('event_id',)
+    readonly_fields = ('service', 'event_id', 'processed_at')
+
+
+@admin.register(EventAuditLog)
+class EventAuditLogAdmin(admin.ModelAdmin):
+    list_display = ('event_type', 'aggregate_type', 'aggregate_id', 'company', 'actor', 'occurred_at')
+    list_filter = ('event_type', 'aggregate_type', 'company')
+    search_fields = ('event_id', 'aggregate_id')
+    readonly_fields = ('event_id', 'recorded_at')
+
+
+@admin.register(EventMetric)
+class EventMetricAdmin(admin.ModelAdmin):
+    list_display = ('event_type', 'company', 'date', 'count', 'updated_at')
+    list_filter = ('event_type', 'company', 'date')
+    readonly_fields = ('updated_at',)

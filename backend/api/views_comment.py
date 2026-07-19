@@ -2,9 +2,10 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
-from .models import Comment, Task
+from django.db import transaction
+from .models import Comment
 from .serializers_comment import CommentSerializer  # ← Changé ici
+from .events import event_actor
 from .permissions import IsAuthorOrReadOnly
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -28,8 +29,10 @@ class CommentViewSet(viewsets.ModelViewSet):
         
         return queryset.select_related('author', 'task').prefetch_related('replies')
     
+    @transaction.atomic
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+        with event_actor(self.request.user):
+            serializer.save(author=self.request.user)
     
     @action(detail=True, methods=['post'])
     def reply(self, request, pk=None):
@@ -42,11 +45,12 @@ class CommentViewSet(viewsets.ModelViewSet):
         )
         
         if serializer.is_valid():
-            serializer.save(
-                task=parent_comment.task,
-                parent=parent_comment,
-                author=request.user
-            )
+            with transaction.atomic(), event_actor(request.user):
+                serializer.save(
+                    task=parent_comment.task,
+                    parent=parent_comment,
+                    author=request.user
+                )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -226,6 +226,7 @@ SLACK_BOT_TOKEN = os.getenv('SLACK_BOT_TOKEN', '')
 # (rappels de meetings en masse, génération de rapports, traitement audio/vidéo)
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
@@ -257,9 +258,32 @@ CELERY_TASK_ROUTES = {
     'api.tasks.send_meeting_reminder': {'queue': 'default'},
     'api.tasks.send_milestone_deadline_reminders': {'queue': 'default'},
     'api.tasks.cleanup_stale_notifications': {'queue': 'default'},
+    'api.tasks.publish_domain_event': {'queue': 'events'},
+    'api.tasks.publish_pending_domain_events': {'queue': 'events'},
 }
 CELERY_TASK_DEFAULT_QUEUE = 'default'
 
 # En environnement de test, les tâches s'exécutent en synchrone (pas de worker/Redis requis)
 CELERY_TASK_ALWAYS_EAGER = os.getenv('CELERY_TASK_ALWAYS_EAGER', 'False') == 'True'
 CELERY_TASK_EAGER_PROPAGATES = True
+
+# Kafka centralized domain-event bus. Database-backed outbox rows are published
+# by Celery only after the originating transaction commits.
+KAFKA_ENABLED = os.getenv('KAFKA_ENABLED', 'True') == 'True'
+KAFKA_BOOTSTRAP_SERVERS = os.getenv('KAFKA_BOOTSTRAP_SERVERS', 'localhost:9092')
+KAFKA_EVENTS_TOPIC = os.getenv('KAFKA_EVENTS_TOPIC', 'smart-todo.events')
+KAFKA_DEAD_LETTER_TOPIC = os.getenv('KAFKA_DEAD_LETTER_TOPIC', 'smart-todo.events.dlq')
+KAFKA_EVENT_SOURCE = os.getenv('KAFKA_EVENT_SOURCE', 'smart-todo.backend')
+KAFKA_CLIENT_ID = os.getenv('KAFKA_CLIENT_ID', 'smart-todo-backend')
+KAFKA_CONSUMER_GROUP_PREFIX = os.getenv('KAFKA_CONSUMER_GROUP_PREFIX', 'smart-todo')
+KAFKA_COMPRESSION_TYPE = os.getenv('KAFKA_COMPRESSION_TYPE', 'zstd')
+KAFKA_LINGER_MS = int(os.getenv('KAFKA_LINGER_MS', '10'))
+KAFKA_DELIVERY_TIMEOUT_MS = int(os.getenv('KAFKA_DELIVERY_TIMEOUT_MS', '120000'))
+KAFKA_FLUSH_TIMEOUT_SECONDS = float(os.getenv('KAFKA_FLUSH_TIMEOUT_SECONDS', '10'))
+KAFKA_CONSUMER_RETRY_SECONDS = float(os.getenv('KAFKA_CONSUMER_RETRY_SECONDS', '5'))
+KAFKA_CONSUMER_MAX_RETRIES = int(os.getenv('KAFKA_CONSUMER_MAX_RETRIES', '20'))
+KAFKA_MAX_POLL_INTERVAL_MS = int(os.getenv('KAFKA_MAX_POLL_INTERVAL_MS', '3600000'))
+KAFKA_SECURITY_PROTOCOL = os.getenv('KAFKA_SECURITY_PROTOCOL', 'PLAINTEXT')
+KAFKA_SASL_MECHANISM = os.getenv('KAFKA_SASL_MECHANISM', 'PLAIN')
+KAFKA_SASL_USERNAME = os.getenv('KAFKA_SASL_USERNAME', '')
+KAFKA_SASL_PASSWORD = os.getenv('KAFKA_SASL_PASSWORD', '')

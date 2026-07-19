@@ -3,20 +3,20 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
 from .models import (
-    Meeting, MeetingParticipant, MeetingSummary, MeetingActionItem,
+    Meeting, MeetingParticipant, MeetingActionItem,
     ActivityLog, Project,
 )
 from .serializers_meeting import (
     MeetingSerializer, MeetingDetailSerializer,
-    MeetingParticipantSerializer, MeetingSummarySerializer,
-    MeetingActionItemSerializer,
+    MeetingParticipantSerializer, MeetingActionItemSerializer,
 )
+from .events import EventTypes, emit_event, event_actor
 from .services.integrations import GoogleCalendarService, SlackService
-from .tasks import transcribe_meeting_audio, process_meeting_ai
 
 
 class MeetingViewSet(viewsets.ModelViewSet):
@@ -42,12 +42,28 @@ class MeetingViewSet(viewsets.ModelViewSet):
             Q(organizer=user) | Q(participants__user=user)
         ).distinct()
 
+    @transaction.atomic
     def perform_create(self, serializer):
-        meeting = serializer.save(organizer=self.request.user)
-        MeetingParticipant.objects.create(
-            meeting=meeting, user=self.request.user, role='organizer',
-        )
+        with event_actor(self.request.user):
+            meeting = serializer.save(organizer=self.request.user)
+            MeetingParticipant.objects.create(
+                meeting=meeting, user=self.request.user, role='organizer',
+            )
         self._log_activity('create', 'meeting', meeting)
+
+    @transaction.atomic
+    def perform_update(self, serializer):
+        previous_status = serializer.instance.status
+        new_status = serializer.validated_data.get('status', previous_status)
+        timestamps = {}
+        if new_status == 'in_progress' and previous_status != 'in_progress':
+            timestamps['started_at'] = timezone.now()
+        elif new_status == 'completed' and previous_status != 'completed':
+            timestamps['ended_at'] = timezone.now()
+
+        with event_actor(self.request.user):
+            meeting = serializer.save(**timestamps)
+        self._log_activity('update', 'meeting', meeting)
 
     @action(detail=True, methods=['post'])
     def add_participant(self, request, pk=None):
@@ -115,10 +131,17 @@ class MeetingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        task = transcribe_meeting_audio.delay(meeting.id, request.user.id)
+        event = emit_event(
+            EventTypes.MEETING_TRANSCRIPTION_REQUESTED,
+            'meeting',
+            meeting.id,
+            {'meeting_id': meeting.id, 'requested_by_id': request.user.id},
+            actor=request.user,
+            company=meeting.project.company if meeting.project else request.user.company,
+        )
 
         return Response(
-            {'status': 'processing', 'task_id': task.id, 'meeting_id': meeting.id},
+            {'status': 'queued', 'event_id': str(event.event_id), 'meeting_id': meeting.id},
             status=status.HTTP_202_ACCEPTED,
         )
 
@@ -137,10 +160,17 @@ class MeetingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        task = process_meeting_ai.delay(meeting.id, request.user.id)
+        event = emit_event(
+            EventTypes.MEETING_AI_PROCESSING_REQUESTED,
+            'meeting',
+            meeting.id,
+            {'meeting_id': meeting.id, 'requested_by_id': request.user.id},
+            actor=request.user,
+            company=meeting.project.company if meeting.project else request.user.company,
+        )
 
         return Response(
-            {'status': 'processing', 'task_id': task.id, 'meeting_id': meeting.id},
+            {'status': 'queued', 'event_id': str(event.event_id), 'meeting_id': meeting.id},
             status=status.HTTP_202_ACCEPTED,
         )
 

@@ -1,6 +1,7 @@
 import logging
 import mimetypes
 
+from django.db import transaction
 from django.db.models import Q
 from django.http import FileResponse
 from rest_framework import viewsets, status, filters, permissions
@@ -8,12 +9,11 @@ from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 
-from .models import File, FileShare, StorageNotification, Company, CompanyGroup, User
+from .models import File, FileShare, StorageNotification, CompanyGroup, User
 from .serializers import (
-    FileSerializer, FileDetailSerializer, FileShareSerializer,
-    StorageNotificationSerializer,
+    FileSerializer, FileDetailSerializer, StorageNotificationSerializer,
 )
-from .permissions import IsSuperAdmin
+from .events import EventTypes, emit_event
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,7 @@ class FileViewSet(viewsets.ModelViewSet):
             Q(shares__shared_with_group__in=user_groups)
         ).filter(company=user.company).distinct()
 
+    @transaction.atomic
     def create(self, request, *args, **kwargs):
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
@@ -94,6 +95,19 @@ class FileViewSet(viewsets.ModelViewSet):
         company.save(update_fields=['storage_used'])
 
         self._check_quota_warnings(company)
+        emit_event(
+            EventTypes.FILE_UPLOADED,
+            'file',
+            file_obj.id,
+            {
+                'file_id': file_obj.id,
+                'name': file_obj.name,
+                'mime_type': file_obj.mime_type,
+                'size_bytes': file_obj.size_bytes,
+            },
+            actor=user,
+            company=company,
+        )
 
         serializer = FileSerializer(file_obj, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -106,11 +120,20 @@ class FileViewSet(viewsets.ModelViewSet):
             raise PermissionDenied('Vous n\'avez pas la permission de modifier ce fichier.')
         serializer.save()
 
+    @transaction.atomic
     def perform_destroy(self, instance):
         user = self.request.user
         if not self._can_delete(instance, user):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied('Vous n\'avez pas la permission de supprimer ce fichier.')
+        emit_event(
+            EventTypes.FILE_DELETED,
+            'file',
+            instance.id,
+            {'file_id': instance.id, 'name': instance.name, 'size_bytes': instance.size_bytes},
+            actor=user,
+            company=instance.company,
+        )
         instance.delete()
 
     @action(detail=True, methods=['get'])
@@ -139,6 +162,7 @@ class FileViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Fichier non trouvé sur le serveur.'}, status=status.HTTP_404_NOT_FOUND)
 
     @action(detail=True, methods=['post'])
+    @transaction.atomic
     def share(self, request, pk=None):
         file_obj = self.get_object()
         user = request.user
@@ -193,6 +217,21 @@ class FileViewSet(viewsets.ModelViewSet):
                 defaults={**share_data, 'shared_with_group': target_group},
             )
 
+        emit_event(
+            EventTypes.FILE_SHARED,
+            'file',
+            file_obj.id,
+            {
+                'file_id': file_obj.id,
+                'name': file_obj.name,
+                'shared_with_user_id': shared_with_user_id,
+                'shared_with_group_id': shared_with_group_id,
+                'can_edit': can_edit,
+                'can_delete': can_delete,
+            },
+            actor=user,
+            company=file_obj.company,
+        )
         serializer = FileDetailSerializer(file_obj, context={'request': request})
         return Response(serializer.data)
 

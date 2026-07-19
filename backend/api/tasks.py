@@ -10,15 +10,17 @@ et asynchrones de la plateforme :
 Chaque tâche est volontairement petite et idempotente pour pouvoir être
 rejouée sans effet de bord (retry Celery automatique en cas d'échec).
 """
-import logging
 from datetime import timedelta
 
 from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.db.models import Avg, Count, Q
+from django.db.models import Avg, Count, F
 from django.utils import timezone
+
+from . import kafka_client
+from .models import EventOutbox
 
 logger = get_task_logger(__name__)
 
@@ -28,42 +30,63 @@ logger = get_task_logger(__name__)
 # ---------------------------------------------------------------------------
 
 def _push_realtime_notification(recipient_id, notification_type, title, message, data=None):
-    """Pousse une notification en temps réel via le channel layer (WebSocket),
-    sans jamais faire planter la tâche si Redis/Channels n'est pas disponible."""
-    try:
-        from channels.layers import get_channel_layer
-        from asgiref.sync import async_to_sync
+    from .services.notifications import push_realtime_notification
 
-        channel_layer = get_channel_layer()
-        if channel_layer is None:
-            return
-        async_to_sync(channel_layer.group_send)(
-            f'notifications_{recipient_id}',
-            {
-                'type': 'send_notification',
-                'notification_type': notification_type,
-                'title': title,
-                'message': message,
-                'data': data or {},
-                'created_at': timezone.now().isoformat(),
-            }
-        )
-    except Exception:
-        logger.warning('Impossible de pousser la notification WebSocket', exc_info=True)
+    push_realtime_notification(recipient_id, notification_type, title, message, data)
 
 
 def _notify(recipient, notification_type, title, message, data=None):
-    """Crée une Notification persistée en base ET la pousse en temps réel."""
-    from .models import Notification
+    from .services.notifications import create_notification
 
-    Notification.objects.create(
-        recipient=recipient,
-        type=notification_type,
-        title=title,
-        message=message,
-        data=data or {},
+    create_notification(recipient, notification_type, title, message, data)
+
+
+# ---------------------------------------------------------------------------
+# Transactional outbox -> Kafka
+# ---------------------------------------------------------------------------
+
+@shared_task(name='api.tasks.publish_domain_event', bind=True, max_retries=None)
+def publish_domain_event(self, event_id):
+    if not settings.KAFKA_ENABLED:
+        return {'status': 'disabled', 'event_id': event_id}
+
+    try:
+        event = EventOutbox.objects.get(event_id=event_id)
+    except EventOutbox.DoesNotExist:
+        return {'status': 'missing', 'event_id': event_id}
+
+    if event.status == 'published':
+        return {'status': 'already_published', 'event_id': event_id}
+
+    EventOutbox.objects.filter(id=event.id).update(attempts=F('attempts') + 1)
+    try:
+        kafka_client.publish_outbox_event(event)
+    except Exception as exc:
+        EventOutbox.objects.filter(id=event.id).update(last_error=str(exc))
+        countdown = min(300, 2 ** min(event.attempts + 1, 8))
+        raise self.retry(exc=exc, countdown=countdown)
+
+    EventOutbox.objects.filter(id=event.id).update(
+        status='published',
+        published_at=timezone.now(),
+        last_error='',
     )
-    _push_realtime_notification(recipient.id, notification_type, title, message, data)
+    return {'status': 'published', 'event_id': event_id}
+
+
+@shared_task(name='api.tasks.publish_pending_domain_events')
+def publish_pending_domain_events(batch_size=500):
+    if not settings.KAFKA_ENABLED:
+        return {'dispatched': 0, 'status': 'disabled'}
+
+    event_ids = list(
+        EventOutbox.objects.filter(status='pending')
+        .order_by('created_at')
+        .values_list('event_id', flat=True)[:batch_size]
+    )
+    for event_id in event_ids:
+        publish_domain_event.delay(str(event_id))
+    return {'dispatched': len(event_ids)}
 
 
 # ---------------------------------------------------------------------------

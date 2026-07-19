@@ -1,5 +1,7 @@
 from rest_framework import permissions
 
+from .models import Project
+
 
 class IsSuperAdmin(permissions.BasePermission):
     """Only SuperAdmins can access"""
@@ -43,29 +45,19 @@ class IsOwnerOrReadOnly(permissions.BasePermission):
         if request.user.role == 'superadmin':
             return True
 
-        # Admin of the same company
-        if request.user.role == 'admin':
-            if hasattr(obj, 'company') and obj.company == request.user.company:
+        if isinstance(obj, Project):
+            if request.user.role == 'admin' and obj.company == request.user.company:
                 return True
-
-        # Vérifier si l'utilisateur est le propriétaire
-        if hasattr(obj, 'owner'):
             if obj.owner == request.user:
                 return True
+            return obj.managers.filter(id=request.user.id).exists()
 
-        # Vérifier si l'utilisateur est chef de projet
-        if hasattr(obj, 'managers'):
-            if obj.managers.filter(id=request.user.id).exists():
-                return True
-
-        if hasattr(obj, 'created_by'):
-            if obj.created_by == request.user:
-                return True
-        elif hasattr(obj, 'author'):
-            if obj.author == request.user:
-                return True
-
-        return False
+        attributes = vars(obj)
+        return (
+            attributes.get('owner') == request.user
+            or attributes.get('created_by') == request.user
+            or attributes.get('author') == request.user
+        )
 
 
 class IsAssignedOrReadOnly(permissions.BasePermission):
