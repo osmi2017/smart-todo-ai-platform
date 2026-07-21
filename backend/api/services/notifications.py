@@ -15,6 +15,7 @@ def push_realtime_notification(
     title: str,
     message: str,
     data: dict = None,
+    notification_id: int = None,
 ) -> None:
     try:
         channel_layer = get_channel_layer()
@@ -24,6 +25,7 @@ def push_realtime_notification(
             f'notifications_{recipient_id}',
             {
                 'type': 'send_notification',
+                'notification_id': notification_id,
                 'notification_type': notification_type,
                 'title': title,
                 'message': message,
@@ -55,5 +57,6 @@ def create_notification(
         title,
         message,
         data,
+        notification.id,
     )
     return notification

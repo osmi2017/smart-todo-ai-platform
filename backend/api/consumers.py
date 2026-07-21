@@ -2,7 +2,7 @@ import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import Notification, User
+from .models import Notification
 
 logger = logging.getLogger(__name__)
 
@@ -13,12 +13,12 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         self.room_group_name = f'notifications_{self.user_id}'
 
         # Vérifier l'authentification
-        if self.scope['user'].is_authenticated and str(self.scope['user'].id) == self.user_id:
+        if self.scope['user'].is_authenticated and self.scope['user'].id == self.user_id:
             await self.channel_layer.group_add(
                 self.room_group_name,
                 self.channel_name
             )
-            await self.accept()
+            await self.accept(subprotocol=self.scope.get('jwt_subprotocol'))
         else:
             await self.close()
 
@@ -74,9 +74,11 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def send_notification(self, event):
         await self.send(text_data=json.dumps({
+            'id': event.get('notification_id'),
             'type': event['notification_type'],
             'title': event['title'],
             'message': event['message'],
             'data': event.get('data', {}),
+            'is_read': False,
             'created_at': event['created_at'],
         }))

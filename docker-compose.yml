@@ -84,7 +84,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: todo_ai_backend
-    command: sh -c "python manage.py migrate --noinput && gunicorn --bind 0.0.0.0:8000 core.wsgi:application"
+    command: sh -c "python manage.py migrate --noinput && daphne -b 0.0.0.0 -p 8000 core.asgi:application"
     environment:
       DEBUG: ${DEBUG:-False}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
@@ -393,6 +393,7 @@ services:
     container_name: todo_ai_frontend
     environment:
       REACT_APP_API_URL: http://localhost:8000/api
+      REACT_APP_WS_URL: ws://localhost:8000
       REACT_APP_ML_URL: http://localhost:5001
       REACT_APP_MEETING_SERVICE_URL: http://localhost:4000
     ports:

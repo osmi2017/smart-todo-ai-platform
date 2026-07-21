@@ -31,9 +31,9 @@ import { fr } from 'date-fns/locale';
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { getNotifications, markAsRead, markAllAsRead, getUnreadCount } = useNotificationService();
-  const { notifications: wsNotifications, markAsRead: wsMarkAsRead } = useWebSocket(user?.id);
+  const { notifications: wsNotifications, markAsRead: wsMarkAsRead } = useWebSocket(user?.id, token);
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   useEffect(() => {
@@ -44,10 +44,18 @@ const NotificationBell = () => {
   }, [user]);
 
   useEffect(() => {
-    if (wsNotifications.length > 0) {
-      setNotifications(prev => [...wsNotifications, ...prev]);
-      setUnreadCount(prev => prev + 1);
-    }
+    if (wsNotifications.length === 0) return;
+
+    const latestNotification = wsNotifications[0];
+    setNotifications(prev => {
+      const alreadyLoaded = latestNotification.id &&
+        prev.some(notification => notification.id === latestNotification.id);
+      if (alreadyLoaded) return prev;
+      if (!latestNotification.is_read) {
+        setUnreadCount(count => count + 1);
+      }
+      return [latestNotification, ...prev];
+    });
   }, [wsNotifications]);
 
   const loadNotifications = async () => {

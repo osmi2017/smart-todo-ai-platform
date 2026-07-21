@@ -59,7 +59,6 @@ def main():
         group_id=CONSUMER_GROUP_ID,
         enable_auto_commit=False,
         auto_offset_reset='earliest',
-        isolation_level='read_committed',
         key_deserializer=lambda key: key.decode('utf-8') if key else None,
     )
     producer = KafkaProducer(
