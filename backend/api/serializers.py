@@ -1,10 +1,10 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.db import models
-from .models import User, Project, Milestone, Task, ActivityLog, Comment, Company, CompanyGroup, File, FileShare, StorageNotification
+from .models import User, Project, Milestone, Task, ActivityLog, Comment, Company, CompanyGroup, File, FileShare, Notification, StorageNotification
 import jwt
 from django.conf import settings
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -366,6 +366,13 @@ class FileDetailSerializer(FileSerializer):
 
     class Meta(FileSerializer.Meta):
         fields = FileSerializer.Meta.fields + ('shares',)
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ('id', 'type', 'title', 'message', 'data', 'is_read', 'created_at')
+        read_only_fields = fields
 
 
 class StorageNotificationSerializer(serializers.ModelSerializer):

@@ -70,20 +70,20 @@ INSTALLED_APPS = [
 # Configuration Channels
 ASGI_APPLICATION = 'core.asgi.application'
 
-# Use Redis channel layer in production, in-memory for local dev
-if DEBUG:
+redis_url = os.getenv('REDIS_URL')
+if redis_url:
     CHANNEL_LAYERS = {
         'default': {
-            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [redis_url],
+            },
         },
     }
 else:
     CHANNEL_LAYERS = {
         'default': {
-            'BACKEND': 'channels_redis.core.RedisChannelLayer',
-            'CONFIG': {
-                "hosts": [os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/0')],
-            },
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
         },
     }
 
