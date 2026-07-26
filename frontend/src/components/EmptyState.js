@@ -1,21 +1,64 @@
 import React from 'react';
-import { Box, Text, Button } from '@chakra-ui/react';
-import { FiPlus } from 'react-icons/fi';
+import { Box, Text, Button, Icon, VStack } from '@chakra-ui/react';
+import { FiInbox } from 'react-icons/fi';
 import { Link as RouterLink } from 'react-router-dom';
 
-const EmptyState = ({ message = 'Aucun élément trouvé', actionLabel, actionTo, onAction }) => (
-  <Box textAlign="center" py={10}>
-    <Text color="gray.500">{message}</Text>
-    {(actionLabel && (actionTo || onAction)) && (
-      <Button
-        mt={4}
-        leftIcon={<FiPlus />}
-        colorScheme="blue"
-        {...(actionTo ? { as: RouterLink, to: actionTo } : { onClick: onAction })}
+const EmptyState = ({ 
+  message = 'Aucun élément trouvé', 
+  description,
+  actionLabel, 
+  actionTo, 
+  onAction,
+  icon = FiInbox 
+}) => (
+  <Box
+    textAlign="center"
+    py={16}
+    px={8}
+    bg="white"
+    borderRadius="2xl"
+    border="1px dashed"
+    borderColor="gray.200"
+  >
+    <VStack spacing={4}>
+      <Box
+        w={16}
+        h={16}
+        borderRadius="2xl"
+        bg="gray.50"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
       >
-        {actionLabel}
-      </Button>
-    )}
+        <Icon as={icon} boxSize={8} color="gray.300" />
+      </Box>
+      <VStack spacing={1}>
+        <Text fontWeight="600" color="gray.700" fontSize="lg">
+          {message}
+        </Text>
+        {description && (
+          <Text color="gray.400" fontSize="sm">
+            {description}
+          </Text>
+        )}
+      </VStack>
+      {(actionLabel && (actionTo || onAction)) && (
+        <Button
+          size="md"
+          fontWeight="500"
+          bgGradient="linear(135deg, brand.500, brand.600)"
+          color="white"
+          _hover={{
+            bgGradient: "linear(135deg, brand.600, brand.700)",
+            transform: 'translateY(-1px)',
+            boxShadow: '0 4px 12px rgba(59,91,219,0.3)',
+          }}
+          {...(actionTo ? { as: RouterLink, to: actionTo } : { onClick: onAction })}
+        >
+          {actionLabel}
+        </Button>
+      )}
+    </VStack>
   </Box>
 );
 

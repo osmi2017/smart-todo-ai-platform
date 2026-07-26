@@ -35,25 +35,104 @@ import PrivateRoute from './components/PrivateRoute';
 const theme = extendTheme({
   colors: {
     brand: {
-      50: '#e6f7ff',
-      100: '#b3e0ff',
-      200: '#80c9ff',
-      300: '#4db2ff',
-      400: '#1a9bff',
-      500: '#0082e6',
-      600: '#0065b3',
-      700: '#004880',
-      800: '#002b4d',
-      900: '#000f1a',
+      50: '#eef2ff',
+      100: '#dce4ff',
+      200: '#b9c9ff',
+      300: '#8ba8ff',
+      400: '#5b7cff',
+      500: '#3b5bdb',
+      600: '#2b43b0',
+      700: '#1e3288',
+      800: '#142263',
+      900: '#0c1542',
     },
+    accent: {
+      50: '#fdf4ff',
+      100: '#fae8ff',
+      200: '#f5d0fe',
+      300: '#f0abfc',
+      400: '#e879f9',
+      500: '#d946ef',
+      600: '#c026d3',
+      700: '#a21caf',
+      800: '#86198f',
+      900: '#701a75',
+    },
+    success: { 50: '#ecfdf5', 500: '#10b981', 600: '#059669' },
+    warning: { 50: '#fffbeb', 500: '#f59e0b', 600: '#d97706' },
+    danger: { 50: '#fef2f2', 500: '#ef4444', 600: '#dc2626' },
   },
   fonts: {
-    heading: 'Inter, sans-serif',
-    body: 'Inter, sans-serif',
+    heading: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  },
+  fontSizes: {
+    xs: '0.75rem',
+    sm: '0.875rem',
+    md: '1rem',
+    lg: '1.125rem',
+    xl: '1.25rem',
+    '2xl': '1.5rem',
+    '3xl': '1.875rem',
+    '4xl': '2.25rem',
   },
   config: {
     initialColorMode: 'light',
     useSystemColorMode: false,
+  },
+  styles: {
+    global: {
+      body: {
+        bg: '#f8fafc',
+        color: 'gray.800',
+      },
+    },
+  },
+  components: {
+    Button: {
+      baseStyle: {
+        fontWeight: '500',
+        borderRadius: 'xl',
+        _hover: { transform: 'translateY(-1px)', boxShadow: 'lg' },
+        _active: { transform: 'translateY(0)' },
+      },
+    },
+    Card: {
+      baseStyle: {
+        bg: 'white',
+        borderRadius: 'xl',
+        border: '1px solid',
+        borderColor: 'gray.100',
+        boxShadow: 'sm',
+        _hover: { boxShadow: 'md' },
+        transition: 'all 0.2s',
+      },
+    },
+    Input: {
+      defaultProps: { focusBorderColor: 'brand.500' },
+      variants: {
+        outline: {
+          field: {
+            borderRadius: 'lg',
+            _hover: { borderColor: 'gray.300' },
+          },
+        },
+      },
+    },
+    Select: {
+      defaultProps: { focusBorderColor: 'brand.500' },
+      variants: {
+        outline: {
+          field: {
+            borderRadius: 'lg',
+            _hover: { borderColor: 'gray.300' },
+          },
+        },
+      },
+    },
+    Badge: {
+      baseStyle: { borderRadius: 'full', fontWeight: '500' },
+    },
   },
 });
 
