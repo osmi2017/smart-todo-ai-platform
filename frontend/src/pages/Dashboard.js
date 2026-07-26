@@ -214,7 +214,7 @@ const Dashboard = () => {
                   <Text fontSize="sm" color="gray.500" fontWeight="500">{kpi.label}</Text>
                   <Text fontSize="3xl" fontWeight="700" color="gray.800">{String(kpi.value)}</Text>
                   <HStack spacing={1}>
-                    <StatArrow type="increase" />
+                    <Icon as={FiTrendingUp} boxSize={3} color="success.500" />
                     <Text fontSize="xs" color="gray.400">{kpi.sub}</Text>
                   </HStack>
                 </VStack>
