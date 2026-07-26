@@ -1,4 +1,4 @@
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
 
 from .events import EventTypes, emit_event, get_event_actor
@@ -94,24 +94,59 @@ def publish_task_events(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=Comment)
-def publish_comment_created(sender, instance, created, **kwargs):
-    if not created:
-        return
+def publish_comment_events(sender, instance, created, **kwargs):
+    actor = get_event_actor(instance.author)
+    company = instance.task.project.company
+    base_payload = {
+        'comment_id': instance.id,
+        'task_id': instance.task_id,
+        'task_title': instance.task.title,
+        'author_id': instance.author_id,
+        'author_name': instance.author.username,
+        'content': instance.content,
+        'parent_id': instance.parent_id,
+    }
 
-    recipient_id = instance.task.assigned_to_id
+    if created:
+        recipient_id = instance.task.assigned_to_id
+        emit_event(
+            EventTypes.COMMENT_CREATED,
+            'comment',
+            instance.id,
+            {
+                **base_payload,
+                'recipient_id': recipient_id if recipient_id != instance.author_id else None,
+            },
+            actor=actor,
+            company=company,
+        )
+    else:
+        emit_event(
+            EventTypes.COMMENT_UPDATED,
+            'comment',
+            instance.id,
+            base_payload,
+            actor=actor,
+            company=company,
+        )
+
+
+@receiver(post_delete, sender=Comment)
+def publish_comment_deleted(sender, instance, **kwargs):
+    actor = get_event_actor(instance.author)
+    company = instance.task.project.company
     emit_event(
-        EventTypes.COMMENT_CREATED,
+        EventTypes.COMMENT_DELETED,
         'comment',
         instance.id,
         {
             'comment_id': instance.id,
             'task_id': instance.task_id,
-            'task_title': instance.task.title,
-            'author_name': instance.author.username,
-            'recipient_id': recipient_id if recipient_id != instance.author_id else None,
+            'author_id': instance.author_id,
+            'parent_id': instance.parent_id,
         },
-        actor=get_event_actor(instance.author),
-        company=instance.task.project.company,
+        actor=actor,
+        company=company,
     )
 
 

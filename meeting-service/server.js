@@ -252,6 +252,22 @@ io.on('connection', (socket) => {
     handleLeave(socket);
   });
 
+  // ---- Task comment rooms (real-time comments) ----
+
+  socket.on('join-task', ({ taskId }) => {
+    if (!taskId) return;
+    const roomName = `task-${taskId}`;
+    socket.join(roomName);
+    console.log(`[socket] Socket ${socket.id} joined ${roomName}`);
+  });
+
+  socket.on('leave-task', ({ taskId }) => {
+    if (!taskId) return;
+    const roomName = `task-${taskId}`;
+    socket.leave(roomName);
+    console.log(`[socket] Socket ${socket.id} left ${roomName}`);
+  });
+
   socket.on('disconnect', () => {
     handleLeave(socket);
   });
@@ -286,7 +302,7 @@ server.listen(PORT, () => {
 // Démarre le consommateur Kafka en parallèle du serveur HTTP/Socket.IO :
 // aucune dépendance entre les deux, un souci de connexion Kafka ne doit
 // jamais empêcher le signaling WebRTC de fonctionner (et inversement).
-const kafkaConsumer = createKafkaConsumer({ getOrCreateRoom });
+const kafkaConsumer = createKafkaConsumer({ getOrCreateRoom, io });
 kafkaConsumer.start().catch((err) => {
   console.error('Impossible de démarrer le consommateur Kafka (audio):', err);
 });
