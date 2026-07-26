@@ -14,13 +14,13 @@ const PORT = process.env.PORT || 4000;
 
 const io = new Server(server, {
   cors: {
-    origin: FRONTEND_URL,
+    origin: '*',
     methods: ['GET', 'POST'],
     credentials: true,
   },
 });
 
-app.use(cors({ origin: FRONTEND_URL, credentials: true }));
+app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json());
 
 // In-memory room state
