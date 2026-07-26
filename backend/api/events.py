@@ -46,6 +46,8 @@ class EventTypes:
     TASK_COMPLETED = 'task.completed'
     TASK_DELETED = 'task.deleted'
     COMMENT_CREATED = 'comment.created'
+    COMMENT_UPDATED = 'comment.updated'
+    COMMENT_DELETED = 'comment.deleted'
     MEETING_CREATED = 'meeting.created'
     MEETING_UPDATED = 'meeting.updated'
     MEETING_STATUS_CHANGED = 'meeting.status_changed'

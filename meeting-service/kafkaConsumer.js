@@ -1,10 +1,11 @@
 /**
  * Consommateur Kafka du service audio/meeting.
  *
- * S'abonne au bus d'événements centralisé (`smart-todo.events`) et réagit à
- * l'événement CloudEvents `meeting.started` en pré-provisionnant la salle
- * WebRTC correspondante, *avant même* que le premier participant ne se
- * connecte en Socket.IO.
+ * S'abonne au bus d'événements centralisé (`smart-todo.events`) et réagit à :
+ *  - `meeting.started` : pré-provisionne la salle WebRTC correspondante.
+ *  - `comment.created` / `comment.updated` / `comment.deleted` : diffuse
+ *    les événements de commentaire en temps réel via Socket.IO aux clients
+ *    connectés à la room `task-{taskId}`.
  *
  * Le backend Django n'appelle jamais directement ce service : il publie un
  * événement sur Kafka et poursuit sa route. Si un pré-provisioning échoue, on
@@ -17,7 +18,9 @@ const TOPIC_EVENTS = process.env.KAFKA_TOPIC || 'smart-todo.events';
 const TOPIC_DLQ = process.env.KAFKA_DLQ_TOPIC || 'smart-todo.events.dlq';
 const CONSUMER_GROUP_ID = 'smart-todo.meeting-audio';
 
-function createKafkaConsumer({ getOrCreateRoom }) {
+const COMMENT_EVENTS = ['comment.created', 'comment.updated', 'comment.deleted'];
+
+function createKafkaConsumer({ getOrCreateRoom, io }) {
   const brokers = (process.env.KAFKA_BOOTSTRAP_SERVERS || 'localhost:9092').split(',');
   const kafkaEnabled =
     (process.env.KAFKA_ENABLED || process.env.KAFKA_EVENTS_ENABLED || 'true').toLowerCase() !==
@@ -68,28 +71,53 @@ function createKafkaConsumer({ getOrCreateRoom }) {
       return;
     }
 
-    if (event.type !== 'meeting.started') {
-      return; // ce service ne réagit qu'au démarrage d'une réunion
-    }
-
+    const eventType = event.type;
     const data = event.data || {};
-    const meetingId = data.meeting_id;
-    if (!meetingId) {
-      console.warn('Événement meeting.started sans meeting_id; conservation dans la DLQ');
-      await publishDlq(message, 'meeting.started is missing data.meeting_id');
+
+    // --- Meeting started → pré-provision WebRTC room ---
+    if (eventType === 'meeting.started') {
+      const meetingId = data.meeting_id;
+      if (!meetingId) {
+        console.warn('Événement meeting.started sans meeting_id; conservation dans la DLQ');
+        await publishDlq(message, 'meeting.started is missing data.meeting_id');
+        return;
+      }
+
+      const room = getOrCreateRoom({
+        meetingId,
+        title: data.title,
+        createdBy: data.organizer_id,
+      });
+      console.log(
+        `[kafka] Salle audio pré-provisionnée pour la réunion ${meetingId} (room=${room.roomId})`
+      );
       return;
     }
 
-    // Une exception ici remonte à kafkajs, qui ne committe pas l'offset :
-    // l'événement sera rejoué au redémarrage plutôt que perdu.
-    const room = getOrCreateRoom({
-      meetingId,
-      title: data.title,
-      createdBy: data.organizer_id,
-    });
-    console.log(
-      `[kafka] Salle audio pré-provisionnée pour la réunion ${meetingId} (room=${room.roomId})`
-    );
+    // --- Comment events → broadcast via Socket.IO ---
+    if (COMMENT_EVENTS.includes(eventType)) {
+      const taskId = data.task_id;
+      if (!taskId) {
+        console.warn(`Événement ${eventType} sans task_id; ignoré`);
+        return;
+      }
+
+      const roomName = `task-${taskId}`;
+
+      if (io) {
+        io.to(roomName).emit(eventType, {
+          comment_id: data.comment_id,
+          task_id: taskId,
+          author_id: data.author_id,
+          author_name: data.author_name,
+          content: data.content,
+          parent_id: data.parent_id,
+          timestamp: event.time || new Date().toISOString(),
+        });
+        console.log(`[kafka] Événement ${eventType} diffusé sur Socket.IO room ${roomName}`);
+      }
+      return;
+    }
   }
 
   return {

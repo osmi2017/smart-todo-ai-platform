@@ -84,7 +84,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: todo_ai_backend
-    command: sh -c "python manage.py migrate --noinput && daphne -b 0.0.0.0 -p 8000 core.asgi:application"
+    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
+    ports:
+      - "8000:8000"
     environment:
       DEBUG: ${DEBUG:-False}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
@@ -366,9 +368,11 @@ services:
       context: ./meeting-service
       dockerfile: Dockerfile
     container_name: todo_ai_meeting
+    ports:
+      - "4000:4000"
     environment:
       PORT: 4000
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: http://10.0.0.5:3000
       KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: ${KAFKA_EVENTS_TOPIC:-smart-todo.events}
@@ -391,7 +395,7 @@ services:
       REACT_APP_API_URL: http://10.0.0.5:8000/api
       REACT_APP_WS_URL: ws://10.0.0.5:8000
       REACT_APP_ML_URL: http://10.0.0.5:5001
-      REACT_APP_MEETING_SERVICE_URL: https://462c-2604-3d09-a78e-4e00-e486-d4ca-7604-eee5.ngrok-free.app
+      REACT_APP_MEETING_SERVICE_URL: http://10.0.0.5:4000
     ports:
       - "3000:3000"
     depends_on:

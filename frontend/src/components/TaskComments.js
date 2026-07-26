@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Box,
   VStack,
@@ -34,8 +34,11 @@ import {
 import { formatDistance } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { io } from 'socket.io-client';
 import { useCommentService } from '../services/commentService';
 import { useAuth } from '../context/AuthContext';
+
+const MEETING_SERVICE_URL = process.env.REACT_APP_MEETING_SERVICE_URL || 'http://localhost:4000';
 
 const TaskComments = ({ taskId }) => {
   const [newComment, setNewComment] = useState('');
@@ -45,12 +48,55 @@ const TaskComments = ({ taskId }) => {
   const [editContent, setEditContent] = useState('');
   const [mentionSearch, setMentionSearch] = useState('');
   const [showMentions, setShowMentions] = useState(false);
+  const [connected, setConnected] = useState(false);
   
   const toast = useToast();
   const queryClient = useQueryClient();
   const commentService = useCommentService();
   const { user } = useAuth();
   const replyInputRef = useRef(null);
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
+
+  // Real-time Socket.IO connection for comment updates
+  useEffect(() => {
+    if (!taskId) return;
+
+    const socket = io(MEETING_SERVICE_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+    });
+
+    socket.on('connect', () => {
+      setConnected(true);
+      socket.emit('join-task', { taskId });
+      console.log('[comments] Socket connected, joined task-' + taskId);
+    });
+
+    socket.on('disconnect', () => {
+      setConnected(false);
+      console.log('[comments] Socket disconnected');
+    });
+
+    const handleCommentEvent = (data) => {
+      console.log('[comments] Received event:', data);
+      queryClientRef.current.invalidateQueries(['comments', taskId]);
+    };
+
+    socket.on('comment.created', handleCommentEvent);
+    socket.on('comment.updated', handleCommentEvent);
+    socket.on('comment.deleted', handleCommentEvent);
+
+    return () => {
+      socket.off('comment.created', handleCommentEvent);
+      socket.off('comment.updated', handleCommentEvent);
+      socket.off('comment.deleted', handleCommentEvent);
+      socket.emit('leave-task', { taskId });
+      socket.disconnect();
+    };
+  }, [taskId]);
 
   // Charger les commentaires
   const { data: comments, isLoading } = useQuery(

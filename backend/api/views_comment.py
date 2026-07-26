@@ -14,6 +14,11 @@ class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated, IsAuthorOrReadOnly]
     
+    def get_permissions(self):
+        if self.action == 'reply':
+            return [IsAuthenticated()]
+        return super().get_permissions()
+    
     def get_queryset(self):
         queryset = Comment.objects.all()
         
@@ -39,18 +44,18 @@ class CommentViewSet(viewsets.ModelViewSet):
         """Ajouter une réponse à un commentaire"""
         parent_comment = self.get_object()
         
+        data = request.data.copy()
+        data['task'] = parent_comment.task_id
+        data['parent'] = parent_comment.id
+        
         serializer = CommentSerializer(
-            data=request.data,
+            data=data,
             context={'request': request}
         )
         
         if serializer.is_valid():
             with transaction.atomic(), event_actor(request.user):
-                serializer.save(
-                    task=parent_comment.task,
-                    parent=parent_comment,
-                    author=request.user
-                )
+                serializer.save(author=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
