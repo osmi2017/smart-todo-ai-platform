@@ -852,3 +852,113 @@ class EventMetric(models.Model):
     def __str__(self):
         return f'{self.event_type}: {self.count} ({self.date})'
 
+
+class Mission(models.Model):
+    STATUS_CHOICES = [
+        ('planned', 'Planifiée'),
+        ('in_progress', 'En cours'),
+        ('completed', 'Terminée'),
+        ('cancelled', 'Annulée'),
+    ]
+
+    company = models.ForeignKey(
+        Company, on_delete=models.CASCADE, related_name='missions'
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planned')
+
+    destination_name = models.CharField(max_length=255)
+    destination_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    destination_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+
+    cost_per_diem = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cost_accommodation = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cost_transport = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    cost_other = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    currency = models.CharField(max_length=10, default='xof', blank=True)
+
+    project = models.ForeignKey(
+        'Project', on_delete=models.SET_NULL, null=True, blank=True, related_name='missions'
+    )
+    tasks = models.ManyToManyField('Task', blank=True, related_name='missions')
+    milestones = models.ManyToManyField('Milestone', blank=True, related_name='missions')
+
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name='missions_created'
+    )
+
+    expense_report = models.TextField(blank=True, default='')
+    mission_report = models.TextField(blank=True, default='')
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'missions'
+        verbose_name = 'Mission'
+        verbose_name_plural = 'Missions'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['company', 'status']),
+            models.Index(fields=['start_date']),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def total_cost(self):
+        return self.cost_per_diem + self.cost_accommodation + self.cost_transport + self.cost_other
+
+    @property
+    def frais_de_mission(self):
+        if self.start_date and self.end_date:
+            days = (self.end_date - self.start_date).days + 1
+        else:
+            days = 1
+        accom_days = max(days - 1, 0)
+        return (
+            self.cost_per_diem * days
+            + self.cost_accommodation * accom_days
+            + self.cost_transport
+            + self.cost_other
+        )
+
+    @property
+    def leader(self):
+        member = self.members.filter(is_leader=True).first()
+        return member.user if member else None
+
+    @property
+    def is_active(self):
+        return self.status in ('planned', 'in_progress')
+
+
+class MissionMember(models.Model):
+    mission = models.ForeignKey(Mission, on_delete=models.CASCADE, related_name='members')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mission_memberships')
+    is_leader = models.BooleanField(default=False)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'mission_members'
+        verbose_name = 'Mission Member'
+        verbose_name_plural = 'Mission Members'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['mission', 'user'], name='unique_mission_member'
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['mission', 'is_leader']),
+        ]
+
+    def __str__(self):
+        role = ' (Chef)' if self.is_leader else ''
+        return f'{self.user.username} - {self.mission.title}{role}'
+

@@ -13,6 +13,7 @@ import {
   Avatar,
   Divider,
   Button,
+  Tooltip,
   useDisclosure,
   Modal,
   ModalOverlay,
@@ -112,27 +113,33 @@ const NotificationBell = () => {
   return (
     <>
       <Menu>
-        <MenuButton
-          as={IconButton}
-          icon={<FiBell />}
-          variant="ghost"
-          borderRadius="full"
-          position="relative"
-          aria-label="Notifications"
+        <Tooltip
+          label={unreadCount > 0 ? `${unreadCount} notification${unreadCount > 1 ? 's' : ''} non lue${unreadCount > 1 ? 's' : ''}` : 'Aucune notification'}
+          hasArrow
+          placement="bottom"
         >
-          {unreadCount > 0 && (
-            <Badge
-              position="absolute"
-              top="-2px"
-              right="-2px"
-              colorScheme="red"
-              borderRadius="full"
-              fontSize="xs"
-            >
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </Badge>
-          )}
-        </MenuButton>
+          <MenuButton
+            as={IconButton}
+            icon={<FiBell />}
+            variant="ghost"
+            borderRadius="full"
+            position="relative"
+            aria-label="Notifications"
+          >
+            {unreadCount > 0 && (
+              <Badge
+                position="absolute"
+                top="-2px"
+                right="-2px"
+                colorScheme="red"
+                borderRadius="full"
+                fontSize="xs"
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Badge>
+            )}
+          </MenuButton>
+        </Tooltip>
         <MenuList width="380px" maxHeight="500px" overflowY="auto">
           <Box p={3} borderBottom="1px solid" borderColor="gray.200">
             <HStack justify="space-between">
