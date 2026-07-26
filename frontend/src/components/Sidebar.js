@@ -33,14 +33,18 @@ import {
   FiGrid,
   FiShield,
   FiHardDrive,
+  FiMap,
   FiChevronLeft,
   FiChevronRight,
 } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
+import { useQuery } from 'react-query';
+import { useTaskService } from '../services/taskService';
 
 const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
   const location = useLocation();
   const { user, isAdmin, isSuperAdmin, company } = useAuth();
+  const taskService = useTaskService();
   const bgColor = useColorModeValue('white', 'gray.900');
   const borderColor = useColorModeValue('gray.100', 'gray.800');
   const hoverBg = useColorModeValue('gray.50', 'gray.800');
@@ -48,6 +52,14 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
   const activeColor = useColorModeValue('brand.600', 'brand.200');
   const textColor = useColorModeValue('gray.600', 'gray.300');
   const mutedColor = useColorModeValue('gray.400', 'gray.500');
+
+  // Fetch real task count
+  const { data: tasks } = useQuery(
+    'sidebar-task-count',
+    () => taskService.getTasks(),
+    { staleTime: 2 * 60 * 1000 }
+  );
+  const taskCount = Array.isArray(tasks) ? tasks.length : (tasks?.results?.length || 0);
 
   const menuItems = [
     { path: '/dashboard', name: 'Tableau de bord', icon: FiHome },
@@ -57,6 +69,7 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
     { path: '/milestones', name: 'Jalons', icon: FiCalendar },
     { path: '/meetings', name: 'Meetings', icon: FiMic },
     { path: '/files', name: 'Fichiers', icon: FiHardDrive },
+    { path: '/missions', name: 'Missions', icon: FiMap },
     { path: '/analytics', name: 'Analytics', icon: FiBarChart2 },
     ...(isAdmin ? [
       { path: '/admin/users', name: 'Utilisateurs', icon: FiUsers },
@@ -162,7 +175,7 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
                   {item.name}
                 </Text>
               )}
-              {!collapsed && item.name === 'Tâches' && (
+              {!collapsed && item.name === 'Tâches' && taskCount > 0 && (
                 <Badge
                   colorScheme="red"
                   ml="auto"
@@ -170,7 +183,7 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
                   fontSize="xs"
                   px={2}
                 >
-                  4
+                  {taskCount > 99 ? '99+' : taskCount}
                 </Badge>
               )}
             </HStack>

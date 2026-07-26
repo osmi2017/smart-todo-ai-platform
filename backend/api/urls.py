@@ -4,6 +4,9 @@ from . import views
 from .views_comment import CommentViewSet
 from .views_meeting import MeetingViewSet, MeetingActionItemViewSet
 from .views_file import FileViewSet, StorageNotificationViewSet
+from .views_mission import MissionViewSet
+from .views_currency import CurrencyListView
+from .views_geocode import GeocodeView
 from .views_tasks import task_status
 
 router = DefaultRouter()
@@ -20,10 +23,11 @@ router.register(r'meetings', MeetingViewSet)
 router.register(r'meeting-action-items', MeetingActionItemViewSet)
 router.register(r'files', FileViewSet)
 router.register(r'storage-notifications', StorageNotificationViewSet)
+router.register(r'missions', MissionViewSet)
 
 urlpatterns = [
-    # Suivi des tâches Celery en arrière-plan (polling de secours ; le
-    # temps réel passe par WebSocket, cf. api/consumers.py)
     path('jobs/<str:task_id>/', task_status, name='task-status'),
+    path('currencies/', CurrencyListView.as_view(), name='currency-list'),
+    path('geocode/', GeocodeView.as_view(), name='geocode'),
     path('', include(router.urls)),
 ]
