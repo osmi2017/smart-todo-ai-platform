@@ -103,7 +103,7 @@ const Dashboard = () => {
   );
   const recentMeetings = meetingsData || [];
 
-  const COLORS = ['#4299E1', '#48BB78', '#ED8936', '#9F7AEA', '#F56565', '#38B2AC'];
+  const COLORS = ['#3b5bdb', '#10b981', '#f59e0b', '#d946ef', '#ef4444', '#14b8a6'];
 
   // Données par défaut sécurisées
   const safeStats = {
@@ -200,78 +200,39 @@ const Dashboard = () => {
       </Flex>
 
       {/* KPIs */}
-      <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4} mb={6}>
-        <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
-          <CardBody>
-            <Stat>
-              <Flex justify="space-between" align="center">
-                <Box>
-                  <StatLabel color="gray.500">Projets actifs</StatLabel>
-                  <StatNumber fontSize="3xl">{String(safeStats.active_projects)}</StatNumber>
-                  <StatHelpText>
+      <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={4} mb={6}>
+        {[
+          { label: 'Projets actifs', value: safeStats.active_projects, sub: `${safeStats.total_projects} total`, icon: FiFolder, color: 'brand.500', bg: 'brand.50' },
+          { label: 'Tâches complétées', value: safeStats.completed_tasks, sub: `${safeStats.total_tasks} total`, icon: FiCheckCircle, color: 'success.500', bg: 'success.50' },
+          { label: 'En cours', value: safeStats.in_progress_tasks, sub: `${safeStats.delayed_tasks} en retard`, icon: FiClock, color: 'warning.500', bg: 'warning.50' },
+          { label: 'Score productivité', value: `${safeStats.productivity_score}%`, sub: '+5% vs hier', icon: FiTarget, color: 'accent.500', bg: 'accent.50' },
+        ].map((kpi, i) => (
+          <Card key={i} bg={cardBg} borderWidth="1px" borderColor={borderColor} className="card-hover">
+            <CardBody p={5}>
+              <Flex justify="space-between" align="flex-start">
+                <VStack align="flex-start" spacing={1}>
+                  <Text fontSize="sm" color="gray.500" fontWeight="500">{kpi.label}</Text>
+                  <Text fontSize="3xl" fontWeight="700" color="gray.800">{String(kpi.value)}</Text>
+                  <HStack spacing={1}>
                     <StatArrow type="increase" />
-                    {String(safeStats.total_projects)} total
-                  </StatHelpText>
+                    <Text fontSize="xs" color="gray.400">{kpi.sub}</Text>
+                  </HStack>
+                </VStack>
+                <Box
+                  w={12}
+                  h={12}
+                  borderRadius="xl"
+                  bg={kpi.bg}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <Icon as={kpi.icon} boxSize={5} color={kpi.color} />
                 </Box>
-                <Icon as={FiFolder} boxSize={10} color="blue.500" opacity={0.3} />
               </Flex>
-            </Stat>
-          </CardBody>
-        </Card>
-
-        <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
-          <CardBody>
-            <Stat>
-              <Flex justify="space-between" align="center">
-                <Box>
-                  <StatLabel color="gray.500">Tâches complétées</StatLabel>
-                  <StatNumber fontSize="3xl">{String(safeStats.completed_tasks)}</StatNumber>
-                  <StatHelpText>
-                    <StatArrow type="increase" />
-                    {String(safeStats.total_tasks)} total
-                  </StatHelpText>
-                </Box>
-                <Icon as={FiCheckCircle} boxSize={10} color="green.500" opacity={0.3} />
-              </Flex>
-            </Stat>
-          </CardBody>
-        </Card>
-
-        <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
-          <CardBody>
-            <Stat>
-              <Flex justify="space-between" align="center">
-                <Box>
-                  <StatLabel color="gray.500">En cours</StatLabel>
-                  <StatNumber fontSize="3xl">{String(safeStats.in_progress_tasks)}</StatNumber>
-                  <StatHelpText>
-                    <StatArrow type="decrease" />
-                    {String(safeStats.delayed_tasks)} en retard
-                  </StatHelpText>
-                </Box>
-                <Icon as={FiClock} boxSize={10} color="orange.500" opacity={0.3} />
-              </Flex>
-            </Stat>
-          </CardBody>
-        </Card>
-
-        <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
-          <CardBody>
-            <Stat>
-              <Flex justify="space-between" align="center">
-                <Box>
-                  <StatLabel color="gray.500">Score productivité</StatLabel>
-                  <StatNumber fontSize="3xl">{String(safeStats.productivity_score)}%</StatNumber>
-                  <StatHelpText>
-                    <StatArrow type="increase" />
-                    +5% vs hier
-                  </StatHelpText>
-                </Box>
-                <Icon as={FiTarget} boxSize={10} color="purple.500" opacity={0.3} />
-              </Flex>
-            </Stat>
-          </CardBody>
-        </Card>
+            </CardBody>
+          </Card>
+        ))}
       </SimpleGrid>
 
       {/* Graphiques principaux */}
@@ -280,8 +241,18 @@ const Dashboard = () => {
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader pb={0}>
             <Flex justify="space-between" align="center">
-              <Heading size="md">Activité hebdomadaire</Heading>
-              <Icon as={FiActivity} color="blue.500" />
+              <Heading size="md" fontWeight="600">Activité hebdomadaire</Heading>
+              <Box
+                w={8}
+                h={8}
+                borderRadius="lg"
+                bg="brand.50"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Icon as={FiActivity} boxSize={4} color="brand.500" />
+              </Box>
             </Flex>
           </CardHeader>
           <CardBody>
@@ -319,8 +290,18 @@ const Dashboard = () => {
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader pb={0}>
             <Flex justify="space-between" align="center">
-              <Heading size="md">Tâches par priorité</Heading>
-              <Icon as={FiBarChart2} color="blue.500" />
+              <Heading size="md" fontWeight="600">Tâches par priorité</Heading>
+              <Box
+                w={8}
+                h={8}
+                borderRadius="lg"
+                bg="accent.50"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Icon as={FiBarChart2} boxSize={4} color="accent.500" />
+              </Box>
             </Flex>
           </CardHeader>
           <CardBody>
@@ -351,7 +332,7 @@ const Dashboard = () => {
         {/* Progression des projets */}
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader>
-            <Heading size="md">Progression des projets</Heading>
+            <Heading size="md" fontWeight="600">Progression des projets</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
@@ -382,7 +363,7 @@ const Dashboard = () => {
         {/* Statut des tâches */}
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader>
-            <Heading size="md">Statut des tâches</Heading>
+            <Heading size="md" fontWeight="600">Statut des tâches</Heading>
           </CardHeader>
           <CardBody>
             <Box height="200px">
@@ -414,7 +395,7 @@ const Dashboard = () => {
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader>
             <Flex justify="space-between" align="center">
-              <Heading size="md">Échéances à venir</Heading>
+              <Heading size="md" fontWeight="600">Échéances à venir</Heading>
               <Tag colorScheme="orange" variant="subtle">
                 <TagLeftIcon as={FiCalendar} />
                 <TagLabel>Prochains jours</TagLabel>
@@ -477,7 +458,7 @@ const Dashboard = () => {
         {/* Activités récentes */}
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader>
-            <Heading size="md">Activités récentes</Heading>
+            <Heading size="md" fontWeight="600">Activités récentes</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
@@ -522,8 +503,18 @@ const Dashboard = () => {
         <CardHeader>
           <Flex justify="space-between" align="center">
             <HStack spacing={3}>
-              <Icon as={FiMic} boxSize={5} color="purple.500" />
-              <Heading size="md">Recent Meetings</Heading>
+              <Box
+                w={8}
+                h={8}
+                borderRadius="lg"
+                bg="accent.50"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Icon as={FiMic} boxSize={4} color="accent.500" />
+              </Box>
+              <Heading size="md" fontWeight="600">Recent Meetings</Heading>
             </HStack>
             <HStack spacing={2}>
               <Button
@@ -632,17 +623,27 @@ const Dashboard = () => {
       {/* Widget IA */}
       <Card
         mt={6}
-        bgGradient="linear(to-r, purple.50, blue.50)"
+        bgGradient="linear(135deg, brand.50, accent.50)"
         borderWidth="1px"
-        borderColor="purple.200"
+        borderColor="brand.200"
       >
         <CardBody>
           <Flex align="center" justify="space-between" wrap="wrap" gap={4}>
             <HStack spacing={4}>
-              <Icon as={FiCpu} boxSize={8} color="purple.500" />
+              <Box
+                w={12}
+                h={12}
+                borderRadius="xl"
+                bgGradient="linear(135deg, brand.500, accent.500)"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Icon as={FiCpu} boxSize={6} color="white" />
+              </Box>
               <Box>
-                <Heading size="sm" color="purple.700">Assistant IA</Heading>
-                <Text color="gray.600" maxW="lg">
+                <Heading size="sm" color="gray.800" fontWeight="600">Assistant IA</Heading>
+                <Text color="gray.600" maxW="lg" fontSize="sm">
                   Basé sur l'analyse de vos données, voici quelques recommandations pour optimiser votre productivité.
                 </Text>
               </Box>

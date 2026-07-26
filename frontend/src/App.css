@@ -1,33 +1,49 @@
 .App {
   min-height: 100vh;
-  background-color: #f7f9fc;
+  background-color: #f8fafc;
 }
 
 /* Animations */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .fade-in {
-  animation: fadeIn 0.5s ease-in-out;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.scale-in {
+  animation: scaleIn 0.3s ease-out;
 }
 
 /* Scrollbar personnalisée */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 10px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -39,30 +55,80 @@
   background: #a0aec0;
 }
 
-/* Utilitaires */
-.text-truncate {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Selection */
+::selection {
+  background: #c7d2fe;
+  color: #1e3a5f;
 }
 
-.cursor-pointer {
-  cursor: pointer;
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid #3b5bdb;
+  outline-offset: 2px;
 }
 
 /* Transitions */
 .transition-all {
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
-.hover-scale:hover {
-  transform: scale(1.02);
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* Glassmorphism */
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #3b5bdb 0%, #d946ef 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass morphism */
 .glass {
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Gradient backgrounds */
+.bg-gradient-brand {
+  background: linear-gradient(135deg, #3b5bdb 0%, #d946ef 100%);
+}
+
+.bg-gradient-mesh {
+  background: 
+    radial-gradient(at 40% 20%, #eef2ff 0px, transparent 50%),
+    radial-gradient(at 80% 0%, #fdf4ff 0px, transparent 50%),
+    radial-gradient(at 0% 50%, #ecfdf5 0px, transparent 50%),
+    #f8fafc;
+}
+
+/* Sidebar transition */
+.sidebar-transition {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), 
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Stat card icon background */
+.stat-icon-bg {
+  position: relative;
+}
+.stat-icon-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0.1;
 }
