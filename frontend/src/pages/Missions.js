@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import {
   Box, Heading, Button, HStack, VStack, Text, Badge, Icon,
@@ -16,15 +17,10 @@ import {
 } from 'react-icons/fi';
 import { useMissionService } from '../services/missionService';
 import LoadingState from '../components/LoadingState';
-
-const statusConfig = {
-  planned: { color: 'blue', label: 'Planifiée', icon: FiClock },
-  in_progress: { color: 'orange', label: 'En cours', icon: FiPlay },
-  completed: { color: 'green', label: 'Terminée', icon: FiCheck },
-  cancelled: { color: 'red', label: 'Annulée', icon: FiXCircle },
-};
+import i18n from '../i18n';
 
 const Missions = () => {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [deleteId, setDeleteId] = useState(null);
@@ -36,6 +32,15 @@ const Missions = () => {
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = React.useRef();
+
+  const statusConfig = {
+    planned: { color: 'blue', label: t('missions.planned'), icon: FiClock },
+    in_progress: { color: 'orange', label: t('missions.inProgress'), icon: FiPlay },
+    completed: { color: 'green', label: t('missions.completed'), icon: FiCheck },
+    cancelled: { color: 'red', label: t('missions.cancelled'), icon: FiXCircle },
+  };
+
+  const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
 
   React.useEffect(() => {
     loadMissions();
@@ -49,7 +54,7 @@ const Missions = () => {
       const data = await getMissions(params);
       setMissions(Array.isArray(data) ? data : data.results || []);
     } catch (error) {
-      toast({ title: 'Erreur lors du chargement des missions', status: 'error', duration: 3000 });
+      toast({ title: t('missions.loadError'), status: 'error', duration: 3000 });
     } finally {
       setLoading(false);
     }
@@ -65,9 +70,9 @@ const Missions = () => {
     try {
       await deleteMission(deleteId);
       setMissions(missions.filter(m => m.id !== deleteId));
-      toast({ title: 'Mission supprimée', status: 'success', duration: 2000 });
+      toast({ title: t('missions.deletedSuccess'), status: 'success', duration: 2000 });
     } catch (error) {
-      toast({ title: 'Erreur lors de la suppression', status: 'error', duration: 3000 });
+      toast({ title: t('missions.deleteError'), status: 'error', duration: 3000 });
     } finally {
       onClose();
       setDeleteId(null);
@@ -80,32 +85,32 @@ const Missions = () => {
 
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
-    return new Date(dateStr + 'T00:00:00').toLocaleDateString('fr-FR', {
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, {
       day: 'numeric', month: 'short', year: 'numeric',
     });
   };
 
-  const formatCost = (amount) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency', currency: 'XOF', minimumFractionDigits: 0,
+  const formatCost = (amount, currency) => {
+    return new Intl.NumberFormat(locale, {
+      style: 'currency', currency: (currency || 'XOF').toUpperCase(), minimumFractionDigits: 0,
     }).format(amount || 0);
   };
 
   if (loading) {
-    return <LoadingState message="Chargement des missions..." />;
+    return <LoadingState message={t('missions.loading')} />;
   }
 
   return (
     <Box>
       <Flex justify="space-between" align="center" mb={6} wrap="wrap" gap={3}>
-        <Heading size="lg">Missions</Heading>
+        <Heading size="lg">{t('missions.title')}</Heading>
         <Button
           as={RouterLink}
           to="/missions/create"
           leftIcon={<FiPlus />}
           colorScheme="blue"
         >
-          Nouvelle mission
+          {t('missions.newMission')}
         </Button>
       </Flex>
 
@@ -113,7 +118,7 @@ const Missions = () => {
         <InputGroup maxW="300px">
           <InputLeftElement><Icon as={FiSearch} color="gray.400" /></InputLeftElement>
           <Input
-            placeholder="Rechercher une mission..."
+            placeholder={t('missions.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             bg={bgColor}
@@ -121,7 +126,7 @@ const Missions = () => {
         </InputGroup>
         <Select
           maxW="200px"
-          placeholder="Tous les statuts"
+          placeholder={t('missions.allStatuses')}
           value={statusFilter}
           onChange={(e) => {
             setStatusFilter(e.target.value);
@@ -129,20 +134,20 @@ const Missions = () => {
           }}
           bg={bgColor}
         >
-          <option value="planned">Planifiée</option>
-          <option value="in_progress">En cours</option>
-          <option value="completed">Terminée</option>
-          <option value="cancelled">Annulée</option>
+          <option value="planned">{t('missions.planned')}</option>
+          <option value="in_progress">{t('missions.inProgress')}</option>
+          <option value="completed">{t('missions.completed')}</option>
+          <option value="cancelled">{t('missions.cancelled')}</option>
         </Select>
       </HStack>
 
       {filtered.length === 0 ? (
         <Box textAlign="center" py={16} bg={bgColor} borderRadius="xl" shadow="sm" borderWidth="1px" borderColor={borderColor}>
           <Icon as={FiMapPin} boxSize={16} color="gray.300" mb={4} />
-          <Heading size="md" color="gray.500" mb={2}>Aucune mission trouvée</Heading>
-          <Text color="gray.400" mb={6}>Créez votre première mission pour commencer</Text>
+          <Heading size="md" color="gray.500" mb={2}>{t('missions.notFound')}</Heading>
+          <Text color="gray.400" mb={6}>{t('missions.createFirst')}</Text>
           <Button as={RouterLink} to="/missions/create" colorScheme="blue" leftIcon={<FiPlus />}>
-            Créer une mission
+            {t('missions.createMission')}
           </Button>
         </Box>
       ) : (
@@ -177,17 +182,17 @@ const Missions = () => {
                         icon={<FiMoreVertical />}
                         variant="ghost"
                         size="sm"
-                        aria-label="Actions"
+                        aria-label={t('missions.table.actions')}
                       />
                       <MenuList>
                         <MenuItem as={RouterLink} to={`/missions/${mission.id}`} icon={<FiEye />}>
-                          Voir détails
+                          {t('missions.actions.viewDetails')}
                         </MenuItem>
                         <MenuItem as={RouterLink} to={`/missions/${mission.id}/edit`} icon={<FiEdit2 />}>
-                          Modifier
+                          {t('missions.actions.edit')}
                         </MenuItem>
                         <MenuItem icon={<FiTrash2 />} color="red.500" onClick={() => confirmDelete(mission.id)}>
-                          Supprimer
+                          {t('missions.actions.delete')}
                         </MenuItem>
                       </MenuList>
                     </Menu>
@@ -201,7 +206,7 @@ const Missions = () => {
                     {mission.duration_days != null && (
                       <Badge variant="outline" display="flex" alignItems="center" gap={1}>
                         <Icon as={FiClock} boxSize={3} />
-                        {mission.duration_days} jour{mission.duration_days > 1 ? 's' : ''}
+                        {mission.duration_days} {t('missions.days')}{mission.duration_days > 1 ? t('missions.daysPlural') : ''}
                       </Badge>
                     )}
                   </HStack>
@@ -217,15 +222,15 @@ const Missions = () => {
                     </HStack>
                     <HStack fontSize="sm" color="gray.500">
                       <Icon as={FiDollarSign} boxSize={4} />
-                      <Text fontWeight="600">{formatCost(mission.frais_de_mission || mission.total_cost)}</Text>
+                      <Text fontWeight="600">{formatCost(mission.frais_de_mission || mission.total_cost, mission.currency)}</Text>
                     </HStack>
                     {mission.members && mission.members.length > 0 && (
                       <HStack fontSize="sm" color="gray.500">
                         <Icon as={FiUsers} boxSize={4} />
-                        <Text>{mission.members.length} membre{mission.members.length > 1 ? 's' : ''}</Text>
+                        <Text>{mission.members.length} {t('missions.members')}{mission.members.length > 1 ? t('missions.membersPlural') : ''}</Text>
                         <AvatarGroup size="xs" max={4} ml={1}>
                           {mission.members.map(m => (
-                            <Tooltip key={m.id} label={`${m.user_name}${m.is_leader ? ' (Chef)' : ''}`}>
+                            <Tooltip key={m.id} label={`${m.user_name}${m.is_leader ? ` (${t('missions.chief')})` : ''}`}>
                               <Avatar name={m.user_name} size="xs" />
                             </Tooltip>
                           ))}
@@ -242,11 +247,11 @@ const Missions = () => {
                       variant="ghost"
                       colorScheme="blue"
                     >
-                      Voir détails
+                      {t('missions.actions.viewDetails')}
                     </Button>
                     {mission.created_by_name && (
                       <Text fontSize="xs" color="gray.400">
-                        par {mission.created_by_name}
+                        {t('missions.by')} {mission.created_by_name}
                       </Text>
                     )}
                   </Flex>
@@ -261,14 +266,14 @@ const Missions = () => {
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Supprimer la mission
+              {t('missions.confirmDelete')}
             </AlertDialogHeader>
             <AlertDialogBody>
-              Êtes-vous sûr de vouloir supprimer cette mission ? Cette action est irréversible.
+              {t('missions.confirmDeleteDesc')}
             </AlertDialogBody>
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose}>Annuler</Button>
-              <Button colorScheme="red" onClick={handleDelete} ml={3}>Supprimer</Button>
+              <Button ref={cancelRef} onClick={onClose}>{t('common.cancel')}</Button>
+              <Button colorScheme="red" onClick={handleDelete} ml={3}>{t('common.delete')}</Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialogOverlay>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Heading,
@@ -69,11 +70,11 @@ import { useCrudService } from '../utils/createCrudService';
 import { useAuth } from '../context/AuthContext';
 import { Link as RouterLink } from 'react-router-dom';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { PROJECT_STATUS_COLORS, PROJECT_STATUS_LABELS } from '../utils/constants';
+import { PROJECT_STATUS_COLORS, getProjectStatusLabel } from '../utils/constants';
 import LoadingState from '../components/LoadingState';
 
 const Projects = () => {
+  const { t } = useTranslation();
   const [selectedProject, setSelectedProject] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -101,8 +102,8 @@ const Projects = () => {
   const queryClient = useQueryClient();
   const projectService = useProjectService();
   const { user: currentUser, axiosInstance } = useAuth();
-  const groupService = useCrudService('/groups', { resourceName: 'groupes' });
-  const userService = useCrudService('/users', { resourceName: 'utilisateurs' });
+  const groupService = useCrudService('/groups', { resourceName: t('sidebar.groups') });
+  const userService = useCrudService('/users', { resourceName: t('sidebar.users') });
 
   const { data: allGroups = [] } = useQuery('groups', () => groupService.getAll());
  const availableGroups = Array.isArray(allGroups) 
@@ -119,8 +120,8 @@ const Projects = () => {
     {
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: 'Impossible de charger les projets',
+          title: t('common.error'),
+          description: t('common.loadErrorDesc'),
           status: 'error',
           duration: 3000,
         });
@@ -135,8 +136,8 @@ const Projects = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('projects');
         toast({
-          title: 'Succès',
-          description: 'Projet créé avec succès',
+          title: t('common.success'),
+          description: t('projects.createdSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -144,8 +145,8 @@ const Projects = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: error.response?.data?.message || 'Erreur lors de la création',
+          title: t('common.error'),
+          description: error.response?.data?.message || t('projects.createError'),
           status: 'error',
           duration: 3000,
         });
@@ -160,8 +161,8 @@ const Projects = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('projects');
         toast({
-          title: 'Succès',
-          description: 'Projet mis à jour avec succès',
+          title: t('common.success'),
+          description: t('projects.updatedSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -169,8 +170,8 @@ const Projects = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: error.response?.data?.message || 'Erreur lors de la mise à jour',
+          title: t('common.error'),
+          description: error.response?.data?.message || t('projects.updateError'),
           status: 'error',
           duration: 3000,
         });
@@ -185,8 +186,8 @@ const Projects = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('projects');
         toast({
-          title: 'Succès',
-          description: 'Projet supprimé avec succès',
+          title: t('common.success'),
+          description: t('projects.deletedSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -194,8 +195,8 @@ const Projects = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: error.response?.data?.message || 'Erreur lors de la suppression',
+          title: t('common.error'),
+          description: error.response?.data?.message || t('projects.deleteError'),
           status: 'error',
           duration: 3000,
         });
@@ -257,8 +258,7 @@ const Projects = () => {
     } else {
       createMutation.mutate(formData);
     }
-    console.log('📦 Données à envoyer:', formData);
-    alert('la')
+    
   };
 
   const addToList = (field, selectedId, setSelectedId) => {
@@ -286,18 +286,17 @@ const Projects = () => {
   };
 
   const getStatusColor = (status) => PROJECT_STATUS_COLORS[status] || 'gray';
-  const getStatusLabel = (status) => PROJECT_STATUS_LABELS[status] || status;
 
   if (isLoading) {
-    return <LoadingState message="Chargement des projets..." />;
+    return <LoadingState message={t('common.loading')} />;
   }
 
   if (error) {
     return (
       <Box textAlign="center" py={10}>
-        <Text color="red.500">Erreur lors du chargement des projets</Text>
+        <Text color="red.500">{t('common.loadErrorDesc')}</Text>
         <Button mt={4} onClick={() => queryClient.invalidateQueries('projects')}>
-          Réessayer
+          {t('common.retry')}
         </Button>
       </Box>
     );
@@ -306,13 +305,13 @@ const Projects = () => {
   return (
     <Box>
       <HStack justify="space-between" mb={6}>
-        <Heading size="lg">Projets</Heading>
+        <Heading size="lg">{t('projects.title')}</Heading>
         <Button
           leftIcon={<FiPlus />}
           colorScheme="blue"
           onClick={() => handleOpenModal()}
         >
-          Nouveau projet
+          {t('projects.newProject')}
         </Button>
       </HStack>
 
@@ -322,7 +321,7 @@ const Projects = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Total projets</StatLabel>
+                <StatLabel>{t('projects.title')}</StatLabel>
                 <StatNumber>{projects.length}</StatNumber>
               </Stat>
             </CardBody>
@@ -330,7 +329,7 @@ const Projects = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>En cours</StatLabel>
+                <StatLabel>{t('common.inProgress')}</StatLabel>
                 <StatNumber>
                   {projects.filter(p => p.status === 'in_progress').length}
                 </StatNumber>
@@ -340,7 +339,7 @@ const Projects = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Terminés</StatLabel>
+                <StatLabel>{t('common.completed')}</StatLabel>
                 <StatNumber>
                   {projects.filter(p => p.status === 'completed').length}
                 </StatNumber>
@@ -350,7 +349,7 @@ const Projects = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Progression moy.</StatLabel>
+                <StatLabel>{t('projects.progressAvg')}</StatLabel>
                 <StatNumber>
                   {Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / projects.length)}%
                 </StatNumber>
@@ -365,13 +364,13 @@ const Projects = () => {
         <Table variant="simple">
           <Thead bg="gray.50">
             <Tr>
-              <Th>Nom</Th>
-              <Th>Statut</Th>
-              <Th>Progression</Th>
-              <Th>Groupes</Th>
-              <Th>Chefs de projet</Th>
-              <Th>Deadline</Th>
-              <Th>Actions</Th>
+              <Th>{t('projects.column.name')}</Th>
+              <Th>{t('common.status')}</Th>
+              <Th>{t('common.progress')}</Th>
+              <Th>{t('projects.column.groups')}</Th>
+              <Th>{t('projects.column.managers')}</Th>
+              <Th>{t('projects.column.deadline')}</Th>
+              <Th>{t('common.actions')}</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -386,7 +385,7 @@ const Projects = () => {
                   </Td>
                   <Td>
                     <Badge colorScheme={getStatusColor(project.status)}>
-                      {getStatusLabel(project.status)}
+                      {getProjectStatusLabel(project.status)}
                     </Badge>
                   </Td>
                   <Td>
@@ -458,13 +457,13 @@ const Projects = () => {
                         icon={<FiEye />}
                         size="sm"
                         variant="ghost"
-                        aria-label="Voir"
+                        aria-label={t('common.view')}
                       />
                       <IconButton
                         icon={<FiEdit2 />}
                         size="sm"
                         variant="ghost"
-                        aria-label="Modifier"
+                        aria-label={t('common.edit')}
                         onClick={() => handleOpenModal(project)}
                       />
                       <IconButton
@@ -472,7 +471,7 @@ const Projects = () => {
                         size="sm"
                         variant="ghost"
                         colorScheme="red"
-                        aria-label="Supprimer"
+                        aria-label={t('common.delete')}
                         onClick={() => handleDelete(project)}
                       />
                     </HStack>
@@ -482,14 +481,14 @@ const Projects = () => {
             ) : (
               <Tr>
                 <Td colSpan={7} textAlign="center" py={8}>
-                  <Text color="gray.500">Aucun projet trouvé</Text>
+                  <Text color="gray.500">{t('projects.notFound')}</Text>
                   <Button
                     mt={4}
                     size="sm"
                     leftIcon={<FiPlus />}
                     onClick={() => handleOpenModal()}
                   >
-                    Créer votre premier projet
+                    {t('projects.createFirst')}
                   </Button>
                 </Td>
               </Tr>
@@ -504,45 +503,45 @@ const Projects = () => {
         <ModalContent>
           <form onSubmit={handleSubmit}>
             <ModalHeader>
-              {selectedProject ? 'Modifier le projet' : 'Nouveau projet'}
+              {selectedProject ? t('projects.editProject') : t('projects.newProject')}
             </ModalHeader>
             <ModalCloseButton />
             <ModalBody>
               <VStack spacing={4}>
                 <FormControl isRequired>
-                  <FormLabel>Nom du projet</FormLabel>
+                  <FormLabel>{t('projects.projectName')}</FormLabel>
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: Site e-commerce"
+                    placeholder={t('projects.namePlaceholder')}
                   />
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>{t('common.description')}</FormLabel>
                   <Textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Description du projet..."
+                    placeholder={t('projects.projectDescription')}
                     rows={3}
                   />
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Statut</FormLabel>
+                  <FormLabel>{t('common.status')}</FormLabel>
                   <Select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   >
-                    <option value="not_started">Non démarré</option>
-                    <option value="in_progress">En cours</option>
-                    <option value="paused">En pause</option>
-                    <option value="completed">Terminé</option>
+                    <option value="not_started">{t('common.notStarted')}</option>
+                    <option value="in_progress">{t('common.inProgress')}</option>
+                    <option value="paused">{t('common.paused')}</option>
+                    <option value="completed">{t('common.completed')}</option>
                   </Select>
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Date de début</FormLabel>
+                  <FormLabel>{t('common.startDate')}</FormLabel>
                   <Input
                     type="date"
                     value={formData.start_date}
@@ -551,7 +550,7 @@ const Projects = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Date de fin prévue</FormLabel>
+                  <FormLabel>{t('common.endDate')}</FormLabel>
                   <Input
                     type="date"
                     value={formData.deadline}
@@ -560,12 +559,12 @@ const Projects = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Groupes</FormLabel>
+                  <FormLabel>{t('projects.groups')}</FormLabel>
                   <HStack mb={2}>
                     <Select
                       value={selectedGroupId}
                       onChange={(e) => setSelectedGroupId(e.target.value)}
-                      placeholder="Sélectionner un groupe"
+                      placeholder={t('projects.selectGroup')}
                       flex={1}
                     >
                       {availableGroups
@@ -575,7 +574,7 @@ const Projects = () => {
                         ))}
                     </Select>
                     <Button size="sm" colorScheme="purple" onClick={() => addToList('groups', selectedGroupId, setSelectedGroupId)}>
-                      Ajouter
+                      {t('common.add')}
                     </Button>
                   </HStack>
                   {formData.groups.length > 0 && (
@@ -596,12 +595,12 @@ const Projects = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Chefs de projet</FormLabel>
+                  <FormLabel>{t('projects.projectManagers')}</FormLabel>
                   <HStack mb={2}>
                     <Select
                       value={selectedManagerId}
                       onChange={(e) => setSelectedManagerId(e.target.value)}
-                      placeholder="Sélectionner un chef de projet"
+                      placeholder={t('projects.selectManager')}
                       flex={1}
                     >
                       {availableUsers
@@ -611,7 +610,7 @@ const Projects = () => {
                         ))}
                     </Select>
                     <Button size="sm" colorScheme="orange" onClick={() => addToList('managers', selectedManagerId, setSelectedManagerId)}>
-                      Ajouter
+                      {t('common.add')}
                     </Button>
                   </HStack>
                   {formData.managers.length > 0 && (
@@ -632,12 +631,12 @@ const Projects = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Membres</FormLabel>
+                  <FormLabel>{t('projectMembers.title')}</FormLabel>
                   <HStack mb={2}>
                     <Select
                       value={selectedMemberId}
                       onChange={(e) => setSelectedMemberId(e.target.value)}
-                      placeholder="Sélectionner un membre"
+                      placeholder={t('projects.selectMember')}
                       flex={1}
                     >
                       {availableUsers
@@ -647,7 +646,7 @@ const Projects = () => {
                         ))}
                     </Select>
                     <Button size="sm" colorScheme="blue" onClick={() => addToList('members', selectedMemberId, setSelectedMemberId)}>
-                      Ajouter
+                      {t('common.add')}
                     </Button>
                   </HStack>
                   {formData.members.length > 0 && (
@@ -671,14 +670,14 @@ const Projects = () => {
 
             <ModalFooter>
               <Button variant="ghost" mr={3} onClick={handleCloseModal}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 colorScheme="blue"
                 isLoading={createMutation.isLoading || updateMutation.isLoading}
               >
-                {selectedProject ? 'Mettre à jour' : 'Créer'}
+                {selectedProject ? t('common.update') : t('common.create')}
               </Button>
             </ModalFooter>
           </form>
@@ -694,17 +693,17 @@ const Projects = () => {
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Supprimer le projet
+              {t('projects.confirmDelete')}
             </AlertDialogHeader>
 
             <AlertDialogBody>
-              Êtes-vous sûr de vouloir supprimer le projet "{selectedProject?.name}" ?
-              Cette action est irréversible.
+              {t('common.confirmDelete')} "{selectedProject?.name}" ?
+              {t('common.irreversible')}
             </AlertDialogBody>
 
             <AlertDialogFooter>
               <Button ref={cancelRef} onClick={onDeleteClose}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button
                 colorScheme="red"
@@ -712,7 +711,7 @@ const Projects = () => {
                 ml={3}
                 isLoading={deleteMutation.isLoading}
               >
-                Supprimer
+                {t('common.delete')}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

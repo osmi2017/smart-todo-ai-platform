@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box, Heading, Button, VStack, HStack,
   FormControl, FormLabel, Input, Textarea, Select,
@@ -21,6 +22,7 @@ import { useProjectService } from '../services/projectService';
 import { useAuth } from '../context/AuthContext';
 
 const MeetingForm = () => {
+  const { t } = useTranslation();
   const { id } = useParams();
   const isEditing = Boolean(id);
   const navigate = useNavigate();
@@ -144,7 +146,7 @@ const MeetingForm = () => {
         );
       }
     } catch (error) {
-      toast({ title: 'Error loading meeting', status: 'error', duration: 3000 });
+      toast({ title: t('meetings.loadError'), status: 'error', duration: 3000 });
       navigate('/meetings');
     } finally {
       setLoadingMeeting(false);
@@ -203,7 +205,7 @@ const MeetingForm = () => {
     });
     setInvitedParticipants(newParticipants);
     toast({
-      title: `Added ${addedCount} member${addedCount !== 1 ? 's' : ''} from group`,
+      title: t('meetings.addedMembers', { count: addedCount }),
       status: 'success',
       duration: 2000,
     });
@@ -213,11 +215,11 @@ const MeetingForm = () => {
   const addExternalEmail = () => {
     const email = externalEmail.trim();
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast({ title: 'Please enter a valid email address', status: 'warning', duration: 2000 });
+      toast({ title: t('meetings.invalidEmail'), status: 'warning', duration: 2000 });
       return;
     }
     if (invitedParticipants.find((p) => p.email === email)) {
-      toast({ title: 'This email is already added', status: 'info', duration: 2000 });
+      toast({ title: t('meetings.emailAlreadyAdded'), status: 'info', duration: 2000 });
       return;
     }
     setInvitedParticipants((prev) => [
@@ -240,7 +242,7 @@ const MeetingForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) {
-      toast({ title: 'Title is required', status: 'warning', duration: 2000 });
+      toast({ title: t('meetings.titleRequired'), status: 'warning', duration: 2000 });
       return;
     }
 
@@ -278,15 +280,15 @@ const MeetingForm = () => {
       }
 
       toast({
-        title: isEditing ? 'Meeting updated' : 'Meeting created',
+        title: isEditing ? t('meetings.updatedSuccess') : t('meetings.createdSuccess'),
         status: 'success',
         duration: 2000,
       });
       navigate(`/meetings/${meetingIdResult}`);
     } catch (error) {
       toast({
-        title: isEditing ? 'Error updating meeting' : 'Error creating meeting',
-        description: error.response?.data?.detail || 'Unknown error',
+        title: isEditing ? t('meetings.updateError') : t('meetings.createError'),
+        description: error.response?.data?.detail || t('meetings.unknownError'),
         status: 'error',
         duration: 3000,
       });
@@ -331,20 +333,20 @@ const MeetingForm = () => {
         mb={4}
         onClick={() => navigate(isEditing ? `/meetings/${id}` : '/meetings')}
       >
-        {isEditing ? 'Back to Meeting' : 'Back to Meetings'}
+        {isEditing ? t('meetings.editMeeting') : t('meetings.newMeeting')}
       </Button>
 
       <Heading size="lg" mb={6}>
-        {isEditing ? 'Edit Meeting' : 'New Meeting'}
+        {isEditing ? t('meetings.editMeeting') : t('meetings.newMeeting')}
       </Heading>
 
       <Box bg={bgColor} borderRadius="lg" shadow="sm" p={6} maxW="800px">
         <form onSubmit={handleSubmit}>
           <Tabs colorScheme="blue" variant="enclosed">
             <TabList>
-              <Tab>Meeting Details</Tab>
+              <Tab>{t('meetings.meetingTitle')}</Tab>
               <Tab>
-                Invite Participants
+                {t('meetings.invited')}
                 {invitedParticipants.length > 0 && (
                   <Badge ml={2} colorScheme="blue" borderRadius="full">
                     {invitedParticipants.length}
@@ -358,7 +360,7 @@ const MeetingForm = () => {
               <TabPanel>
                 <VStack spacing={5}>
                   <FormControl isRequired>
-                    <FormLabel>Title</FormLabel>
+                    <FormLabel>{t('meetings.meetingTitle')}</FormLabel>
                     <Input
                       name="title"
                       value={formData.title}
@@ -368,7 +370,7 @@ const MeetingForm = () => {
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>{t('common.description')}</FormLabel>
                     <Textarea
                       name="description"
                       value={formData.description}
@@ -380,27 +382,27 @@ const MeetingForm = () => {
 
                   {isEditing && (
                     <FormControl>
-                      <FormLabel>Status</FormLabel>
+                      <FormLabel>{t('common.status')}</FormLabel>
                       <Select name="status" value={formData.status} onChange={handleChange}>
-                        <option value="scheduled">Scheduled</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
+                        <option value="scheduled">{t('meetings.scheduled')}</option>
+                        <option value="in_progress">{t('meetings.inProgress')}</option>
+                        <option value="completed">{t('meetings.completed')}</option>
+                        <option value="cancelled">{t('meetings.cancelled')}</option>
                       </Select>
                     </FormControl>
                   )}
 
                   <FormControl>
-                    <FormLabel>Input Type</FormLabel>
+                    <FormLabel>{t('meetings.contentType')}</FormLabel>
                     <Select name="input_type" value={formData.input_type} onChange={handleChange}>
-                      <option value="text">Text Notes</option>
-                      <option value="audio">Audio Upload</option>
-                      <option value="both">Audio + Text</option>
+                      <option value="text">{t('meetings.textNotes')}</option>
+                      <option value="audio">{t('meetings.audioUpload')}</option>
+                      <option value="both">{t('meetings.audioAndText')}</option>
                     </Select>
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>Scheduled Date & Time</FormLabel>
+                    <FormLabel>{t('meetings.schedule')}</FormLabel>
                     <Input
                       name="scheduled_at"
                       type="datetime-local"
@@ -410,12 +412,12 @@ const MeetingForm = () => {
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>Project (optional)</FormLabel>
+                    <FormLabel>{t('meetings.projectOptional')}</FormLabel>
                     <Select
                       name="project"
                       value={formData.project}
                       onChange={handleChange}
-                      placeholder="Select project"
+                      placeholder={t('meetings.projectOptional')}
                     >
                       {projects.map((p) => (
                         <option key={p.id} value={p.id}>
@@ -428,7 +430,7 @@ const MeetingForm = () => {
                   {(formData.input_type === 'audio' || formData.input_type === 'both') &&
                     !isEditing && (
                       <FormControl>
-                        <FormLabel>Audio File</FormLabel>
+                        <FormLabel>{t('meetings.audioFile')}</FormLabel>
                         <Box
                           borderWidth={2}
                           borderStyle="dashed"
@@ -449,7 +451,7 @@ const MeetingForm = () => {
                           <Text color="gray.500">
                             {audioFile
                               ? audioFile.name
-                              : 'Click to upload audio file (mp3, wav, m4a)'}
+                              : t('meetings.audioUploadHint')}
                           </Text>
                           <Input
                             id="audio-upload"
@@ -465,13 +467,13 @@ const MeetingForm = () => {
                   {isEditing && formData.input_type !== 'audio' && (
                     <Alert status="info" borderRadius="md" fontSize="sm">
                       <AlertIcon />
-                      You can edit meeting notes below. To re-upload audio, create a new meeting.
+                      {t('meetings.audioEditNote')}
                     </Alert>
                   )}
 
                   {(formData.input_type === 'text' || formData.input_type === 'both') && (
                     <FormControl>
-                      <FormLabel>Meeting Notes</FormLabel>
+                      <FormLabel>{t('meetings.meetingNotes')}</FormLabel>
                       <Textarea
                         name="raw_notes"
                         value={formData.raw_notes}
@@ -491,7 +493,7 @@ const MeetingForm = () => {
                   {invitedParticipants.length > 0 && (
                     <Box>
                       <Text fontWeight="600" mb={2}>
-                        Invited ({invitedParticipants.length})
+                        {t('meetings.invited')} ({invitedParticipants.length})
                       </Text>
                       <Wrap spacing={2}>
                         {invitedParticipants.map((p, i) => (
@@ -548,7 +550,7 @@ const MeetingForm = () => {
                       >
                         <HStack flex={1}>
                           <Icon as={FiUsers} color="purple.500" />
-                          <Text fontWeight="600">Add from Group</Text>
+                          <Text fontWeight="600">{t('meetings.addToGroup')}</Text>
                         </HStack>
                         <AccordionIcon />
                       </AccordionButton>
@@ -575,7 +577,7 @@ const MeetingForm = () => {
                             <Box>
                               <HStack justify="space-between" mb={2}>
                                 <Text fontSize="sm" color="gray.500">
-                                  {groupMembers.length} member{groupMembers.length !== 1 ? 's' : ''}
+                                  {t('meetings.memberCount', { count: groupMembers.length })}
                                 </Text>
                                 <Button
                                   size="xs"
@@ -583,7 +585,7 @@ const MeetingForm = () => {
                                   leftIcon={<FiUserPlus />}
                                   onClick={addGroupMembers}
                                 >
-                                  Add All
+                                  {t('meetings.addAll')}
                                 </Button>
                               </HStack>
                               <VStack
@@ -619,7 +621,7 @@ const MeetingForm = () => {
                                       </HStack>
                                       {isAdded ? (
                                         <Badge colorScheme="green" fontSize="xs">
-                                          Added
+                                          {t('meetings.added')}
                                         </Badge>
                                       ) : (
                                         <IconButton
@@ -649,7 +651,7 @@ const MeetingForm = () => {
                       >
                         <HStack flex={1}>
                           <Icon as={FiSearch} color="blue.500" />
-                          <Text fontWeight="600">Add from Enterprise</Text>
+                          <Text fontWeight="600">{t('meetings.addToEnterprise')}</Text>
                         </HStack>
                         <AccordionIcon />
                       </AccordionButton>
@@ -657,7 +659,7 @@ const MeetingForm = () => {
                         <VStack spacing={3} align="stretch">
                           <InputGroup>
                             <Input
-                              placeholder="Search users by name or email..."
+                              placeholder={t('meetings.searchUsersPlaceholder')}
                               value={userSearch}
                               onChange={(e) => setUserSearch(e.target.value)}
                             />
@@ -706,7 +708,7 @@ const MeetingForm = () => {
                                           <Text fontSize="sm">{u.username}</Text>
                                           {isSelf && (
                                             <Badge fontSize="2xs" colorScheme="gray">
-                                              You
+                                              {t('meetings.youLabel')}
                                             </Badge>
                                           )}
                                         </HStack>
@@ -719,7 +721,7 @@ const MeetingForm = () => {
                                     </HStack>
                                     {isAdded ? (
                                       <Badge colorScheme="green" fontSize="xs">
-                                        Added
+                                        {t('meetings.added')}
                                       </Badge>
                                     ) : (
                                       <IconButton
@@ -737,7 +739,7 @@ const MeetingForm = () => {
                               })}
                               {filteredUsers.length === 0 && (
                                 <Text fontSize="sm" color="gray.500" textAlign="center" py={4}>
-                                  No users found
+                                  {t('common.noResults')}
                                 </Text>
                               )}
                             </VStack>
@@ -754,14 +756,14 @@ const MeetingForm = () => {
                       >
                         <HStack flex={1}>
                           <Icon as={FiMail} color="orange.500" />
-                          <Text fontWeight="600">Invite by Email (External)</Text>
+                          <Text fontWeight="600">{t('meetings.inviteByEmail')}</Text>
                         </HStack>
                         <AccordionIcon />
                       </AccordionButton>
                       <AccordionPanel px={0}>
                         <VStack spacing={3} align="stretch">
                           <Text fontSize="sm" color="gray.500">
-                            Invite external participants who are not part of your enterprise.
+                            {t('meetings.inviteExternalDesc')}
                           </Text>
                           <HStack>
                             <Input
@@ -782,13 +784,13 @@ const MeetingForm = () => {
                               onClick={addExternalEmail}
                               flexShrink={0}
                             >
-                              Add
+                              {t('common.add')}
                             </Button>
                           </HStack>
                           {invitedParticipants.filter((p) => p.type === 'external').length > 0 && (
                             <Box>
                               <Text fontSize="xs" color="gray.500" mb={1}>
-                                External invites:
+                                {t('meetings.externalInvites')}
                               </Text>
                               <Wrap spacing={2}>
                                 {invitedParticipants
@@ -821,16 +823,16 @@ const MeetingForm = () => {
               variant="ghost"
               onClick={() => navigate(isEditing ? `/meetings/${id}` : '/meetings')}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
               colorScheme="blue"
               leftIcon={isEditing ? <FiSave /> : undefined}
               isLoading={submitting}
-              loadingText={isEditing ? 'Saving...' : 'Creating...'}
+              loadingText={isEditing ? t('common.saving') : t('common.creating')}
             >
-              {isEditing ? 'Save Changes' : 'Create Meeting'}
+              {isEditing ? t('meetings.saveChanges') : t('meetings.createMeeting')}
             </Button>
           </HStack>
         </form>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Skeleton, SkeletonText, VStack, HStack, SimpleGrid, Card, CardBody } from '@chakra-ui/react';
+import { useTranslation } from 'react-i18next';
 
 const LoadingCard = () => (
   <Card>
@@ -20,10 +21,12 @@ const LoadingCard = () => (
 );
 
 const LoadingState = ({ 
-  message = 'Chargement...', 
+  message,
   variant = 'default',
   count = 6 
 }) => {
+  const { t } = useTranslation();
+  const displayMessage = message || t('common.loading');
   if (variant === 'cards') {
     return (
       <Box>

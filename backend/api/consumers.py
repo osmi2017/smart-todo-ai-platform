@@ -7,6 +7,39 @@ from .models import Notification
 logger = logging.getLogger(__name__)
 
 
+class DashboardConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        if not self.scope['user'].is_authenticated:
+            await self.close()
+            return
+
+        self.user = self.scope['user']
+        company_id = getattr(self.user, 'company_id', None)
+        self.room_group_name = f'dashboard_{company_id or "global"}'
+
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+        await self.accept(subprotocol=self.scope.get('jwt_subprotocol'))
+
+    async def disconnect(self, close_code):
+        if hasattr(self, 'room_group_name'):
+            await self.channel_layer.group_discard(
+                self.room_group_name,
+                self.channel_name
+            )
+
+    async def receive(self, text_data):
+        pass
+
+    async def dashboard_refresh(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'dashboard_refresh',
+            'reason': event.get('reason', 'update'),
+        }))
+
+
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user_id = self.scope['url_route']['kwargs']['user_id']

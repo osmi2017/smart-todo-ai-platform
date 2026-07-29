@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Heading,
@@ -42,19 +43,20 @@ import { useQuery } from 'react-query';
 import { useTaskService } from '../services/taskService';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr as frLocale, enUS } from 'date-fns/locale';
 import {
   TASK_STATUS_COLORS,
-  TASK_STATUS_LABELS,
   PRIORITY_COLORS,
-  PRIORITY_LABELS,
   getPriorityColor,
   getPriorityLabel,
+  getTaskStatusLabel,
 } from '../utils/constants';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 
 const Tasks = () => {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'fr' ? frLocale : enUS;
   const [filters, setFilters] = useState({
     status: '',
     priority: '',
@@ -71,8 +73,8 @@ const Tasks = () => {
     {
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: 'Impossible de charger les tâches',
+          title: t('common.error'),
+          description: t('common.loadErrorDesc'),
           status: 'error',
           duration: 3000,
         });
@@ -81,14 +83,13 @@ const Tasks = () => {
   );
 
   const getStatusColor = (status) => TASK_STATUS_COLORS[status] || 'gray';
-  const getStatusLabel = (status) => TASK_STATUS_LABELS[status] || status;
 
   const handleTaskClick = (taskId) => {
     navigate(`/tasks/${taskId}`);
   };
 
   if (isLoading) {
-    return <LoadingState message="Chargement des tâches..." />;
+    return <LoadingState message={t('common.loading')} />;
   }
 
   return (
@@ -96,14 +97,14 @@ const Tasks = () => {
       <VStack spacing={6} align="stretch">
         {/* En-tête */}
         <HStack justify="space-between">
-          <Heading size="lg">Tâches</Heading>
+          <Heading size="lg">{t('tasks.title')}</Heading>
           <Button
             leftIcon={<FiPlus />}
             colorScheme="blue"
             as={RouterLink}
             to="/tasks/create"  // ← CORRIGÉ: /create au lieu de /new
           >
-            Nouvelle tâche
+            {t('tasks.newTask')}
           </Button>
         </HStack>
 
@@ -113,33 +114,33 @@ const Tasks = () => {
             <VStack spacing={4}>
               <HStack spacing={4} width="100%">
                 <Input
-                  placeholder="Rechercher une tâche..."
+                  placeholder={t('tasks.searchPlaceholder')}
                   value={filters.search}
                   onChange={(e) => setFilters({ ...filters, search: e.target.value })}
                   leftElement={<FiSearch />}
                 />
                 <Select
-                  placeholder="Tous les statuts"
+                  placeholder={t('common.allStatuses')}
                   value={filters.status}
                   onChange={(e) => setFilters({ ...filters, status: e.target.value })}
                   width="200px"
                 >
-                  <option value="todo">À faire</option>
-                  <option value="in_progress">En cours</option>
-                  <option value="review">En révision</option>
-                  <option value="blocked">Bloquée</option>
-                  <option value="completed">Terminée</option>
+                  <option value="todo">{t('common.todo')}</option>
+                  <option value="in_progress">{t('common.inProgress')}</option>
+                  <option value="review">{t('common.review')}</option>
+                  <option value="blocked">{t('common.blocked')}</option>
+                  <option value="completed">{t('common.completed')}</option>
                 </Select>
                 <Select
-                  placeholder="Toutes priorités"
+                  placeholder={t('common.allPriorities')}
                   value={filters.priority}
                   onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
                   width="200px"
                 >
-                  <option value="1">Basse</option>
-                  <option value="2">Moyenne</option>
-                  <option value="3">Haute</option>
-                  <option value="4">Critique</option>
+                  <option value="1">{t('common.low')}</option>
+                  <option value="2">{t('common.medium')}</option>
+                  <option value="3">{t('common.high')}</option>
+                  <option value="4">{t('common.critical')}</option>
                 </Select>
               </HStack>
             </VStack>
@@ -174,7 +175,7 @@ const Tasks = () => {
                           {getPriorityLabel(task.priority)}
                         </Badge>
                         <Badge colorScheme={getStatusColor(task.status)}>
-                          {getStatusLabel(task.status)}
+                          {getTaskStatusLabel(task.status)}
                         </Badge>
                       </HStack>
                       <Menu>
@@ -190,16 +191,16 @@ const Tasks = () => {
                             icon={<FiEye />}
                             onClick={() => navigate(`/tasks/${task.id}`)}
                           >
-                            Voir détails
+                            {t('common.view')}
                           </MenuItem>
                           <MenuItem 
                             icon={<FiEdit2 />}
                             onClick={() => navigate(`/tasks/${task.id}/edit`)}
                           >
-                            Modifier
+                            {t('common.edit')}
                           </MenuItem>
                           <MenuItem icon={<FiTrash2 />} color="red.500">
-                            Supprimer
+                            {t('common.delete')}
                           </MenuItem>
                         </MenuList>
                       </Menu>
@@ -233,14 +234,14 @@ const Tasks = () => {
 
                     {/* Prédictions ML */}
                     {task.delay_probability && task.delay_probability > 0.5 && (
-                      <Tooltip label={`Risque de retard: ${Math.round(task.delay_probability * 100)}%`}>
+                      <Tooltip label={`${t('tasks.riskWarning')} ${Math.round(task.delay_probability * 100)}%`}>
                         <Tag
                           size="sm"
                           colorScheme={task.delay_probability > 0.7 ? 'red' : 'orange'}
                           variant="subtle"
                         >
                           <TagLeftIcon as={FiAlertCircle} />
-                          <TagLabel>Risque {Math.round(task.delay_probability * 100)}%</TagLabel>
+                          <TagLabel>{t('tasks.risk')} {Math.round(task.delay_probability * 100)}%</TagLabel>
                         </Tag>
                       </Tooltip>
                     )}
@@ -256,7 +257,7 @@ const Tasks = () => {
                     <HStack justify="space-between" mt={2}>
                       <HStack spacing={3} fontSize="sm" color="gray.500">
                         {task.deadline && (
-                          <Tooltip label="Date limite">
+                          <Tooltip label={t('common.deadline')}>
                             <HStack spacing={1}>
                               <FiClock size={12} />
                               <Text>
@@ -293,8 +294,8 @@ const Tasks = () => {
           </SimpleGrid>
         ) : (
           <EmptyState
-            message="Aucune tâche trouvée"
-            actionLabel="Créer votre première tâche"
+            message={t('tasks.notFound')}
+            actionLabel={t('tasks.createFirst')}
             actionTo="/tasks/create"
           />
         )}

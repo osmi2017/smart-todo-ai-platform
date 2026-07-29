@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box, Heading, Button, VStack, HStack,
   FormControl, FormLabel, Input, Textarea, Select,
@@ -18,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import LocationSearch from '../components/LocationSearch';
 
 const MissionForm = () => {
+  const { t } = useTranslation();
   const { id } = useParams();
   const isEditing = Boolean(id);
   const navigate = useNavigate();
@@ -174,7 +176,7 @@ const MissionForm = () => {
         setSelectedMilestoneIds(data.milestones);
       }
     } catch (error) {
-      toast({ title: 'Erreur lors du chargement', status: 'error', duration: 3000 });
+      toast({ title: t('missions.loadErrorTitle'), status: 'error', duration: 3000 });
       navigate('/missions');
     } finally {
       setLoadingMission(false);
@@ -217,23 +219,23 @@ const MissionForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) {
-      toast({ title: 'Le titre est requis', status: 'warning', duration: 2000 });
+      toast({ title: t('missions.form.titleRequired'), status: 'warning', duration: 2000 });
       return;
     }
     if (!formData.destination_name.trim()) {
-      toast({ title: 'La destination est requise', status: 'warning', duration: 2000 });
+      toast({ title: t('missions.form.destinationRequired'), status: 'warning', duration: 2000 });
       return;
     }
     if (!formData.start_date) {
-      toast({ title: 'La date de début est requise', status: 'warning', duration: 2000 });
+      toast({ title: t('missions.form.startDateRequired'), status: 'warning', duration: 2000 });
       return;
     }
     if (selectedMemberIds.length === 0) {
-      toast({ title: 'Ajoutez au moins un membre', status: 'warning', duration: 2000 });
+      toast({ title: t('missions.form.atLeastOneMember'), status: 'warning', duration: 2000 });
       return;
     }
     if (!selectedLeaderId) {
-      toast({ title: 'Un chef de mission est obligatoire', status: 'warning', duration: 2000 });
+      toast({ title: t('missions.form.chiefRequired'), status: 'warning', duration: 2000 });
       return;
     }
 
@@ -252,17 +254,17 @@ const MissionForm = () => {
 
       if (isEditing) {
         await updateMission(id, payload);
-        toast({ title: 'Mission mise à jour', status: 'success', duration: 2000 });
+        toast({ title: t('missions.updatedSuccess'), status: 'success', duration: 2000 });
         navigate(`/missions/${id}`);
       } else {
         const result = await createMission(payload);
-        toast({ title: 'Mission créée', status: 'success', duration: 2000 });
+        toast({ title: t('missions.createdSuccess'), status: 'success', duration: 2000 });
         navigate(`/missions/${result.id}`);
       }
     } catch (error) {
       toast({
-        title: isEditing ? 'Erreur lors de la mise à jour' : 'Erreur lors de la création',
-        description: error.response?.data?.detail || JSON.stringify(error.response?.data) || 'Erreur inconnue',
+        title: isEditing ? t('missions.updateError') : t('missions.createError'),
+        description: error.response?.data?.detail || JSON.stringify(error.response?.data) || t('common.unknownError'),
         status: 'error',
         duration: 5000,
       });
@@ -295,11 +297,11 @@ const MissionForm = () => {
         mb={4}
         onClick={() => navigate(isEditing ? `/missions/${id}` : '/missions')}
       >
-        {isEditing ? 'Retour à la mission' : 'Retour aux missions'}
+        {isEditing ? t('missions.form.backToMission') : t('missions.form.backToMissions')}
       </Button>
 
       <Heading size="lg" mb={6}>
-        {isEditing ? 'Modifier la mission' : 'Nouvelle mission'}
+        {isEditing ? t('missions.editMission') : t('missions.newMission')}
       </Heading>
 
       <Flex gap={6} align="start" direction={{ base: 'column', lg: 'row' }}>
@@ -309,38 +311,38 @@ const MissionForm = () => {
             <VStack spacing={5} align="stretch">
               {/* Informations générales */}
               <Heading size="sm" color="gray.600" textTransform="uppercase" letterSpacing="wider">
-                Informations générales
+                {t('missions.form.generalInfo')}
               </Heading>
 
               <FormControl isRequired>
-                <FormLabel>Titre de la mission</FormLabel>
+                <FormLabel>{t('missions.form.title')}</FormLabel>
                 <Input
                   name="title"
                   value={formData.title}
                   onChange={handleChange}
-                  placeholder="Ex: Mission d'audit à Abidjan"
+                  placeholder={t('missions.form.titlePlaceholder')}
                 />
               </FormControl>
 
               <FormControl>
-                <FormLabel>Description</FormLabel>
+                <FormLabel>{t('missions.form.description')}</FormLabel>
                 <Textarea
                   name="description"
                   value={formData.description}
                   onChange={handleChange}
-                  placeholder="Description de la mission..."
+                  placeholder={t('missions.form.descriptionPlaceholder')}
                   rows={3}
                 />
               </FormControl>
 
               {isEditing && (
                 <FormControl>
-                  <FormLabel>Statut</FormLabel>
+                  <FormLabel>{t('missions.form.status')}</FormLabel>
                   <Select name="status" value={formData.status} onChange={handleChange}>
-                    <option value="planned">Planifiée</option>
-                    <option value="in_progress">En cours</option>
-                    <option value="completed">Terminée</option>
-                    <option value="cancelled">Annulée</option>
+                    <option value="planned">{t('missions.planned')}</option>
+                    <option value="in_progress">{t('missions.inProgress')}</option>
+                    <option value="completed">{t('missions.completed')}</option>
+                    <option value="cancelled">{t('missions.cancelled')}</option>
                   </Select>
                 </FormControl>
               )}
@@ -348,19 +350,19 @@ const MissionForm = () => {
               {/* Projet & Liens */}
               <Divider />
               <Heading size="sm" color="gray.600" textTransform="uppercase" letterSpacing="wider">
-                <HStack><Icon as={FiLink} /> Projet & Liens</HStack>
+                <HStack><Icon as={FiLink} /> {t('missions.form.projectAndLinks')}</HStack>
               </Heading>
 
               <FormControl>
-                <FormLabel>Projet associé</FormLabel>
+                <FormLabel>{t('missions.form.associatedProject')}</FormLabel>
                 {loadingProjects ? (
-                  <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">Chargement...</Text></HStack>
+                  <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">{t('common.loading')}</Text></HStack>
                 ) : (
                   <Select
                     name="project"
                     value={formData.project}
                     onChange={handleChange}
-                    placeholder="Aucun projet"
+                    placeholder={t('missions.form.noProject')}
                   >
                     {projects.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
@@ -372,9 +374,9 @@ const MissionForm = () => {
               {formData.project && (
                 <>
                   <FormControl>
-                    <FormLabel>Tâches associées</FormLabel>
+                    <FormLabel>{t('missions.form.associatedTasks')}</FormLabel>
                     {loadingLinked ? (
-                      <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">Chargement...</Text></HStack>
+                      <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">{t('common.loading')}</Text></HStack>
                     ) : projectTasks.length > 0 ? (
                       <Wrap spacing={2}>
                         {projectTasks.map(task => {
@@ -395,14 +397,14 @@ const MissionForm = () => {
                         })}
                       </Wrap>
                     ) : (
-                      <Text fontSize="sm" color="gray.400">Aucune tâche dans ce projet</Text>
+                      <Text fontSize="sm" color="gray.400">{t('missions.form.noTasksInProject')}</Text>
                     )}
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>Jalons associés</FormLabel>
+                    <FormLabel>{t('missions.form.associatedMilestones')}</FormLabel>
                     {loadingLinked ? (
-                      <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">Chargement...</Text></HStack>
+                      <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">{t('common.loading')}</Text></HStack>
                     ) : projectMilestones.length > 0 ? (
                       <Wrap spacing={2}>
                         {projectMilestones.map(ms => {
@@ -423,7 +425,7 @@ const MissionForm = () => {
                         })}
                       </Wrap>
                     ) : (
-                      <Text fontSize="sm" color="gray.400">Aucun jalon dans ce projet</Text>
+                      <Text fontSize="sm" color="gray.400">{t('missions.form.noMilestonesInProject')}</Text>
                     )}
                   </FormControl>
                 </>
@@ -432,14 +434,14 @@ const MissionForm = () => {
               {/* Destination */}
               <Divider />
               <Heading size="sm" color="gray.600" textTransform="uppercase" letterSpacing="wider">
-                <HStack><Icon as={FiMapPin} /> Destination</HStack>
+                <HStack><Icon as={FiMapPin} /> {t('missions.form.destination')}</HStack>
               </Heading>
 
               <FormControl isRequired>
-                <FormLabel>Nom de la destination</FormLabel>
+                <FormLabel>{t('missions.form.destinationName')}</FormLabel>
                 <LocationSearch
                   value={formData.destination_name}
-                  placeholder="Rechercher une ville, un pays..."
+                  placeholder={t('missions.form.destinationPlaceholder')}
                   onSelect={(loc) => {
                     setFormData(prev => ({
                       ...prev,
@@ -458,7 +460,7 @@ const MissionForm = () => {
 
               <HStack spacing={4}>
                 <FormControl>
-                  <FormLabel>Latitude</FormLabel>
+                  <FormLabel>{t('missions.form.latitude')}</FormLabel>
                   <Input
                     name="destination_lat"
                     type="number"
@@ -472,7 +474,7 @@ const MissionForm = () => {
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>Longitude</FormLabel>
+                  <FormLabel>{t('missions.form.longitude')}</FormLabel>
                   <Input
                     name="destination_lng"
                     type="number"
@@ -490,12 +492,12 @@ const MissionForm = () => {
               {/* Dates */}
               <Divider />
               <Heading size="sm" color="gray.600" textTransform="uppercase" letterSpacing="wider">
-                <HStack><Icon as={FiUsers} /> Dates</HStack>
+                <HStack><Icon as={FiUsers} /> {t('missions.form.dates')}</HStack>
               </Heading>
 
               <HStack spacing={4}>
                 <FormControl isRequired>
-                  <FormLabel>Date de début</FormLabel>
+                  <FormLabel>{t('missions.form.startDate')}</FormLabel>
                   <Input
                     name="start_date"
                     type="date"
@@ -504,7 +506,7 @@ const MissionForm = () => {
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>Date de fin</FormLabel>
+                  <FormLabel>{t('missions.form.endDate')}</FormLabel>
                   <Input
                     name="end_date"
                     type="date"
@@ -517,11 +519,11 @@ const MissionForm = () => {
               {/* Membres */}
               <Divider />
               <Heading size="sm" color="gray.600" textTransform="uppercase" letterSpacing="wider">
-                <HStack><Icon as={FiUsers} /> Équipe</HStack>
+                <HStack><Icon as={FiUsers} /> {t('missions.form.team')}</HStack>
               </Heading>
 
               <FormControl>
-                <FormLabel>Chef de mission (obligatoire)</FormLabel>
+                <FormLabel>{t('missions.form.chiefLabel')}</FormLabel>
                 <Select
                   value={selectedLeaderId}
                   onChange={(e) => {
@@ -531,7 +533,7 @@ const MissionForm = () => {
                       setSelectedMemberIds(prev => [...prev, parseInt(val)]);
                     }
                   }}
-                  placeholder="Sélectionner le chef de mission"
+                  placeholder={t('missions.form.selectChief')}
                 >
                   {companyUsers.map(u => (
                     <option key={u.id} value={u.id}>{u.username} ({u.email})</option>
@@ -540,12 +542,12 @@ const MissionForm = () => {
               </FormControl>
 
               <FormControl>
-                <FormLabel>Ajouter des membres</FormLabel>
+                <FormLabel>{t('missions.form.addMembers')}</FormLabel>
                 <HStack mb={2}>
                   <Select
                     value={selectedMemberId}
                     onChange={(e) => setSelectedMemberId(e.target.value)}
-                    placeholder="Sélectionner un membre"
+                    placeholder={t('missions.form.selectMember')}
                     flex={1}
                   >
                     {companyUsers
@@ -555,7 +557,7 @@ const MissionForm = () => {
                       ))}
                   </Select>
                   <Button size="sm" colorScheme="blue" leftIcon={<FiPlus />} onClick={addMember}>
-                    Ajouter
+                    {t('missions.form.addButton')}
                   </Button>
                 </HStack>
                 {selectedMemberIds.length > 0 && (
@@ -574,7 +576,7 @@ const MissionForm = () => {
                             <TagLabel>{u?.username || `#${uid}`}</TagLabel>
                             {isLeader && (
                               <Badge ml={1} fontSize="2xs" variant="outline" colorScheme="orange">
-                                Chef
+                                {t('missions.chief')}
                               </Badge>
                             )}
                             <TagCloseButton onClick={() => removeMember(uid)} />
@@ -589,13 +591,13 @@ const MissionForm = () => {
               {/* Coûts */}
               <Divider />
               <Heading size="sm" color="gray.600" textTransform="uppercase" letterSpacing="wider">
-                <HStack><Icon as={FiDollarSign} /> Coûts détaillés</HStack>
+                <HStack><Icon as={FiDollarSign} /> {t('missions.form.detailedCosts')}</HStack>
               </Heading>
 
               <FormControl>
-                <FormLabel>Devise</FormLabel>
+                <FormLabel>{t('missions.form.currency')}</FormLabel>
                 {loadingCurrencies ? (
-                  <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">Chargement des devises...</Text></HStack>
+                  <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">{t('missions.form.loadingCurrencies')}</Text></HStack>
                 ) : (
                   <Select
                     value={formData.currency}
@@ -612,7 +614,7 @@ const MissionForm = () => {
 
               <HStack spacing={4} flexWrap="wrap">
                 <FormControl>
-                  <FormLabel>Indemnité ({formData.currency.toUpperCase()}/jour)</FormLabel>
+                  <FormLabel>{t('missions.form.allowance')} ({formData.currency.toUpperCase()}/jour)</FormLabel>
                   <NumberInput
                     value={formData.cost_per_diem}
                     onChange={(val) => setFormData(prev => ({ ...prev, cost_per_diem: parseFloat(val) || 0 }))}
@@ -626,7 +628,7 @@ const MissionForm = () => {
                   </NumberInput>
                 </FormControl>
                 <FormControl>
-                  <FormLabel>Hébergement ({formData.currency.toUpperCase()})</FormLabel>
+                  <FormLabel>{t('missions.form.housing')} ({formData.currency.toUpperCase()})</FormLabel>
                   <NumberInput
                     value={formData.cost_accommodation}
                     onChange={(val) => setFormData(prev => ({ ...prev, cost_accommodation: parseFloat(val) || 0 }))}
@@ -642,7 +644,7 @@ const MissionForm = () => {
               </HStack>
               <HStack spacing={4} flexWrap="wrap">
                 <FormControl>
-                  <FormLabel>Transport ({formData.currency.toUpperCase()})</FormLabel>
+                  <FormLabel>{t('missions.form.transport')} ({formData.currency.toUpperCase()})</FormLabel>
                   <NumberInput
                     value={formData.cost_transport}
                     onChange={(val) => setFormData(prev => ({ ...prev, cost_transport: parseFloat(val) || 0 }))}
@@ -656,7 +658,7 @@ const MissionForm = () => {
                   </NumberInput>
                 </FormControl>
                 <FormControl>
-                  <FormLabel>Autres frais ({formData.currency.toUpperCase()})</FormLabel>
+                  <FormLabel>{t('missions.form.otherExpenses')} ({formData.currency.toUpperCase()})</FormLabel>
                   <NumberInput
                     value={formData.cost_other}
                     onChange={(val) => setFormData(prev => ({ ...prev, cost_other: parseFloat(val) || 0 }))}
@@ -674,16 +676,16 @@ const MissionForm = () => {
               {/* Rapports */}
               <Divider />
               <Heading size="sm" color="gray.600" textTransform="uppercase" letterSpacing="wider">
-                Rapports
+                {t('missions.form.reports')}
               </Heading>
 
               <FormControl>
-                <FormLabel>Rapport de mission</FormLabel>
+                <FormLabel>{t('missions.form.missionReport')}</FormLabel>
                 <Textarea
                   name="mission_report"
                   value={formData.mission_report}
                   onChange={handleChange}
-                  placeholder="Rapport d'activité de la mission..."
+                  placeholder={t('missions.form.reportPlaceholder')}
                   rows={4}
                 />
               </FormControl>
@@ -694,16 +696,16 @@ const MissionForm = () => {
                 variant="ghost"
                 onClick={() => navigate(isEditing ? `/missions/${id}` : '/missions')}
               >
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 colorScheme="blue"
                 leftIcon={<FiSave />}
                 isLoading={submitting}
-                loadingText={isEditing ? 'Enregistrement...' : 'Création...'}
+                loadingText={isEditing ? t('missions.form.saving') : t('missions.form.creating')}
               >
-                {isEditing ? 'Enregistrer' : 'Créer la mission'}
+                {isEditing ? t('missions.form.save') : t('missions.form.createMission')}
               </Button>
             </HStack>
           </form>
@@ -745,12 +747,12 @@ const MissionForm = () => {
                 </HStack>
                 {destinationDistance != null && (
                   <Badge colorScheme="purple" fontSize="xs" alignSelf="start">
-                    Distance : {destinationDistance < 1
+                    {t('missions.form.distanceLabel')} {destinationDistance < 1
                       ? `${Math.round(destinationDistance * 1000)} m`
                       : destinationDistance < 100
                         ? `${destinationDistance.toFixed(1)} km`
                         : `${Math.round(destinationDistance).toLocaleString()} km`
-                    } (depuis votre position)
+                    } {t('missions.form.distanceFromPosition')}
                   </Badge>
                 )}
               </VStack>
@@ -760,7 +762,7 @@ const MissionForm = () => {
               <VStack spacing={3}>
                 <Icon as={FiMapPin} boxSize={12} color="gray.300" />
                 <Text color="gray.400" fontSize="sm" textAlign="center">
-                  Recherchez une destination pour<br />afficher la carte
+                  {t('missions.form.searchForMap')}
                 </Text>
               </VStack>
             </Box>

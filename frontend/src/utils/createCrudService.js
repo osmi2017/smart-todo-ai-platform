@@ -27,7 +27,7 @@ export const useCrudService = (endpoint, options = {}) => {
       const response = await axiosInstance.get(`${endpoint}/`, { params });
       return response.data;
     } catch (error) {
-      console.error(`Erreur chargement ${resourceName}:`, error);
+      console.error(`Error loading ${resourceName}:`, error);
       if (fallback !== undefined) return typeof fallback === 'function' ? fallback() : fallback;
       throw error;
     }
@@ -38,7 +38,7 @@ export const useCrudService = (endpoint, options = {}) => {
       const response = await axiosInstance.get(`${endpoint}/${id}/`);
       return response.data;
     } catch (error) {
-      console.error(`Erreur chargement ${resourceName} ${id}:`, error);
+      console.error(`Error loading ${resourceName} ${id}:`, error);
       if (fallback !== undefined) return null;
       throw error;
     }
@@ -50,7 +50,7 @@ export const useCrudService = (endpoint, options = {}) => {
       const response = await axiosInstance.post(`${endpoint}/`, payload);
       return response.data;
     } catch (error) {
-      console.error(`Erreur création ${resourceName}:`, error.response?.data || error);
+      console.error(`Error creating ${resourceName}:`, error.response?.data || error);
       throw error;
     }
   };
@@ -61,7 +61,7 @@ export const useCrudService = (endpoint, options = {}) => {
       const response = await axiosInstance.put(`${endpoint}/${id}/`, payload);
       return response.data;
     } catch (error) {
-      console.error(`Erreur mise à jour ${resourceName}:`, error.response?.data || error);
+      console.error(`Error updating ${resourceName}:`, error.response?.data || error);
       throw error;
     }
   };
@@ -71,7 +71,7 @@ export const useCrudService = (endpoint, options = {}) => {
       const response = await axiosInstance.patch(`${endpoint}/${id}/`, data);
       return response.data;
     } catch (error) {
-      console.error(`Erreur mise à jour partielle ${resourceName}:`, error.response?.data || error);
+      console.error(`Error patching ${resourceName}:`, error.response?.data || error);
       throw error;
     }
   };
@@ -81,7 +81,7 @@ export const useCrudService = (endpoint, options = {}) => {
       await axiosInstance.delete(`${endpoint}/${id}/`);
       return true;
     } catch (error) {
-      console.error(`Erreur suppression ${resourceName}:`, error);
+      console.error(`Error deleting ${resourceName}:`, error);
       throw error;
     }
   };

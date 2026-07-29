@@ -1,5 +1,7 @@
 import uuid
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db import IntegrityError, transaction
 from django.db.models import F
 from django.utils.dateparse import parse_datetime
@@ -15,7 +17,25 @@ from .models import (
 from .services.notifications import create_notification
 from .tasks import process_meeting_ai, transcribe_meeting_audio
 
-SUPPORTED_SERVICES = ('audit', 'statistics', 'notifications', 'audio')
+SUPPORTED_SERVICES = ('audit', 'statistics', 'notifications', 'audio', 'dashboard')
+
+
+def _broadcast_dashboard_refresh(company_id, reason='update'):
+    try:
+        channel_layer = get_channel_layer()
+        if channel_layer is None:
+            return
+        group = f'dashboard_{company_id or "global"}'
+        async_to_sync(channel_layer.group_send)(
+            group,
+            {
+                'type': 'dashboard_refresh',
+                'reason': reason,
+            },
+        )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning('Unable to push dashboard refresh', exc_info=True)
 
 
 def handle_event(service: str, event: dict) -> bool:
@@ -39,6 +59,8 @@ def handle_event(service: str, event: dict) -> bool:
             _handle_notifications(event)
         elif service == 'audio':
             _handle_audio(event)
+        elif service == 'dashboard':
+            _handle_dashboard(event)
 
     return True
 
@@ -138,3 +160,39 @@ def _handle_audio(event: dict) -> None:
         transcribe_meeting_audio.delay(data['meeting_id'], data.get('requested_by_id'))
     elif event['type'] == EventTypes.MEETING_AI_PROCESSING_REQUESTED:
         process_meeting_ai.delay(data['meeting_id'], data.get('requested_by_id'))
+
+
+DASHBOARD_EVENTS = frozenset({
+    EventTypes.TASK_CREATED,
+    EventTypes.TASK_UPDATED,
+    EventTypes.TASK_ASSIGNED,
+    EventTypes.TASK_UNASSIGNED,
+    EventTypes.TASK_STATUS_CHANGED,
+    EventTypes.TASK_COMPLETED,
+    EventTypes.TASK_DELETED,
+    EventTypes.PROJECT_CREATED,
+    EventTypes.PROJECT_UPDATED,
+    EventTypes.PROJECT_DELETED,
+    EventTypes.MEETING_CREATED,
+    EventTypes.MEETING_UPDATED,
+    EventTypes.MEETING_STATUS_CHANGED,
+    EventTypes.MEETING_STARTED,
+    EventTypes.MEETING_COMPLETED,
+    EventTypes.MEETING_CANCELLED,
+    EventTypes.COMMENT_CREATED,
+    EventTypes.COMMENT_UPDATED,
+    EventTypes.COMMENT_DELETED,
+    EventTypes.FILE_UPLOADED,
+    EventTypes.FILE_SHARED,
+    EventTypes.FILE_DELETED,
+})
+
+
+def _handle_dashboard(event: dict) -> None:
+    event_type = event['type']
+    if event_type not in DASHBOARD_EVENTS:
+        return
+
+    reason = event_type.replace('.', '_')
+    company_id = event.get('company_id')
+    _broadcast_dashboard_refresh(company_id, reason=reason)

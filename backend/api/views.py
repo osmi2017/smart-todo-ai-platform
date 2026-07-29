@@ -11,8 +11,9 @@ from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.views import APIView
 
-from .models import User, Project, Milestone, Task, ActivityLog, Company, CompanyGroup, Notification
+from .models import User, Project, Milestone, Task, ActivityLog, Company, CompanyGroup, Notification, Meeting, File
 from .serializers import (
     UserSerializer, UserRegisterSerializer, UserLoginSerializer,
     ProjectSerializer, MilestoneSerializer, TaskSerializer, 
@@ -576,7 +577,10 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
     def dashboard(self, request):
         user = request.user
         today = timezone.now().date()
-        week_start = today - timedelta(days=today.weekday())
+        time_range = request.query_params.get('time_range', 'week')
+
+        range_days = {'week': 7, 'month': 30, 'year': 365}.get(time_range, 7)
+        since_date = today - timedelta(days=range_days)
 
         tasks = self.get_queryset()
         if user.role == 'superadmin':
@@ -591,14 +595,17 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         else:
             projects = Project.objects.none()
 
-        total_tasks = tasks.count()
-        completed_tasks = tasks.filter(status='completed').count()
-        in_progress_tasks = tasks.filter(status='in_progress').count()
-        review_tasks = tasks.filter(status='review').count()
-        blocked_tasks = tasks.filter(status='blocked').count()
-        todo_tasks = tasks.filter(status='todo').count()
+        tasks_in_range = tasks.filter(created_at__date__gte=since_date)
+        projects_in_range = projects.filter(created_at__date__gte=since_date)
 
-        delayed_count = tasks.filter(
+        total_tasks = tasks_in_range.count()
+        completed_tasks = tasks_in_range.filter(status='completed').count()
+        in_progress_tasks = tasks_in_range.filter(status='in_progress').count()
+        review_tasks = tasks_in_range.filter(status='review').count()
+        blocked_tasks = tasks_in_range.filter(status='blocked').count()
+        todo_tasks = tasks_in_range.filter(status='todo').count()
+
+        delayed_count = tasks_in_range.filter(
             deadline__lt=today,
             status__in=['todo', 'in_progress', 'blocked']
         ).count()
@@ -608,14 +615,35 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         )
 
         day_names = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-        weekly_activity = []
-        for i in range(7):
-            day_date = week_start + timedelta(days=i)
-            count = tasks.filter(updated_at__date=day_date).count()
-            weekly_activity.append({'day': day_names[i], 'tasks': count})
+        month_names = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+        if time_range == 'week':
+            activity_period = 7
+            activity_start = today - timedelta(days=today.weekday())
+            weekly_activity = []
+            for i in range(activity_period):
+                day_date = activity_start + timedelta(days=i)
+                count = tasks_in_range.filter(updated_at__date=day_date).count()
+                weekly_activity.append({'day': day_names[i], 'tasks': count})
+        elif time_range == 'month':
+            weekly_activity = []
+            for i in range(30):
+                day_date = today - timedelta(days=29 - i)
+                count = tasks_in_range.filter(updated_at__date=day_date).count()
+                weekly_activity.append({'day': day_date.strftime('%d/%m'), 'tasks': count})
+        else:
+            weekly_activity = []
+            for i in range(12):
+                month_date = today - timedelta(days=30 * (11 - i))
+                month_start = month_date.replace(day=1)
+                month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                count = tasks_in_range.filter(
+                    updated_at__date__gte=month_start,
+                    updated_at__date__lte=month_end,
+                ).count()
+                weekly_activity.append({'day': month_names[(month_start.month - 1) % 12], 'tasks': count})
 
         project_progress = []
-        for proj in projects[:8]:
+        for proj in projects_in_range[:8]:
             proj_tasks = proj.tasks.count()
             proj_completed = proj.tasks.filter(status='completed').count()
             progress = round((proj_completed / proj_tasks * 100) if proj_tasks > 0 else 0)
@@ -626,8 +654,8 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             })
 
         data = {
-            'total_projects': projects.count(),
-            'active_projects': projects.filter(
+            'total_projects': projects_in_range.count(),
+            'active_projects': projects_in_range.filter(
                 status__in=['in_progress', 'not_started']
             ).count(),
             'total_tasks': total_tasks,
@@ -637,10 +665,10 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             'productivity_score': productivity_score,
 
             'tasks_by_priority': {
-                'low': tasks.filter(priority=1).count(),
-                'medium': tasks.filter(priority=2).count(),
-                'high': tasks.filter(priority=3).count(),
-                'critical': tasks.filter(priority=4).count(),
+                'low': tasks_in_range.filter(priority=1).count(),
+                'medium': tasks_in_range.filter(priority=2).count(),
+                'high': tasks_in_range.filter(priority=3).count(),
+                'critical': tasks_in_range.filter(priority=4).count(),
             },
 
             'tasks_by_status': {
@@ -661,7 +689,7 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             ).data,
 
             'recent_activities': ActivityLogSerializer(
-                ActivityLog.objects.filter(user=user)[:20],
+                ActivityLog.objects.filter(user=user, created_at__date__gte=since_date)[:20],
                 many=True
             ).data,
 
@@ -1040,5 +1068,101 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             company=target_user.company,
         )
         return Response(UserSerializer(target_user).data)
+
+
+class GlobalSearchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        q = request.query_params.get('q', '').strip()
+        if len(q) < 3:
+            return Response([])
+
+        user = request.user
+        results = []
+
+        tasks = Task.objects.all()
+        projects = Project.objects.all()
+        meetings = Meeting.objects.all()
+        files = File.objects.all()
+
+        if user.role != 'superadmin':
+            if user.role == 'admin' and user.company:
+                tasks = tasks.filter(project__company=user.company)
+                projects = projects.filter(company=user.company)
+                meetings = meetings.filter(
+                    Q(organizer__company=user.company) | Q(project__company=user.company)
+                ).distinct()
+                files = files.filter(company=user.company)
+            elif user.company:
+                user_groups = user.company_groups.all()
+                tasks = tasks.filter(
+                    Q(project__groups__in=user_groups) | Q(assigned_to=user) | Q(created_by=user)
+                ).filter(project__company=user.company).distinct()
+                projects = projects.filter(
+                    Q(groups__in=user_groups) | Q(owner=user) | Q(members=user)
+                ).filter(company=user.company).distinct()
+                meetings = meetings.filter(
+                    Q(organizer=user) | Q(participants__user=user)
+                ).distinct()
+                files = files.filter(
+                    Q(uploaded_by=user) | Q(shares__shared_with_user=user) |
+                    Q(shares__shared_with_group__in=user_groups)
+                ).filter(company=user.company).distinct()
+            else:
+                tasks = tasks.filter(assigned_to=user) | tasks.filter(created_by=user)
+                projects = projects.filter(Q(owner=user) | Q(members=user)).distinct()
+                meetings = meetings.filter(Q(organizer=user) | Q(participants__user=user)).distinct()
+                files = files.filter(uploaded_by=user).distinct()
+
+        for task in tasks.filter(
+            Q(title__icontains=q) | Q(description__icontains=q)
+        ).distinct()[:5]:
+            results.append({
+                'type': 'task',
+                'id': task.id,
+                'title': task.title,
+                'description': task.description[:120] if task.description else '',
+                'url': f'/tasks/{task.id}',
+                'badge': task.get_status_display() if hasattr(task, 'get_status_display') else task.status,
+            })
+
+        for project in projects.filter(
+            Q(name__icontains=q) | Q(description__icontains=q)
+        ).distinct()[:5]:
+            results.append({
+                'type': 'project',
+                'id': project.id,
+                'title': project.name,
+                'description': project.description[:120] if project.description else '',
+                'url': f'/projects/{project.id}',
+                'badge': project.get_status_display() if hasattr(project, 'get_status_display') else project.status,
+            })
+
+        for meeting in meetings.filter(
+            Q(title__icontains=q) | Q(description__icontains=q)
+        ).distinct()[:5]:
+            results.append({
+                'type': 'meeting',
+                'id': meeting.id,
+                'title': meeting.title,
+                'description': meeting.description[:120] if meeting.description else '',
+                'url': f'/meetings/{meeting.id}',
+                'badge': meeting.get_status_display() if hasattr(meeting, 'get_status_display') else meeting.status,
+            })
+
+        for file_obj in files.filter(
+            Q(name__icontains=q) | Q(description__icontains=q)
+        ).distinct()[:5]:
+            results.append({
+                'type': 'file',
+                'id': file_obj.id,
+                'title': file_obj.name,
+                'description': file_obj.description[:120] if file_obj.description else '',
+                'url': f'/files/{file_obj.id}',
+                'badge': file_obj.mime_type if file_obj.mime_type else '',
+            })
+
+        return Response(results)
 
 

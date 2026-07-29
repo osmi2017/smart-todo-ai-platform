@@ -176,7 +176,7 @@ const UserManagement = () => {
             <Th>Nom d'utilisateur</Th>
             <Th>Email</Th>
             <Th>Nom complet</Th>
-            <Th>R\u00f4le</Th>
+            <Th>Profile</Th>
             <Th>Entreprise</Th>
             <Th>Groupes</Th>
             <Th>Actions</Th>
@@ -237,7 +237,7 @@ const UserManagement = () => {
             </FormControl>
             <HStack mb={4} spacing={4}>
               <FormControl>
-                <FormLabel>Pr\u00e9nom</FormLabel>
+                <FormLabel>Prénoms</FormLabel>
                 <Input value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
               </FormControl>
               <FormControl>
@@ -246,7 +246,7 @@ const UserManagement = () => {
               </FormControl>
             </HStack>
             <FormControl mb={4}>
-              <FormLabel>R\u00f4le</FormLabel>
+              <FormLabel>Profile</FormLabel>
               <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                 <option value="user">User</option>
                 <option value="admin">Admin</option>

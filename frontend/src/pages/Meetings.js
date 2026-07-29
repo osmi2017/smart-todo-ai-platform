@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   Box, Heading, Button, HStack, VStack, Text, Badge, Icon,
   SimpleGrid, IconButton,
@@ -18,13 +19,6 @@ import {
 } from 'react-icons/fi';
 import { useMeetingService } from '../services/meetingService';
 
-const statusConfig = {
-  scheduled: { color: 'blue', label: 'Scheduled', icon: FiClock },
-  in_progress: { color: 'orange', label: 'In Progress', icon: FiPlay },
-  completed: { color: 'green', label: 'Completed', icon: FiCheck },
-  cancelled: { color: 'red', label: 'Cancelled', icon: FiXCircle },
-};
-
 const inputTypeConfig = {
   audio: { icon: FiMic, label: 'Audio' },
   text: { icon: FiFileText, label: 'Text' },
@@ -32,6 +26,7 @@ const inputTypeConfig = {
 };
 
 const Meetings = () => {
+  const { t, i18n } = useTranslation();
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -45,6 +40,13 @@ const Meetings = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = React.useRef();
 
+  const statusConfig = {
+    scheduled: { color: 'blue', label: t('meetings.scheduled'), icon: FiClock },
+    in_progress: { color: 'orange', label: t('meetings.inProgress'), icon: FiPlay },
+    completed: { color: 'green', label: t('meetings.completed'), icon: FiCheck },
+    cancelled: { color: 'red', label: t('meetings.cancelled'), icon: FiXCircle },
+  };
+
   useEffect(() => {
     loadMeetings();
   }, [statusFilter]);
@@ -57,7 +59,7 @@ const Meetings = () => {
       const data = await getMeetings(params);
       setMeetings(Array.isArray(data) ? data : data.results || []);
     } catch (error) {
-      toast({ title: 'Error loading meetings', status: 'error', duration: 3000 });
+      toast({ title: t('meetings.loadError'), status: 'error', duration: 3000 });
     } finally {
       setLoading(false);
     }
@@ -73,9 +75,9 @@ const Meetings = () => {
     try {
       await deleteMeeting(deleteId);
       setMeetings(meetings.filter(m => m.id !== deleteId));
-      toast({ title: 'Meeting deleted', status: 'success', duration: 2000 });
+      toast({ title: t('meetings.deletedSuccess'), status: 'success', duration: 2000 });
     } catch (error) {
-      toast({ title: 'Error deleting meeting', status: 'error', duration: 3000 });
+      toast({ title: t('meetings.deleteError'), status: 'error', duration: 3000 });
     } finally {
       onClose();
       setDeleteId(null);
@@ -86,16 +88,18 @@ const Meetings = () => {
     m.title.toLowerCase().includes(search.toLowerCase())
   );
 
+  const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
+
   const formatDate = (dateStr) => {
     if (!dateStr) return null;
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    return new Date(dateStr).toLocaleDateString(locale, {
       month: 'short', day: 'numeric', year: 'numeric',
     });
   };
 
   const formatTime = (dateStr) => {
     if (!dateStr) return null;
-    return new Date(dateStr).toLocaleTimeString('en-US', {
+    return new Date(dateStr).toLocaleTimeString(locale, {
       hour: '2-digit', minute: '2-digit',
     });
   };
@@ -103,14 +107,14 @@ const Meetings = () => {
   return (
     <Box>
       <Flex justify="space-between" align="center" mb={6} wrap="wrap" gap={3}>
-        <Heading size="lg">Meetings</Heading>
+        <Heading size="lg">{t('meetings.title')}</Heading>
         <Button
           as={RouterLink}
           to="/meetings/create"
           leftIcon={<FiPlus />}
           colorScheme="blue"
         >
-          New Meeting
+          {t('meetings.newMeeting')}
         </Button>
       </Flex>
 
@@ -118,7 +122,7 @@ const Meetings = () => {
         <InputGroup maxW="300px">
           <InputLeftElement><Icon as={FiSearch} color="gray.400" /></InputLeftElement>
           <Input
-            placeholder="Search meetings..."
+            placeholder={t('meetings.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             bg={bgColor}
@@ -126,15 +130,15 @@ const Meetings = () => {
         </InputGroup>
         <Select
           maxW="200px"
-          placeholder="All statuses"
+          placeholder={t('meetings.allStatuses')}
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           bg={bgColor}
         >
-          <option value="scheduled">Scheduled</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
+          <option value="scheduled">{t('meetings.scheduled')}</option>
+          <option value="in_progress">{t('meetings.inProgress')}</option>
+          <option value="completed">{t('meetings.completed')}</option>
+          <option value="cancelled">{t('meetings.cancelled')}</option>
         </Select>
       </HStack>
 
@@ -143,10 +147,10 @@ const Meetings = () => {
       ) : filtered.length === 0 ? (
         <Box textAlign="center" py={16} bg={bgColor} borderRadius="xl" shadow="sm" borderWidth="1px" borderColor={borderColor}>
           <Icon as={FiCalendar} boxSize={16} color="gray.300" mb={4} />
-          <Heading size="md" color="gray.500" mb={2}>No meetings found</Heading>
-          <Text color="gray.400" mb={6}>Create your first meeting to get started with AI-powered summaries</Text>
+          <Heading size="md" color="gray.500" mb={2}>{t('meetings.notFound')}</Heading>
+          <Text color="gray.400" mb={6}>{t('meetings.createFirst')}</Text>
           <Button as={RouterLink} to="/meetings/create" colorScheme="blue" leftIcon={<FiPlus />}>
-            Create Meeting
+            {t('meetings.createMeeting')}
           </Button>
         </Box>
       ) : (
@@ -189,13 +193,13 @@ const Meetings = () => {
                       />
                       <MenuList>
                         <MenuItem as={RouterLink} to={`/meetings/${meeting.id}`} icon={<FiEye />}>
-                          View Details
+                          {t('meetings.viewDetails')}
                         </MenuItem>
                         <MenuItem as={RouterLink} to={`/meetings/${meeting.id}/edit`} icon={<FiEdit2 />}>
-                          Edit
+                          {t('common.edit')}
                         </MenuItem>
                         <MenuItem icon={<FiTrash2 />} color="red.500" onClick={() => confirmDelete(meeting.id)}>
-                          Delete
+                          {t('common.delete')}
                         </MenuItem>
                       </MenuList>
                     </Menu>
@@ -214,7 +218,7 @@ const Meetings = () => {
                     </Tooltip>
                     {meeting.ai_processed && (
                       <Badge colorScheme="green" variant="subtle">
-                        AI Processed
+                        {t('meetings.aiProcessed')}
                       </Badge>
                     )}
                   </HStack>
@@ -229,7 +233,7 @@ const Meetings = () => {
                     )}
                     <HStack fontSize="sm" color="gray.500">
                       <Icon as={FiUsers} boxSize={4} />
-                      <Text>{meeting.participants_count || 0} participants</Text>
+                      <Text>{meeting.participants_count || 0} {t('meetings.participants')}</Text>
                     </HStack>
                   </VStack>
 
@@ -241,11 +245,11 @@ const Meetings = () => {
                       variant="ghost"
                       colorScheme="blue"
                     >
-                      View Details
+                      {t('meetings.viewDetails')}
                     </Button>
                     <HStack spacing={1}>
                       {(meeting.status === 'scheduled' || meeting.status === 'in_progress') && (
-                        <Tooltip label="Join Video Call">
+                        <Tooltip label={t('meetings.joinVideo')}>
                           <IconButton
                             as={RouterLink}
                             to={`/meetings/${meeting.id}/video`}
@@ -253,12 +257,12 @@ const Meetings = () => {
                             size="sm"
                             variant="ghost"
                             colorScheme="green"
-                            aria-label="Join Video Call"
+                            aria-label={t('meetings.joinVideo')}
                           />
                         </Tooltip>
                       )}
                       {!meeting.ai_processed && (
-                        <Tooltip label="Process with AI">
+                        <Tooltip label={t('meetings.processAI')}>
                           <IconButton
                             as={RouterLink}
                             to={`/meetings/${meeting.id}`}
@@ -266,7 +270,7 @@ const Meetings = () => {
                             size="sm"
                             variant="ghost"
                             colorScheme="purple"
-                            aria-label="Process with AI"
+                            aria-label={t('meetings.processAI')}
                           />
                         </Tooltip>
                       )}
@@ -283,14 +287,14 @@ const Meetings = () => {
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Delete Meeting
+              {t('meetings.deleteConfirm')}
             </AlertDialogHeader>
             <AlertDialogBody>
-              Are you sure? This action cannot be undone.
+              {t('common.confirmDelete')}? {t('common.irreversible')}
             </AlertDialogBody>
             <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose}>Cancel</Button>
-              <Button colorScheme="red" onClick={handleDelete} ml={3}>Delete</Button>
+              <Button ref={cancelRef} onClick={onClose}>{t('common.cancel')}</Button>
+              <Button colorScheme="red" onClick={handleDelete} ml={3}>{t('common.delete')}</Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialogOverlay>

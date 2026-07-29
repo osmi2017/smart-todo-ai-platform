@@ -75,8 +75,7 @@ import { useMilestoneService } from '../services/milestoneService';
 import { useProjectService } from '../services/projectService';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { format, formatDistance, isAfter, isBefore, addDays } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { MILESTONE_STATUS_COLORS, MILESTONE_STATUS_LABELS } from '../utils/constants';
+import { MILESTONE_STATUS_COLORS, getMilestoneStatusLabel } from '../utils/constants';
 import LoadingState from '../components/LoadingState';
 
 const Milestones = () => {
@@ -298,8 +297,6 @@ const Milestones = () => {
   };
 
   const getStatusColor = (status) => MILESTONE_STATUS_COLORS[status] || 'gray';
-  const getStatusLabel = (status) => MILESTONE_STATUS_LABELS[status] || status;
-
   const getRiskColor = (risk) => {
     if (risk >= 75) return 'red';
     if (risk >= 50) return 'orange';
@@ -485,7 +482,7 @@ const Milestones = () => {
                       <Box>
                         <HStack mb={2}>
                           <Badge colorScheme={getStatusColor(milestone.status)}>
-                            {getStatusLabel(milestone.status)}
+                            {getMilestoneStatusLabel(milestone.status)}
                           </Badge>
                           <Badge colorScheme={milestone.project_name ? 'purple' : 'gray'}>
                             {milestone.project_name || 'Sans projet'}

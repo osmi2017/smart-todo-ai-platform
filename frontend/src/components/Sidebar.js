@@ -37,12 +37,14 @@ import {
   FiChevronLeft,
   FiChevronRight,
 } from 'react-icons/fi';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useQuery } from 'react-query';
 import { useTaskService } from '../services/taskService';
 
 const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
   const location = useLocation();
+  const { t } = useTranslation();
   const { user, isAdmin, isSuperAdmin, company } = useAuth();
   const taskService = useTaskService();
   const bgColor = useColorModeValue('white', 'gray.900');
@@ -53,7 +55,6 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
   const textColor = useColorModeValue('gray.600', 'gray.300');
   const mutedColor = useColorModeValue('gray.400', 'gray.500');
 
-  // Fetch real task count
   const { data: tasks } = useQuery(
     'sidebar-task-count',
     () => taskService.getTasks(),
@@ -62,21 +63,21 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
   const taskCount = Array.isArray(tasks) ? tasks.length : (tasks?.results?.length || 0);
 
   const menuItems = [
-    { path: '/dashboard', name: 'Tableau de bord', icon: FiHome },
-    { path: '/projects', name: 'Projets', icon: FiFolder },
-    { path: '/tasks', name: 'Tâches', icon: FiCheckSquare },
-    { path: '/kanban', name: 'Kanban', icon: FiColumns },
-    { path: '/milestones', name: 'Jalons', icon: FiCalendar },
-    { path: '/meetings', name: 'Meetings', icon: FiMic },
-    { path: '/files', name: 'Fichiers', icon: FiHardDrive },
-    { path: '/missions', name: 'Missions', icon: FiMap },
-    { path: '/analytics', name: 'Analytics', icon: FiBarChart2 },
+    { path: '/dashboard', name: t('sidebar.dashboard'), icon: FiHome },
+    { path: '/projects', name: t('sidebar.projects'), icon: FiFolder },
+    { path: '/tasks', name: t('sidebar.tasks'), icon: FiCheckSquare },
+    { path: '/kanban', name: t('sidebar.kanban'), icon: FiColumns },
+    { path: '/milestones', name: t('sidebar.milestones'), icon: FiCalendar },
+    { path: '/meetings', name: t('sidebar.meetings'), icon: FiMic },
+    { path: '/files', name: t('sidebar.files'), icon: FiHardDrive },
+    { path: '/missions', name: t('sidebar.missions'), icon: FiMap },
+    { path: '/analytics', name: t('sidebar.analytics'), icon: FiBarChart2 },
     ...(isAdmin ? [
-      { path: '/admin/users', name: 'Utilisateurs', icon: FiUsers },
-      { path: '/admin/groups', name: 'Groupes', icon: FiGrid },
+      { path: '/admin/users', name: t('sidebar.users'), icon: FiUsers },
+      { path: '/admin/groups', name: t('sidebar.groups'), icon: FiGrid },
     ] : []),
     ...(isSuperAdmin ? [
-      { path: '/admin/companies', name: 'Entreprises', icon: FiBriefcase },
+      { path: '/admin/companies', name: t('sidebar.companies'), icon: FiBriefcase },
     ] : []),
   ];
 
@@ -84,7 +85,6 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
 
   const SidebarContent = () => (
     <VStack spacing={0} align="stretch" h="100%">
-      {/* Logo */}
       <HStack
         spacing={3}
         px={collapsed ? 3 : 5}
@@ -109,7 +109,7 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
               SmartTodoAI
             </Heading>
             <Text fontSize="xs" color={mutedColor}>
-              Gestion de projets
+              {t('sidebar.projectManagement')}
             </Text>
           </Box>
         )}
@@ -117,7 +117,6 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
 
       <Divider mx={4} borderColor={borderColor} />
 
-      {/* Menu items */}
       <VStack
         spacing={1}
         align="stretch"
@@ -175,7 +174,7 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
                   {item.name}
                 </Text>
               )}
-              {!collapsed && item.name === 'Tâches' && taskCount > 0 && (
+              {!collapsed && item.path === '/tasks' && taskCount > 0 && (
                 <Badge
                   colorScheme="red"
                   ml="auto"
@@ -201,7 +200,6 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
 
       <Divider mx={4} borderColor={borderColor} />
 
-      {/* User info */}
       {user && (
         <HStack
           spacing={3}
@@ -237,12 +235,10 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
     </VStack>
   );
 
-  // Mobile: render as Drawer content
   if (isMobile) {
     return <SidebarContent />;
   }
 
-  // Desktop: fixed sidebar
   return (
     <Box
       as="aside"
@@ -259,8 +255,6 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
       display={{ base: 'none', lg: 'block' }}
     >
       <SidebarContent />
-
-      {/* Collapse toggle */}
       <IconButton
         icon={collapsed ? <FiChevronRight /> : <FiChevronLeft />}
         onClick={onToggle}

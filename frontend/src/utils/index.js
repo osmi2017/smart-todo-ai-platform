@@ -1,15 +1,14 @@
 export { useCrudService } from './createCrudService';
 export {
   TASK_STATUS_COLORS,
-  TASK_STATUS_LABELS,
+  getTaskStatusLabel,
   PROJECT_STATUS_COLORS,
-  PROJECT_STATUS_LABELS,
+  getProjectStatusLabel,
   MILESTONE_STATUS_COLORS,
-  MILESTONE_STATUS_LABELS,
+  getMilestoneStatusLabel,
   PRIORITY_COLORS,
-  PRIORITY_LABELS,
+  getPriorityLabel,
   getStatusColor,
   getStatusLabel,
   getPriorityColor,
-  getPriorityLabel,
 } from './constants';

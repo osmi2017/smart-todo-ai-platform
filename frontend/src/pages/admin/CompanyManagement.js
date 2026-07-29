@@ -9,14 +9,16 @@ import {
 import { FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useCrudService } from '../../utils/createCrudService';
+import { useTranslation } from 'react-i18next';
 
 const CompanyManagement = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const queryClient = useQueryClient();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [editingCompany, setEditingCompany] = useState(null);
   const [form, setForm] = useState({ name: '', slug: '', description: '', storage_tier: '1GB' });
-  const companyService = useCrudService('/companies', { resourceName: 'entreprises' });
+  const companyService = useCrudService('/companies', { resourceName: t('sidebar.companies') });
 
   const { data: companies = [], isLoading, error } = useQuery(
     'companies',
@@ -28,11 +30,11 @@ const CompanyManagement = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('companies');
-        toast({ title: 'Entreprise cr\u00e9\u00e9e', status: 'success', duration: 3000 });
+        toast({ title: t('admin.companyCreated'), status: 'success', duration: 3000 });
         handleClose();
       },
       onError: (err) => {
-        toast({ title: 'Erreur', description: JSON.stringify(err.response?.data || 'Erreur'), status: 'error', duration: 3000 });
+        toast({ title: t('common.error'), description: JSON.stringify(err.response?.data || t('common.error')), status: 'error', duration: 3000 });
       },
     }
   );
@@ -42,11 +44,11 @@ const CompanyManagement = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('companies');
-        toast({ title: 'Entreprise mise \u00e0 jour', status: 'success', duration: 3000 });
+        toast({ title: t('admin.companyUpdated'), status: 'success', duration: 3000 });
         handleClose();
       },
       onError: (err) => {
-        toast({ title: 'Erreur', description: JSON.stringify(err.response?.data || 'Erreur'), status: 'error', duration: 3000 });
+        toast({ title: t('common.error'), description: JSON.stringify(err.response?.data || t('common.error')), status: 'error', duration: 3000 });
       },
     }
   );
@@ -56,7 +58,7 @@ const CompanyManagement = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('companies');
-        toast({ title: 'Entreprise supprim\u00e9e', status: 'info', duration: 3000 });
+        toast({ title: t('admin.companyDeleted'), status: 'info', duration: 3000 });
       },
     }
   );
@@ -96,27 +98,26 @@ const CompanyManagement = () => {
   };
 
   if (isLoading) return <Box p={8}><Spinner size="xl" /></Box>;
-  if (error) return <Box p={8}><Alert status="error"><AlertIcon />Erreur de chargement</Alert></Box>;
+  if (error) return <Box p={8}><Alert status="error"><AlertIcon />{t('common.loadError')}</Alert></Box>;
 
   return (
     <Box p={8}>
       <HStack justify="space-between" mb={6}>
-        <Heading size="lg">Gestion des entreprises</Heading>
+        <Heading size="lg">{t('admin.companyManagement')}</Heading>
         <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={() => handleOpen()}>
-          Nouvelle entreprise
+          {t('admin.newCompany')}
         </Button>
       </HStack>
 
       <Table variant="simple">
         <Thead>
           <Tr>
-            <Th>Nom</Th>
+            <Th>{t('admin.column.name')}</Th>
             <Th>Slug</Th>
-            <Th>Utilisateurs</Th>
-            <Th>Groupes</Th>
-            <Th>Stockage</Th>
-            <Th>Statut</Th>
-            <Th>Actions</Th>
+            <Th>{t('sidebar.users')}</Th>
+            <Th>{t('sidebar.groups')}</Th>
+            <Th>{t('common.status')}</Th>
+            <Th>{t('common.actions')}</Th>
           </Tr>
         </Thead>
         <Tbody>
@@ -129,7 +130,7 @@ const CompanyManagement = () => {
               <Td>
                 <Box minW="120px">
                   <Text fontSize="xs" mb={1}>
-                    {c.storage_tier === 'unlimited' ? 'Illimit\u00e9' : c.storage_tier}
+                    {c.storage_tier === 'unlimited' ? t('common.notDefined') : c.storage_tier}
                   </Text>
                   {c.storage_tier !== 'unlimited' && c.storage_limit_bytes && (
                     <Progress
@@ -143,13 +144,13 @@ const CompanyManagement = () => {
               </Td>
               <Td>
                 <Badge colorScheme={c.is_active ? 'green' : 'red'}>
-                  {c.is_active ? 'Actif' : 'Inactif'}
+                  {c.is_active ? t('common.inProgress') : t('common.notDefined')}
                 </Badge>
               </Td>
               <Td>
                 <HStack spacing={2}>
-                  <IconButton size="sm" icon={<FiEdit2 />} onClick={() => handleOpen(c)} aria-label="Modifier" />
-                  <IconButton size="sm" icon={<FiTrash2 />} colorScheme="red" onClick={() => deleteMutation.mutate(c.id)} aria-label="Supprimer" />
+                  <IconButton size="sm" icon={<FiEdit2 />} onClick={() => handleOpen(c)} aria-label={t('common.edit')} />
+                  <IconButton size="sm" icon={<FiTrash2 />} colorScheme="red" onClick={() => deleteMutation.mutate(c.id)} aria-label={t('common.delete')} />
                 </HStack>
               </Td>
             </Tr>
@@ -160,23 +161,23 @@ const CompanyManagement = () => {
       <Modal isOpen={isOpen} onClose={handleClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>{editingCompany ? 'Modifier' : 'Cr\u00e9er'} une entreprise</ModalHeader>
+          <ModalHeader>{editingCompany ? t('common.edit') : t('common.create')} {t('sidebar.companies').toLowerCase()}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <FormControl mb={4} isRequired>
-              <FormLabel>Nom</FormLabel>
-              <Input value={form.name} onChange={handleNameChange} placeholder="Nom de l'entreprise" />
+              <FormLabel>{t('common.name')}</FormLabel>
+              <Input value={form.name} onChange={handleNameChange} placeholder={t('admin.companyName')} />
             </FormControl>
             <FormControl mb={4} isRequired>
               <FormLabel>Slug</FormLabel>
               <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="slug-entreprise" />
             </FormControl>
             <FormControl mb={4}>
-              <FormLabel>Description</FormLabel>
+              <FormLabel>{t('common.description')}</FormLabel>
               <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             </FormControl>
             <FormControl mb={4}>
-              <FormLabel>Quota de stockage</FormLabel>
+              <FormLabel>{t('files.storage')}</FormLabel>
               <Select value={form.storage_tier} onChange={(e) => setForm({ ...form, storage_tier: e.target.value })}>
                 <option value="100MB">100 Mo</option>
                 <option value="500MB">500 Mo</option>
@@ -185,14 +186,14 @@ const CompanyManagement = () => {
                 <option value="10GB">10 Go</option>
                 <option value="50GB">50 Go</option>
                 <option value="100GB">100 Go</option>
-                <option value="unlimited">Illimit\u00e9</option>
+                <option value="unlimited">{t('common.notDefined')}</option>
               </Select>
             </FormControl>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={handleClose}>Annuler</Button>
+            <Button variant="ghost" mr={3} onClick={handleClose}>{t('common.cancel')}</Button>
             <Button colorScheme="blue" onClick={handleSubmit} isLoading={createMutation.isLoading || updateMutation.isLoading}>
-              {editingCompany ? 'Mettre \u00e0 jour' : 'Cr\u00e9er'}
+              {editingCompany ? t('common.update') : t('common.create')}
             </Button>
           </ModalFooter>
         </ModalContent>

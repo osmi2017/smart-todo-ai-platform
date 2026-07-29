@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ProjectMembers from '../components/ProjectMembers';
 import {
   Box,
@@ -73,9 +74,11 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useProjectService } from '../services/projectService';
 import { useTaskService } from '../services/taskService';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr as frLocale, enUS } from 'date-fns/locale';
 
 const ProjectDetail = () => {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'fr' ? frLocale : enUS;
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
@@ -110,8 +113,8 @@ const ProjectDetail = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: 'Impossible de charger le projet',
+          title: t('common.error'),
+          description: t('common.loadErrorDesc'),
           status: 'error',
           duration: 3000,
         });
@@ -146,8 +149,8 @@ const ProjectDetail = () => {
         queryClient.invalidateQueries(['project', id]);
         queryClient.invalidateQueries('projects');
         toast({
-          title: 'Succès',
-          description: 'Projet mis à jour avec succès',
+          title: t('common.success'),
+          description: t('projects.updatedSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -155,8 +158,8 @@ const ProjectDetail = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: error.response?.data?.message || 'Erreur lors de la mise à jour',
+          title: t('common.error'),
+          description: error.response?.data?.message || t('projects.updateError'),
           status: 'error',
           duration: 3000,
         });
@@ -171,8 +174,8 @@ const ProjectDetail = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('projects');
         toast({
-          title: 'Succès',
-          description: 'Projet supprimé avec succès',
+          title: t('common.success'),
+          description: t('projects.deletedSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -180,8 +183,8 @@ const ProjectDetail = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: error.response?.data?.message || 'Erreur lors de la suppression',
+          title: t('common.error'),
+          description: error.response?.data?.message || t('projects.deleteError'),
           status: 'error',
           duration: 3000,
         });
@@ -195,7 +198,7 @@ const ProjectDetail = () => {
   };
 
   const handleDeleteProject = () => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce projet ? Cette action est irréversible.')) {
+    if (window.confirm(`${t('common.confirmDelete')} ? ${t('common.irreversible')}`)) {
       deleteProjectMutation.mutate();
     }
   };
@@ -204,7 +207,7 @@ const ProjectDetail = () => {
     return (
       <Box textAlign="center" py={10}>
         <Spinner size="xl" color="blue.500" />
-        <Text mt={4}>Chargement du projet...</Text>
+        <Text mt={4}>{t('common.loading')}</Text>
       </Box>
     );
   }
@@ -212,9 +215,9 @@ const ProjectDetail = () => {
   if (!project) {
     return (
       <Box textAlign="center" py={10}>
-        <Text color="red.500">Projet non trouvé</Text>
+        <Text color="red.500">{t('projects.notFound')}</Text>
         <Button mt={4} as={RouterLink} to="/projects">
-          Retour aux projets
+          {t('common.back')}
         </Button>
       </Box>
     );
@@ -233,11 +236,11 @@ const ProjectDetail = () => {
 
   const getStatusLabel = (status) => {
     const labels = {
-      'not_started': 'Non démarré',
-      'in_progress': 'En cours',
-      'paused': 'En pause',
-      'completed': 'Terminé',
-      'archived': 'Archivé',
+      'not_started': t('common.notStarted'),
+      'in_progress': t('common.inProgress'),
+      'paused': t('common.paused'),
+      'completed': t('common.completed'),
+      'archived': t('common.archived'),
     };
     return labels[status] || status;
   };
@@ -248,7 +251,7 @@ const ProjectDetail = () => {
   };
 
   const getPriorityLabel = (priority) => {
-    const labels = { 1: 'Basse', 2: 'Moyenne', 3: 'Haute', 4: 'Critique' };
+    const labels = { 1: t('common.low'), 2: t('common.medium'), 3: t('common.high'), 4: t('common.critical') };
     return labels[priority] || priority;
   };
 
@@ -271,7 +274,7 @@ const ProjectDetail = () => {
               as={RouterLink}
               to={`/tasks/create?project=${id}`}
             >
-              Nouvelle tâche
+              {t('tasks.newTask')}
             </Button>
             <Menu>
               <MenuButton as={Button} variant="ghost" size="sm">
@@ -279,20 +282,19 @@ const ProjectDetail = () => {
               </MenuButton>
               <MenuList>
                 <MenuItem icon={<FiEdit2 />} onClick={onEditOpen}>
-                  Modifier le projet
+                  {t('projects.editProject')}
                 </MenuItem>
                 <MenuItem icon={<FiBarChart2 />} as={RouterLink} to={`/analytics?project=${id}`}>
-                  Voir les analytics
+                  {t('sidebar.analytics')}
                 </MenuItem>
                 <MenuItem icon={<FiUserPlus />} onClick={() => {
-                  // Changer l'onglet actif vers "Membres"
                   const membersTab = document.querySelector('[aria-selected="false"]:has-text("Membres")');
                   if (membersTab) membersTab.click();
                 }}>
-                  Gérer les membres
+                  {t('projectMembers.title')}
                 </MenuItem>
                 <MenuItem icon={<FiTrash2 />} color="red.500" onClick={handleDeleteProject}>
-                  Supprimer
+                  {t('common.delete')}
                 </MenuItem>
               </MenuList>
             </Menu>
@@ -311,7 +313,7 @@ const ProjectDetail = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Progression</StatLabel>
+                <StatLabel>{t('common.progress')}</StatLabel>
                 <StatNumber>{Math.round(project.progress)}%</StatNumber>
                 <Progress
                   value={project.progress}
@@ -327,10 +329,10 @@ const ProjectDetail = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Tâches totales</StatLabel>
+                <StatLabel>{t('sidebar.tasks')}</StatLabel>
                 <StatNumber>{stats?.total_tasks || 0}</StatNumber>
                 <StatHelpText>
-                  {stats?.completed_tasks || 0} complétées
+                  {stats?.completed_tasks || 0} {t('common.completed')}
                 </StatHelpText>
               </Stat>
             </CardBody>
@@ -339,10 +341,10 @@ const ProjectDetail = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Membres</StatLabel>
+                <StatLabel>{t('projectMembers.title')}</StatLabel>
                 <StatNumber>{stats?.members_count || 1}</StatNumber>
                 <StatHelpText>
-                  {stats?.members_count || 1} participants
+                  {stats?.members_count || 1} {t('projectMembers.title').toLowerCase()}
                 </StatHelpText>
               </Stat>
             </CardBody>
@@ -351,10 +353,10 @@ const ProjectDetail = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Jalons</StatLabel>
+                <StatLabel>{t('projects.milestones')}</StatLabel>
                 <StatNumber>{stats?.milestones_count || 0}</StatNumber>
                 <StatHelpText>
-                  {stats?.milestones_count || 0} jalons
+                  {stats?.milestones_count || 0} {t('projects.milestones').toLowerCase()}
                 </StatHelpText>
               </Stat>
             </CardBody>
@@ -366,12 +368,12 @@ const ProjectDetail = () => {
           <Alert status="warning" variant="left-accent" borderRadius="md">
             <AlertIcon />
             <Box flex={1}>
-              <AlertTitle>Risque détecté !</AlertTitle>
+              <AlertTitle>{t('projects.riskHigh')}</AlertTitle>
               <AlertDescription>
-                Le score de risque de ce projet est de {Math.round(project.risk_score)}%. 
+                {t('projects.riskHigh')} {Math.round(project.risk_score)}%.
                 {project.risk_score > 75 
-                  ? ' Risque critique, intervention nécessaire.' 
-                  : ' Une attention particulière est recommandée.'}
+                  ? ` ${t('common.critical')}`
+                  : ''}
               </AlertDescription>
             </Box>
           </Alert>
@@ -381,15 +383,15 @@ const ProjectDetail = () => {
         <HStack spacing={6} color="gray.600" fontSize="sm">
           <HStack>
             <FiCalendar />
-            <Text>Début: {project.start_date 
-              ? format(new Date(project.start_date), 'dd MMMM yyyy', { locale: fr })
-              : 'Non définie'}</Text>
+            <Text>{t('projects.startDateLabel')} {project.start_date 
+              ? format(new Date(project.start_date), 'dd MMMM yyyy', { locale: dateLocale })
+              : t('common.notDefined')}</Text>
           </HStack>
           <HStack>
             <FiClock />
-            <Text>Deadline: {project.deadline 
-              ? format(new Date(project.deadline), 'dd MMMM yyyy', { locale: fr })
-              : 'Non définie'}</Text>
+            <Text>{t('projects.endDateLabel')} {project.deadline 
+              ? format(new Date(project.deadline), 'dd MMMM yyyy', { locale: dateLocale })
+              : t('common.notDefined')}</Text>
           </HStack>
         </HStack>
 
@@ -397,7 +399,7 @@ const ProjectDetail = () => {
         <HStack spacing={6} flexWrap="wrap">
           {project.groups_detail && project.groups_detail.length > 0 && (
             <HStack>
-              <Text fontSize="sm" fontWeight="600" color="gray.600">Groupes:</Text>
+              <Text fontSize="sm" fontWeight="600" color="gray.600">{t('projects.groupsLabel')}</Text>
               {project.groups_detail.map((g) => (
                 <Badge key={g.id} colorScheme="purple">{g.name}</Badge>
               ))}
@@ -405,7 +407,7 @@ const ProjectDetail = () => {
           )}
           {project.managers_detail && project.managers_detail.length > 0 && (
             <HStack>
-              <Text fontSize="sm" fontWeight="600" color="gray.600">Chefs de projet:</Text>
+              <Text fontSize="sm" fontWeight="600" color="gray.600">{t('projects.managersLabel')}</Text>
               {project.managers_detail.map((m) => (
                 <Badge key={m.id} colorScheme="orange">{m.username}</Badge>
               ))}
@@ -418,10 +420,10 @@ const ProjectDetail = () => {
         {/* Tabs */}
         <Tabs variant="enclosed" colorScheme="blue">
           <TabList>
-            <Tab>Tâches</Tab>
-            <Tab>Jalons</Tab>
-            <Tab>Membres</Tab>
-            <Tab>Statistiques</Tab>
+            <Tab>{t('sidebar.tasks')}</Tab>
+            <Tab>{t('projects.milestones')}</Tab>
+            <Tab>{t('projectMembers.title')}</Tab>
+            <Tab>{t('projects.statistics')}</Tab>
           </TabList>
 
           <TabPanels>
@@ -450,11 +452,11 @@ const ProjectDetail = () => {
                                   task.status === 'in_progress' ? 'blue' :
                                   task.status === 'blocked' ? 'red' : 'gray'
                                 }>
-                                  {task.status === 'todo' ? 'À faire' :
-                                   task.status === 'in_progress' ? 'En cours' :
-                                   task.status === 'review' ? 'En révision' :
-                                   task.status === 'blocked' ? 'Bloquée' :
-                                   task.status === 'completed' ? 'Terminée' : task.status}
+                                  {task.status === 'todo' ? t('common.todo') :
+                                   task.status === 'in_progress' ? t('common.inProgress') :
+                                   task.status === 'review' ? t('common.review') :
+                                   task.status === 'blocked' ? t('common.blocked') :
+                                   task.status === 'completed' ? t('common.completed') : task.status}
                                 </Badge>
                               </HStack>
                               <Text fontWeight="500">{task.title}</Text>
@@ -467,7 +469,7 @@ const ProjectDetail = () => {
                           </HStack>
                           <HStack spacing={4}>
                             {task.delay_probability > 0.7 && (
-                              <Icon as={FiAlertCircle} color="red.500" title="Risque de retard élevé" />
+                              <Icon as={FiAlertCircle} color="red.500" title={t('projects.riskHigh')} />
                             )}
                             {task.assigned_to_name && (
                               <Avatar size="sm" name={task.assigned_to_name} />
@@ -479,7 +481,7 @@ const ProjectDetail = () => {
                   ))
                 ) : (
                   <Box textAlign="center" py={8}>
-                    <Text color="gray.500">Aucune tâche dans ce projet</Text>
+                    <Text color="gray.500">{t('projects.noTasks')}</Text>
                     <Button
                       mt={4}
                       leftIcon={<FiPlus />}
@@ -488,7 +490,7 @@ const ProjectDetail = () => {
                       as={RouterLink}
                       to={`/tasks/create?project=${id}`}
                     >
-                      Créer une tâche
+                      {t('projects.createTask')}
                     </Button>
                   </Box>
                 )}
@@ -497,7 +499,7 @@ const ProjectDetail = () => {
 
             <TabPanel>
               <Box textAlign="center" py={8}>
-                <Text color="gray.500">Fonctionnalité à venir</Text>
+                <Text color="gray.500">{t('projects.comingSoon')}</Text>
                 <Button
                   mt={4}
                   leftIcon={<FiPlus />}
@@ -506,7 +508,7 @@ const ProjectDetail = () => {
                   as={RouterLink}
                   to={`/milestones/create?project=${id}`}
                 >
-                  Créer un jalon
+                  {t('projects.createMilestone')}
                 </Button>
               </Box>
             </TabPanel>
@@ -523,24 +525,24 @@ const ProjectDetail = () => {
               <SimpleGrid columns={2} spacing={4}>
                 <Card>
                   <CardHeader>
-                    <Heading size="md">Progression</Heading>
+                    <Heading size="md">{t('common.progress')}</Heading>
                   </CardHeader>
                   <CardBody>
                     <VStack align="stretch" spacing={4}>
                       <Box>
-                        <Text fontSize="sm" color="gray.500">Taux de complétion</Text>
+                        <Text fontSize="sm" color="gray.500">{t('projects.completionRate')}</Text>
                         <Text fontSize="2xl" fontWeight="bold">
                           {stats?.completion_rate ? Math.round(stats.completion_rate) : 0}%
                         </Text>
                       </Box>
                       <Box>
-                        <Text fontSize="sm" color="gray.500">Temps total passé</Text>
+                        <Text fontSize="sm" color="gray.500">{t('projects.totalTime')}</Text>
                         <Text fontSize="2xl" fontWeight="bold">
                           {Math.round(stats?.total_time_spent || 0)}h
                         </Text>
                       </Box>
                       <Box>
-                        <Text fontSize="sm" color="gray.500">Temps moyen par tâche</Text>
+                        <Text fontSize="sm" color="gray.500">{t('projects.avgTimePerTask')}</Text>
                         <Text fontSize="2xl" fontWeight="bold">
                           {stats?.avg_task_time ? Math.round(stats.avg_task_time) : 0}h
                         </Text>
@@ -551,60 +553,60 @@ const ProjectDetail = () => {
 
                 <Card>
                   <CardHeader>
-                    <Heading size="md">Tâches en retard</Heading>
+                    <Heading size="md">{t('projects.overdueTasks')}</Heading>
                   </CardHeader>
                   <CardBody>
                     <Text fontSize="4xl" fontWeight="bold" color="red.500">
                       {stats?.delayed_tasks || 0}
                     </Text>
-                    <Text color="gray.500">tâches en retard</Text>
+                    <Text color="gray.500">{t('projects.overdueTasksCount')}</Text>
                   </CardBody>
                 </Card>
 
                 <Card gridColumn="span 2">
                   <CardHeader>
-                    <Heading size="md">Distribution des tâches</Heading>
+                    <Heading size="md">{t('projects.taskDistribution')}</Heading>
                   </CardHeader>
                   <CardBody>
                     <SimpleGrid columns={2} spacing={4}>
                       <Box>
-                        <Text fontSize="sm" color="gray.500">Par priorité</Text>
+                        <Text fontSize="sm" color="gray.500">{t('projects.byPriority')}</Text>
                         <VStack align="stretch" mt={2}>
                           <HStack justify="space-between">
-                            <Text>Basse</Text>
+                            <Text>{t('common.low')}</Text>
                             <Badge>0</Badge>
                           </HStack>
                           <HStack justify="space-between">
-                            <Text>Moyenne</Text>
+                            <Text>{t('common.medium')}</Text>
                             <Badge colorScheme="blue">0</Badge>
                           </HStack>
                           <HStack justify="space-between">
-                            <Text>Haute</Text>
+                            <Text>{t('common.high')}</Text>
                             <Badge colorScheme="orange">0</Badge>
                           </HStack>
                           <HStack justify="space-between">
-                            <Text>Critique</Text>
+                            <Text>{t('common.critical')}</Text>
                             <Badge colorScheme="red">0</Badge>
                           </HStack>
                         </VStack>
                       </Box>
                       <Box>
-                        <Text fontSize="sm" color="gray.500">Par statut</Text>
+                        <Text fontSize="sm" color="gray.500">{t('projects.byStatus')}</Text>
                         <VStack align="stretch" mt={2}>
                           <HStack justify="space-between">
-                            <Text>À faire</Text>
+                            <Text>{t('common.todo')}</Text>
                             <Badge>0</Badge>
                           </HStack>
                           <HStack justify="space-between">
-                            <Text>En cours</Text>
+                            <Text>{t('common.inProgress')}</Text>
                             <Badge colorScheme="blue">0</Badge>
                           </HStack>
                           <HStack justify="space-between">
-                            <Text>Bloquées</Text>
+                            <Text>{t('projects.blockedCount')}</Text>
                             <Badge colorScheme="red">0</Badge>
                           </HStack>
                           <HStack justify="space-between">
-                            <Text>Terminées</Text>
+                            <Text>{t('projects.completedCount')}</Text>
                             <Badge colorScheme="green">0</Badge>
                           </HStack>
                         </VStack>
@@ -623,12 +625,12 @@ const ProjectDetail = () => {
         <ModalOverlay />
         <ModalContent>
           <form onSubmit={handleEditSubmit}>
-            <ModalHeader>Modifier le projet</ModalHeader>
+            <ModalHeader>{t('projects.editProject')}</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
               <VStack spacing={4}>
                 <FormControl isRequired>
-                  <FormLabel>Nom du projet</FormLabel>
+                  <FormLabel>{t('projects.projectName')}</FormLabel>
                   <Input
                     value={editFormData.name}
                     onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
@@ -636,7 +638,7 @@ const ProjectDetail = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>{t('common.description')}</FormLabel>
                   <Textarea
                     value={editFormData.description}
                     onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
@@ -645,20 +647,20 @@ const ProjectDetail = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Statut</FormLabel>
+                  <FormLabel>{t('common.status')}</FormLabel>
                   <Select
                     value={editFormData.status}
                     onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}
                   >
-                    <option value="not_started">Non démarré</option>
-                    <option value="in_progress">En cours</option>
-                    <option value="paused">En pause</option>
-                    <option value="completed">Terminé</option>
+                    <option value="not_started">{t('common.notStarted')}</option>
+                    <option value="in_progress">{t('common.inProgress')}</option>
+                    <option value="paused">{t('common.paused')}</option>
+                    <option value="completed">{t('common.completed')}</option>
                   </Select>
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Date de début</FormLabel>
+                  <FormLabel>{t('common.startDate')}</FormLabel>
                   <Input
                     type="date"
                     value={editFormData.start_date}
@@ -667,7 +669,7 @@ const ProjectDetail = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Date de fin prévue</FormLabel>
+                  <FormLabel>{t('common.endDate')}</FormLabel>
                   <Input
                     type="date"
                     value={editFormData.deadline}
@@ -679,14 +681,14 @@ const ProjectDetail = () => {
 
             <ModalFooter>
               <Button variant="ghost" mr={3} onClick={onEditClose}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 colorScheme="blue"
                 isLoading={updateProjectMutation.isLoading}
               >
-                Mettre à jour
+                {t('common.update')}
               </Button>
             </ModalFooter>
           </form>

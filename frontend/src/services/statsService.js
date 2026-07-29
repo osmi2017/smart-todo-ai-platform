@@ -6,8 +6,10 @@ export const useStatsService = () => {
   const projectService = useCrudService('/projects', { resourceName: 'stats projet' });
   const userService = useCrudService('/users', { resourceName: 'stats utilisateur' });
 
-  const getDashboardStats = async () => {
-    const response = await axiosInstance.get('/tasks/dashboard/');
+  const getDashboardStats = async (timeRange = 'week') => {
+    const response = await axiosInstance.get('/tasks/dashboard/', {
+      params: { time_range: timeRange },
+    });
     return response.data;
   };
 

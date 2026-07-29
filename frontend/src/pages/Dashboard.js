@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -51,7 +51,10 @@ import { useQuery } from 'react-query';
 import { useStatsService } from '../services/statsService';
 import { useMeetingService } from '../services/meetingService';
 import { format, formatDistance } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr as frLocale, enUS } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '../context/AuthContext';
+import { useDashboardSocket } from '../hooks/useDashboardSocket';
 
 // Import Recharts
 import {
@@ -73,22 +76,24 @@ import {
 } from 'recharts';
 
 const Dashboard = () => {
+  const { t, i18n } = useTranslation();
   const [timeRange, setTimeRange] = useState('week');
   const statsService = useStatsService();
   const { getMeetings } = useMeetingService();
+  const { user, token } = useAuth();
   const cardBg = useColorModeValue('white', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
   const { data: stats, isLoading, error, refetch } = useQuery(
     ['dashboard', timeRange],
-    () => statsService.getDashboardStats(),
+    () => statsService.getDashboardStats(timeRange),
     {
-      refetchInterval: 30000,
+      refetchInterval: 60000,
       retry: 1,
     }
   );
 
-  const { data: meetingsData } = useQuery(
+  const { data: meetingsData, refetch: refetchMeetings } = useQuery(
     'dashboard-meetings',
     async () => {
       try {
@@ -99,13 +104,21 @@ const Dashboard = () => {
         return [];
       }
     },
-    { refetchInterval: 30000 }
+    { refetchInterval: 60000 }
   );
   const recentMeetings = meetingsData || [];
 
+  const handleRefresh = useCallback((reason) => {
+    refetch();
+    refetchMeetings();
+  }, [refetch, refetchMeetings]);
+
+  useDashboardSocket(token, handleRefresh);
+
   const COLORS = ['#3b5bdb', '#10b981', '#f59e0b', '#d946ef', '#ef4444', '#14b8a6'];
 
-  // Données par défaut sécurisées
+  const dateLocale = i18n.language === 'fr' ? frLocale : enUS;
+
   const safeStats = {
     total_projects: stats?.total_projects || 0,
     active_projects: stats?.active_projects || 0,
@@ -122,27 +135,26 @@ const Dashboard = () => {
     project_progress: Array.isArray(stats?.project_progress) ? stats.project_progress : [],
   };
 
-  // Préparation des données pour les graphiques avec vérifications
   const priorityData = [
-    { name: 'Basse', value: Number(safeStats.tasks_by_priority.low) || 0, color: '#718096' },
-    { name: 'Moyenne', value: Number(safeStats.tasks_by_priority.medium) || 0, color: '#4299E1' },
-    { name: 'Haute', value: Number(safeStats.tasks_by_priority.high) || 0, color: '#ED8936' },
-    { name: 'Critique', value: Number(safeStats.tasks_by_priority.critical) || 0, color: '#F56565' },
-  ].filter(item => item.value > 0); // Ne garder que les catégories avec des valeurs
+    { name: t('common.low'), value: Number(safeStats.tasks_by_priority.low) || 0, color: '#718096' },
+    { name: t('common.medium'), value: Number(safeStats.tasks_by_priority.medium) || 0, color: '#4299E1' },
+    { name: t('common.high'), value: Number(safeStats.tasks_by_priority.high) || 0, color: '#ED8936' },
+    { name: t('common.critical'), value: Number(safeStats.tasks_by_priority.critical) || 0, color: '#F56565' },
+  ].filter(item => item.value > 0);
 
   const statusData = [
-    { name: 'À faire', value: Number(safeStats.tasks_by_status.todo) || 0, color: '#A0AEC0' },
-    { name: 'En cours', value: Number(safeStats.tasks_by_status.in_progress) || 0, color: '#4299E1' },
-    { name: 'Révision', value: Number(safeStats.tasks_by_status.review) || 0, color: '#9F7AEA' },
-    { name: 'Bloquée', value: Number(safeStats.tasks_by_status.blocked) || 0, color: '#F56565' },
-    { name: 'Terminée', value: Number(safeStats.tasks_by_status.completed) || 0, color: '#48BB78' },
+    { name: t('common.todo'), value: Number(safeStats.tasks_by_status.todo) || 0, color: '#A0AEC0' },
+    { name: t('common.inProgress'), value: Number(safeStats.tasks_by_status.in_progress) || 0, color: '#4299E1' },
+    { name: t('common.review'), value: Number(safeStats.tasks_by_status.review) || 0, color: '#9F7AEA' },
+    { name: t('common.blocked'), value: Number(safeStats.tasks_by_status.blocked) || 0, color: '#F56565' },
+    { name: t('common.completed'), value: Number(safeStats.tasks_by_status.completed) || 0, color: '#48BB78' },
   ].filter(item => item.value > 0);
 
   if (isLoading) {
     return (
       <Box textAlign="center" py={10}>
         <Spinner size="xl" color="blue.500" thickness="4px" />
-        <Text mt={4}>Chargement du tableau de bord...</Text>
+        <Text mt={4}>{t('common.loading')}</Text>
       </Box>
     );
   }
@@ -153,13 +165,13 @@ const Dashboard = () => {
         <Alert status="error" borderRadius="lg" maxW="lg" mx="auto">
           <AlertIcon />
           <Box flex="1">
-            <AlertTitle>Erreur de chargement</AlertTitle>
+            <AlertTitle>{t('common.loadError')}</AlertTitle>
             <AlertDescription>
-              Impossible de charger les données du tableau de bord
+              {t('common.loadErrorDesc')}
             </AlertDescription>
           </Box>
           <Button size="sm" onClick={() => refetch()}>
-            Réessayer
+            {t('common.retry')}
           </Button>
         </Alert>
       </Box>
@@ -168,9 +180,8 @@ const Dashboard = () => {
 
   return (
     <Box>
-      {/* En-tête avec période */}
       <Flex justify="space-between" align="center" mb={6}>
-        <Heading size="lg">Tableau de bord</Heading>
+        <Heading size="lg">{t('dashboard.title')}</Heading>
         <HStack spacing={2}>
           <Button
             size="sm"
@@ -178,7 +189,7 @@ const Dashboard = () => {
             colorScheme={timeRange === 'week' ? 'blue' : 'gray'}
             onClick={() => setTimeRange('week')}
           >
-            Semaine
+            {t('dashboard.week')}
           </Button>
           <Button
             size="sm"
@@ -186,7 +197,7 @@ const Dashboard = () => {
             colorScheme={timeRange === 'month' ? 'blue' : 'gray'}
             onClick={() => setTimeRange('month')}
           >
-            Mois
+            {t('dashboard.month')}
           </Button>
           <Button
             size="sm"
@@ -194,18 +205,17 @@ const Dashboard = () => {
             colorScheme={timeRange === 'year' ? 'blue' : 'gray'}
             onClick={() => setTimeRange('year')}
           >
-            Année
+            {t('dashboard.year')}
           </Button>
         </HStack>
       </Flex>
 
-      {/* KPIs */}
       <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={4} mb={6}>
         {[
-          { label: 'Projets actifs', value: safeStats.active_projects, sub: `${safeStats.total_projects} total`, icon: FiFolder, color: 'brand.500', bg: 'brand.50' },
-          { label: 'Tâches complétées', value: safeStats.completed_tasks, sub: `${safeStats.total_tasks} total`, icon: FiCheckCircle, color: 'success.500', bg: 'success.50' },
-          { label: 'En cours', value: safeStats.in_progress_tasks, sub: `${safeStats.delayed_tasks} en retard`, icon: FiClock, color: 'warning.500', bg: 'warning.50' },
-          { label: 'Score productivité', value: `${safeStats.productivity_score}%`, sub: '+5% vs hier', icon: FiTarget, color: 'accent.500', bg: 'accent.50' },
+          { label: t('dashboard.activeProjects'), value: safeStats.active_projects, sub: `${safeStats.total_projects} ${t('dashboard.total')}`, icon: FiFolder, color: 'brand.500', bg: 'brand.50' },
+          { label: t('dashboard.completedTasks'), value: safeStats.completed_tasks, sub: `${safeStats.total_tasks} ${t('dashboard.total')}`, icon: FiCheckCircle, color: 'success.500', bg: 'success.50' },
+          { label: t('dashboard.tasksInProgress'), value: safeStats.in_progress_tasks, sub: `${safeStats.delayed_tasks} ${t('dashboard.overdueTasks')}`, icon: FiClock, color: 'warning.500', bg: 'warning.50' },
+          { label: t('dashboard.productivityScore'), value: `${safeStats.productivity_score}%`, sub: `+5% ${t('dashboard.vsYesterday')}`, icon: FiTarget, color: 'accent.500', bg: 'accent.50' },
         ].map((kpi, i) => (
           <Card key={i} bg={cardBg} borderWidth="1px" borderColor={borderColor} className="card-hover">
             <CardBody p={5}>
@@ -235,13 +245,11 @@ const Dashboard = () => {
         ))}
       </SimpleGrid>
 
-      {/* Graphiques principaux */}
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6} mb={6}>
-        {/* Activité hebdomadaire */}
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader pb={0}>
             <Flex justify="space-between" align="center">
-              <Heading size="md" fontWeight="600">Activité hebdomadaire</Heading>
+              <Heading size="md" fontWeight="600">{t('dashboard.weeklyActivity')}</Heading>
               <Box
                 w={8}
                 h={8}
@@ -278,7 +286,7 @@ const Dashboard = () => {
                     stroke="#4299E1"
                     fillOpacity={1}
                     fill="url(#colorTasks)"
-                    name="Tâches"
+                    name={t('sidebar.tasks')}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -286,11 +294,10 @@ const Dashboard = () => {
           </CardBody>
         </Card>
 
-        {/* Distribution par priorité */}
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader pb={0}>
             <Flex justify="space-between" align="center">
-              <Heading size="md" fontWeight="600">Tâches par priorité</Heading>
+              <Heading size="md" fontWeight="600">{t('dashboard.tasksByPriority')}</Heading>
               <Box
                 w={8}
                 h={8}
@@ -329,10 +336,9 @@ const Dashboard = () => {
           </CardBody>
         </Card>
 
-        {/* Progression des projets */}
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader>
-            <Heading size="md" fontWeight="600">Progression des projets</Heading>
+            <Heading size="md" fontWeight="600">{t('dashboard.projectProgress')}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
@@ -340,7 +346,7 @@ const Dashboard = () => {
                 safeStats.project_progress.map((project, index) => (
                   <Box key={index}>
                     <Flex justify="space-between" mb={1}>
-                      <Text fontWeight="medium">{String(project.name || 'Projet')}</Text>
+                      <Text fontWeight="medium">{String(project.name || t('dashboard.project'))}</Text>
                       <Text fontWeight="bold" color={project.color || 'blue.500'}>
                         {String(project.progress || 0)}%
                       </Text>
@@ -354,16 +360,15 @@ const Dashboard = () => {
                   </Box>
                 ))
               ) : (
-                <Text color="gray.500" textAlign="center">Aucun projet</Text>
+                <Text color="gray.500" textAlign="center">{t('dashboard.noProjects')}</Text>
               )}
             </VStack>
           </CardBody>
         </Card>
 
-        {/* Statut des tâches */}
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader>
-            <Heading size="md" fontWeight="600">Statut des tâches</Heading>
+            <Heading size="md" fontWeight="600">{t('dashboard.taskStatus')}</Heading>
           </CardHeader>
           <CardBody>
             <Box height="200px">
@@ -389,16 +394,14 @@ const Dashboard = () => {
         </Card>
       </SimpleGrid>
 
-      {/* Section basse : Échéances et activités récentes */}
       <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-        {/* Échéances à venir */}
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader>
             <Flex justify="space-between" align="center">
-              <Heading size="md" fontWeight="600">Échéances à venir</Heading>
+              <Heading size="md" fontWeight="600">{t('dashboard.upcomingDeadlines')}</Heading>
               <Tag colorScheme="orange" variant="subtle">
                 <TagLeftIcon as={FiCalendar} />
-                <TagLabel>Prochains jours</TagLabel>
+                <TagLabel>{t('dashboard.nextDays')}</TagLabel>
               </Tag>
             </Flex>
           </CardHeader>
@@ -417,7 +420,7 @@ const Dashboard = () => {
                     <CardBody py={3}>
                       <Flex justify="space-between" align="center">
                         <Box>
-                          <Text fontWeight="500">{String(task.title || 'Sans titre')}</Text>
+                          <Text fontWeight="500">{String(task.title || t('common.untitled'))}</Text>
                           <HStack spacing={2} mt={1}>
                             <Badge
                               colorScheme={
@@ -426,7 +429,7 @@ const Dashboard = () => {
                                 task.priority === 2 ? 'blue' : 'gray'
                               }
                             >
-                              Priorité {String(task.priority || 2)}
+                              {t('dashboard.priority')} {String(task.priority || 2)}
                             </Badge>
                             <Text fontSize="xs" color="gray.500">
                               {String(task.project_name || '')}
@@ -438,10 +441,10 @@ const Dashboard = () => {
                             {task.deadline ? format(new Date(task.deadline), 'dd/MM') : ''}
                           </Text>
                           <Text fontSize="xs" color="gray.500">
-                            {task.deadline ? formatDistance(new Date(task.deadline), new Date(), { 
+                            {task.deadline ? formatDistance(new Date(task.deadline), new Date(), {
                               addSuffix: true,
-                              locale: fr 
-                            }) : ''}
+                              locale: dateLocale
+                            }) : t('dashboard.noDeadline')}
                           </Text>
                         </VStack>
                       </Flex>
@@ -449,16 +452,15 @@ const Dashboard = () => {
                   </Card>
                 ))
               ) : (
-                <Text color="gray.500" textAlign="center">Aucune échéance</Text>
+                <Text color="gray.500" textAlign="center">{t('dashboard.noDeadline')}</Text>
               )}
             </VStack>
           </CardBody>
         </Card>
 
-        {/* Activités récentes */}
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader>
-            <Heading size="md" fontWeight="600">Activités récentes</Heading>
+            <Heading size="md" fontWeight="600">{t('dashboard.recentActivity')}</Heading>
           </CardHeader>
           <CardBody>
             <VStack spacing={4} align="stretch">
@@ -467,38 +469,37 @@ const Dashboard = () => {
                   <Flex key={activity.id} align="center">
                     <Avatar
                       size="sm"
-                      name={activity.user_name || 'Utilisateur'}
+                      name={activity.user_name || t('dashboard.user')}
                       mr={3}
                     />
                     <Box flex={1}>
                       <Text fontSize="sm">
-                        <Text as="span" fontWeight="bold">{String(activity.user_name || 'Utilisateur')}</Text>
+                        <Text as="span" fontWeight="bold">{String(activity.user_name || t('dashboard.user'))}</Text>
                         {' '}
-                        {activity.action === 'create' && 'a créé'}
-                        {activity.action === 'update' && 'a modifié'}
-                        {activity.action === 'complete' && 'a complété'}
-                        {activity.action === 'delete' && 'a supprimé'}
+                        {activity.action === 'create' && t('dashboard.created')}
+                        {activity.action === 'update' && t('dashboard.modified')}
+                        {activity.action === 'complete' && t('dashboard.completedAction')}
+                        {activity.action === 'delete' && t('dashboard.deleted')}
                         {' '}
                         <Text as="span" fontWeight="500">{String(activity.entity_type || '')}</Text>
                       </Text>
                       <Text fontSize="xs" color="gray.500">
                         {activity.created_at ? formatDistance(new Date(activity.created_at), new Date(), {
                           addSuffix: true,
-                          locale: fr
+                          locale: dateLocale
                         }) : ''}
                       </Text>
                     </Box>
                   </Flex>
                 ))
               ) : (
-                <Text color="gray.500" textAlign="center">Aucune activité récente</Text>
+                <Text color="gray.500" textAlign="center">{t('dashboard.noActivity')}</Text>
               )}
             </VStack>
           </CardBody>
         </Card>
       </SimpleGrid>
 
-      {/* Widget Meetings */}
       <Card mt={6} bg={cardBg} borderWidth="1px" borderColor={borderColor}>
         <CardHeader>
           <Flex justify="space-between" align="center">
@@ -514,7 +515,7 @@ const Dashboard = () => {
               >
                 <Icon as={FiMic} boxSize={4} color="accent.500" />
               </Box>
-              <Heading size="md" fontWeight="600">Recent Meetings</Heading>
+              <Heading size="md" fontWeight="600">{t('dashboard.recentMeetings')}</Heading>
             </HStack>
             <HStack spacing={2}>
               <Button
@@ -525,7 +526,7 @@ const Dashboard = () => {
                 as={RouterLink}
                 to="/meetings/create"
               >
-                New Meeting
+                {t('dashboard.newMeeting')}
               </Button>
               <Button
                 size="sm"
@@ -533,7 +534,7 @@ const Dashboard = () => {
                 as={RouterLink}
                 to="/meetings"
               >
-                View All
+                {t('dashboard.viewAll')}
               </Button>
             </HStack>
           </Flex>
@@ -566,7 +567,7 @@ const Dashboard = () => {
                           }
                         />
                         <Box>
-                          <Text fontWeight="500">{String(meeting.title || 'Untitled')}</Text>
+                          <Text fontWeight="500">{String(meeting.title || t('common.untitled'))}</Text>
                           <HStack spacing={2} mt={1}>
                             <Badge
                               colorScheme={
@@ -576,7 +577,7 @@ const Dashboard = () => {
                               }
                               size="sm"
                             >
-                              {meeting.status === 'in_progress' ? 'In Progress' :
+                              {meeting.status === 'in_progress' ? t('dashboard.meetingInProgress') :
                                meeting.status?.charAt(0).toUpperCase() + meeting.status?.slice(1)}
                             </Badge>
                             {meeting.ai_processed && (
@@ -593,7 +594,7 @@ const Dashboard = () => {
                           {meeting.scheduled_at ? format(new Date(meeting.scheduled_at), 'dd/MM') : ''}
                         </Text>
                         <Text fontSize="xs" color="gray.400">
-                          {meeting.participants_count || 0} participants
+                          {meeting.participants_count || 0} {t('dashboard.participants')}
                         </Text>
                       </VStack>
                     </Flex>
@@ -604,7 +605,7 @@ const Dashboard = () => {
           ) : (
             <Box textAlign="center" py={6}>
               <Icon as={FiMic} boxSize={8} color="gray.300" mb={2} />
-              <Text color="gray.500">No meetings yet</Text>
+              <Text color="gray.500">{t('dashboard.noMeetings')}</Text>
               <Button
                 mt={3}
                 size="sm"
@@ -613,14 +614,13 @@ const Dashboard = () => {
                 as={RouterLink}
                 to="/meetings/create"
               >
-                Create your first meeting
+                {t('dashboard.createFirstMeeting')}
               </Button>
             </Box>
           )}
         </CardBody>
       </Card>
 
-      {/* Widget IA */}
       <Card
         mt={6}
         bgGradient="linear(135deg, brand.50, accent.50)"
@@ -642,15 +642,15 @@ const Dashboard = () => {
                 <Icon as={FiCpu} boxSize={6} color="white" />
               </Box>
               <Box>
-                <Heading size="sm" color="gray.800" fontWeight="600">Assistant IA</Heading>
+                <Heading size="sm" color="gray.800" fontWeight="600">{t('dashboard.aiAssistant')}</Heading>
                 <Text color="gray.600" maxW="lg" fontSize="sm">
-                  Basé sur l'analyse de vos données, voici quelques recommandations pour optimiser votre productivité.
+                  {t('dashboard.aiRecommendation')}
                 </Text>
               </Box>
             </HStack>
             <HStack spacing={3}>
               <Tag size="lg" colorScheme="purple" variant="subtle" borderRadius="full">
-                <TagLabel>{String(safeStats.delayed_tasks)} tâches à risque</TagLabel>
+                <TagLabel>{String(safeStats.delayed_tasks)} {t('dashboard.atRiskTasks')}</TagLabel>
               </Tag>
               <Button
                 size="sm"
@@ -659,7 +659,7 @@ const Dashboard = () => {
                 as={RouterLink}
                 to="/analytics"
               >
-                Voir les insights
+                {t('dashboard.viewInsights')}
               </Button>
             </HStack>
           </Flex>

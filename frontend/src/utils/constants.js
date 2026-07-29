@@ -1,6 +1,4 @@
-/**
- * Shared constants for status/priority labels and colors used across the app.
- */
+import i18n from '../i18n';
 
 // --- Task Status ---
 export const TASK_STATUS_COLORS = {
@@ -11,12 +9,15 @@ export const TASK_STATUS_COLORS = {
   completed: 'green',
 };
 
-export const TASK_STATUS_LABELS = {
-  todo: 'À faire',
-  in_progress: 'En cours',
-  review: 'En révision',
-  blocked: 'Bloquée',
-  completed: 'Terminée',
+export const getTaskStatusLabel = (status) => {
+  const labels = {
+    todo: i18n.t('common.todo'),
+    in_progress: i18n.t('common.inProgress'),
+    review: i18n.t('common.review'),
+    blocked: i18n.t('common.blocked'),
+    completed: i18n.t('common.completed'),
+  };
+  return labels[status] || status;
 };
 
 // --- Project Status ---
@@ -28,12 +29,15 @@ export const PROJECT_STATUS_COLORS = {
   archived: 'purple',
 };
 
-export const PROJECT_STATUS_LABELS = {
-  not_started: 'Non démarré',
-  in_progress: 'En cours',
-  paused: 'En pause',
-  completed: 'Terminé',
-  archived: 'Archivé',
+export const getProjectStatusLabel = (status) => {
+  const labels = {
+    not_started: i18n.t('common.notStarted'),
+    in_progress: i18n.t('common.inProgress'),
+    paused: i18n.t('common.paused'),
+    completed: i18n.t('common.completed'),
+    archived: i18n.t('common.archived'),
+  };
+  return labels[status] || status;
 };
 
 // --- Milestone Status ---
@@ -45,21 +49,34 @@ export const MILESTONE_STATUS_COLORS = {
   cancelled: 'purple',
 };
 
-export const MILESTONE_STATUS_LABELS = {
-  not_started: 'Non démarré',
-  in_progress: 'En cours',
-  completed: 'Terminé',
-  delayed: 'En retard',
-  cancelled: 'Annulé',
+export const getMilestoneStatusLabel = (status) => {
+  const labels = {
+    not_started: i18n.t('common.notStarted'),
+    in_progress: i18n.t('common.inProgress'),
+    completed: i18n.t('common.completed'),
+    delayed: i18n.t('common.delayed'),
+    cancelled: i18n.t('common.cancelled'),
+  };
+  return labels[status] || status;
 };
 
 // --- Priority ---
 export const PRIORITY_COLORS = { 1: 'gray', 2: 'blue', 3: 'orange', 4: 'red' };
 
-export const PRIORITY_LABELS = { 1: 'Basse', 2: 'Moyenne', 3: 'Haute', 4: 'Critique' };
+export const getPriorityLabel = (priority) => {
+  const labels = {
+    1: i18n.t('common.low'),
+    2: i18n.t('common.medium'),
+    3: i18n.t('common.high'),
+    4: i18n.t('common.critical'),
+  };
+  return labels[priority] || priority;
+};
 
-// --- Helpers ---
+// --- Legacy helpers (kept for backward compatibility) ---
 export const getStatusColor = (statusMap, status) => statusMap[status] || 'gray';
-export const getStatusLabel = (labelMap, status) => labelMap[status] || status;
+export const getStatusLabel = (labelMap, status) => {
+  if (typeof labelMap === 'function') return labelMap(status);
+  return labelMap[status] || status;
+};
 export const getPriorityColor = (priority) => PRIORITY_COLORS[priority] || 'gray';
-export const getPriorityLabel = (priority) => PRIORITY_LABELS[priority] || priority;

@@ -70,18 +70,22 @@ import { useProjectService } from '../services/projectService';
 import { useAuth } from '../context/AuthContext';
 import { Link as RouterLink } from 'react-router-dom';
 import { format, isAfter, isBefore } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr as frLocale, enUS } from 'date-fns/locale';
 import SortableTaskCard from '../components/SortableTaskCard';
 import { getPriorityColor, getPriorityLabel } from '../utils/constants';
 import LoadingState from '../components/LoadingState';
+import { useTranslation } from 'react-i18next';
 
 const Kanban = () => {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'fr' ? frLocale : enUS;
+
   const [columns, setColumns] = useState({
-    todo: { id: 'todo', title: 'À faire', tasks: [], color: 'gray' },
-    in_progress: { id: 'in_progress', title: 'En cours', tasks: [], color: 'blue' },
-    review: { id: 'review', title: 'En révision', tasks: [], color: 'purple' },
-    blocked: { id: 'blocked', title: 'Bloquées', tasks: [], color: 'red' },
-    completed: { id: 'completed', title: 'Terminées', tasks: [], color: 'green' },
+    todo: { id: 'todo', title: t('common.todo'), tasks: [], color: 'gray' },
+    in_progress: { id: 'in_progress', title: t('common.inProgress'), tasks: [], color: 'blue' },
+    review: { id: 'review', title: t('common.review'), tasks: [], color: 'purple' },
+    blocked: { id: 'blocked', title: t('common.blocked'), tasks: [], color: 'red' },
+    completed: { id: 'completed', title: t('common.completed'), tasks: [], color: 'green' },
   });
 
   const [activeId, setActiveId] = useState(null);
@@ -296,7 +300,7 @@ const Kanban = () => {
 
 
   if (isLoading) {
-    return <LoadingState message="Chargement du tableau Kanban..." />;
+    return <LoadingState message={t('kanban.title')} />;
   }
 
   return (
@@ -304,7 +308,7 @@ const Kanban = () => {
       <VStack spacing={4} align="stretch" height="100%">
         {/* En-tête */}
         <Flex justify="space-between" align="center">
-          <Heading size="lg">Tableau Kanban</Heading>
+          <Heading size="lg">{t('kanban.title')}</Heading>
           <HStack spacing={3}>
             <Button
               leftIcon={<FiPlus />}
@@ -313,7 +317,7 @@ const Kanban = () => {
               as={RouterLink}
               to="/tasks/new"
             >
-              Nouvelle tâche
+              {t('kanban.newTask')}
             </Button>
           </HStack>
         </Flex>
@@ -325,7 +329,7 @@ const Kanban = () => {
               <FiSearch color="gray.300" />
             </InputLeftElement>
             <Input
-              placeholder="Rechercher une tâche..."
+              placeholder={t('kanban.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -337,7 +341,7 @@ const Kanban = () => {
           </InputGroup>
 
           <Select
-            placeholder="Tous les projets"
+            placeholder={t('common.allProjects')}
             value={filterProject}
             onChange={(e) => setFilterProject(e.target.value)}
             size="sm"
@@ -349,7 +353,7 @@ const Kanban = () => {
           </Select>
 
           <Select
-            placeholder="Toutes priorités"
+            placeholder={t('common.allPriorities')}
             value={filterPriority}
             onChange={(e) => {
               setFilterPriority(e.target.value);
@@ -358,16 +362,16 @@ const Kanban = () => {
             size="sm"
             width="200px"
           >
-            <option value="1">Basse</option>
-            <option value="2">Moyenne</option>
-            <option value="3">Haute</option>
-            <option value="4">Critique</option>
+            <option value="1">{t('common.low')}</option>
+            <option value="2">{t('common.medium')}</option>
+            <option value="3">{t('common.high')}</option>
+            <option value="4">{t('common.critical')}</option>
           </Select>
 
           <Badge colorScheme="purple" px={3} py={1} borderRadius="full">
             <HStack spacing={1}>
               <FiCpu />
-              <Text>Mode prédictif actif</Text>
+              <Text>{t('kanban.predictiveMode')}</Text>
             </HStack>
           </Badge>
         </HStack>
@@ -432,7 +436,7 @@ const Kanban = () => {
                     icon={<FiPlus />}
                     size="xs"
                     variant="ghost"
-                    aria-label="Ajouter"
+                    aria-label={t('kanban.addToColumn')}
                   />
                 </Flex>
 
@@ -478,7 +482,7 @@ const Kanban = () => {
                         textAlign="center"
                       >
                         <Text color="gray.400" fontSize="sm">
-                          Aucune tâche
+                          {t('kanban.noTasks')}
                         </Text>
                       </Box>
                     )}
@@ -505,6 +509,7 @@ const Kanban = () => {
 
 // Composant pour l'overlay de drag
 const TaskCardOverlay = ({ task }) => {
+  const { t } = useTranslation();
   if (!task) return null;
 
   return (
@@ -526,7 +531,7 @@ const TaskCardOverlay = ({ task }) => {
               task.priority === 3 ? 'orange' :
               task.priority === 2 ? 'blue' : 'gray'
             }>
-              Priorité {task.priority}
+              {t('common.priority')} {task.priority}
             </Badge>
             {task.assigned_to_name && (
               <Avatar size="xs" name={task.assigned_to_name} />

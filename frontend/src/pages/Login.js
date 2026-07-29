@@ -24,6 +24,7 @@ import {
 } from '@chakra-ui/react';
 import { FiEye, FiEyeOff, FiCpu, FiZap, FiShield, FiCheckCircle } from 'react-icons/fi';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
 const Login = () => {
@@ -33,6 +34,7 @@ const Login = () => {
   const toast = useToast();
   const { login } = useAuth();
   const isMobile = useBreakpointValue({ base: true, md: false });
+  const { t } = useTranslation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,8 +49,8 @@ const Login = () => {
       navigate('/dashboard');
     } else {
       toast({
-        title: 'Erreur de connexion',
-        description: result.error || 'Identifiants incorrects',
+        title: t('auth.loginError'),
+        description: result.error || t('auth.invalidCredentials'),
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -60,9 +62,9 @@ const Login = () => {
   };
 
   const features = [
-    { icon: FiZap, text: 'Gestion intelligente des tâches' },
-    { icon: FiShield, text: 'Sécurité multi-tenant' },
-    { icon: FiCheckCircle, text: 'Analytics et prédictions IA' },
+    { icon: FiZap, text: t('auth.features.taskManagement') },
+    { icon: FiShield, text: t('auth.features.multiTenant') },
+    { icon: FiCheckCircle, text: t('auth.features.ai') },
   ];
 
   return (
@@ -118,7 +120,7 @@ const Login = () => {
               SmartTodoAI
             </Heading>
             <Text color="whiteAlpha.800" fontSize="lg" maxW="sm">
-              Plateforme intelligente de gestion de projets et de tâches
+              {t('auth.platformDesc')}
             </Text>
           </VStack>
 
@@ -173,10 +175,10 @@ const Login = () => {
 
           <VStack spacing={2} mb={8} textAlign="center">
             <Heading size="xl" fontWeight="700" color="gray.800">
-              Bienvenue
+              {t('auth.welcome')}
             </Heading>
             <Text color="gray.500" fontSize="md">
-              Connectez-vous à votre espace de travail
+              {t('auth.loginSubtitleDesc')}
             </Text>
           </VStack>
 
@@ -185,7 +187,7 @@ const Login = () => {
               <Stack spacing={5}>
                 <FormControl isRequired>
                   <FormLabel fontSize="sm" fontWeight="500" color="gray.700">
-                    Nom d'utilisateur
+                    {t('auth.username')}
                   </FormLabel>
                   <Input
                     name="username"
@@ -203,7 +205,7 @@ const Login = () => {
 
                 <FormControl isRequired>
                   <FormLabel fontSize="sm" fontWeight="500" color="gray.700">
-                    Mot de passe
+                    {t('auth.password')}
                   </FormLabel>
                   <InputGroup size="lg">
                     <Input
@@ -236,7 +238,7 @@ const Login = () => {
                   fontSize="md"
                   fontWeight="600"
                   isLoading={isLoading}
-                  loadingText="Connexion..."
+                  loadingText={t('auth.loginLoading')}
                   bgGradient="linear(135deg, brand.500, brand.600)"
                   color="white"
                   _hover={{
@@ -247,14 +249,14 @@ const Login = () => {
                   _active={{ transform: 'translateY(0)' }}
                   w="full"
                 >
-                  Se connecter
+                  {t('auth.loginButton')}
                 </Button>
               </Stack>
             </form>
 
             <VStack spacing={3} mt={6}>
               <Text fontSize="sm" color="gray.500">
-                Pas encore de compte ?{' '}
+                {t('auth.noAccount')}{' '}
                 <Link
                   as={RouterLink}
                   to="/register"
@@ -262,7 +264,7 @@ const Login = () => {
                   fontWeight="600"
                   _hover={{ color: 'brand.600', textDecoration: 'underline' }}
                 >
-                  S'inscrire
+                  {t('auth.registerButton')}
                 </Link>
               </Text>
               <Link
@@ -272,7 +274,7 @@ const Login = () => {
                 color="gray.400"
                 _hover={{ color: 'brand.500' }}
               >
-                Mot de passe oublié ?
+                {t('auth.forgotPassword')}
               </Link>
             </VStack>
           </Card>

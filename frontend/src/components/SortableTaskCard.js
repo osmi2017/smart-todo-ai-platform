@@ -33,9 +33,12 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Link as RouterLink } from 'react-router-dom';
 import { format, isAfter, isBefore } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr as frLocale, enUS } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 
 const SortableTaskCard = ({ task, columnId }) => {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'fr' ? frLocale : enUS;
   const {
     attributes,
     listeners,
@@ -85,7 +88,7 @@ const SortableTaskCard = ({ task, columnId }) => {
   const formatDateTooltip = (dateString) => {
     try {
       if (!dateString) return '';
-      return format(new Date(dateString), 'dd MMM', { locale: fr });
+      return format(new Date(dateString), 'dd MMM', { locale: dateLocale });
     } catch (error) {
       console.error('Erreur formatage date tooltip:', error);
       return '';
@@ -94,7 +97,7 @@ const SortableTaskCard = ({ task, columnId }) => {
 
   // Valeurs par défaut sécurisées
   const priority = task.priority || 2;
-  const title = task.title || 'Sans titre';
+  const title = task.title || t('common.untitled');
   const projectName = task.project_name || '';
   const tags = Array.isArray(task.tags) ? task.tags : [];
   const delayProbability = task.delay_probability || 0;
@@ -128,12 +131,12 @@ const SortableTaskCard = ({ task, columnId }) => {
                   P{priority}
                 </Badge>
                 {isDelayed && (
-                  <Tooltip label="Tâche en retard">
+                  <Tooltip label={t('sortableTask.overdueTask')}>
                     <Icon as={FiAlertCircle} color="red.500" />
                   </Tooltip>
                 )}
                 {delayProbability > 0.7 && (
-                  <Tooltip label={`Risque de retard: ${Math.round(delayProbability * 100)}%`}>
+                  <Tooltip label={`${t('sortableTask.riskWarning')} ${Math.round(delayProbability * 100)}%`}>
                     <Icon as={FiCpu} color="orange.500" />
                   </Tooltip>
                 )}
@@ -148,10 +151,10 @@ const SortableTaskCard = ({ task, columnId }) => {
                 />
                 <MenuList onClick={(e) => e.stopPropagation()}>
                   <MenuItem as={RouterLink} to={`/tasks/${task.id}`}>
-                    Voir détails
+                    {t('sortableTask.viewDetails')}
                   </MenuItem>
-                  <MenuItem>Modifier</MenuItem>
-                  <MenuItem color="red.500">Supprimer</MenuItem>
+                  <MenuItem>{t('common.edit')}</MenuItem>
+                  <MenuItem color="red.500">{t('common.delete')}</MenuItem>
                 </MenuList>
               </Menu>
             </HStack>
@@ -196,7 +199,7 @@ const SortableTaskCard = ({ task, columnId }) => {
             <HStack justify="space-between" fontSize="xs" color="gray.500">
               <HStack spacing={3}>
                 {task.deadline && (
-                  <Tooltip label={`Échéance: ${formatDateTooltip(task.deadline)}`}>
+                  <Tooltip label={`${t('sortableTask.dueDate')} ${formatDateTooltip(task.deadline)}`}>
                     <HStack spacing={1}>
                       <FiClock size={12} />
                       <Text>{formatDate(task.deadline)}</Text>

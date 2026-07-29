@@ -9,6 +9,8 @@ from .views_currency import CurrencyListView
 from .views_geocode import GeocodeView
 from .views_tasks import task_status
 
+search_view = views.GlobalSearchView.as_view()
+
 router = DefaultRouter()
 router.register(r'auth', views.AuthViewSet, basename='auth')
 router.register(r'companies', views.CompanyViewSet)
@@ -27,6 +29,7 @@ router.register(r'missions', MissionViewSet)
 
 urlpatterns = [
     path('jobs/<str:task_id>/', task_status, name='task-status'),
+    path('search/', search_view, name='global-search'),
     path('currencies/', CurrencyListView.as_view(), name='currency-list'),
     path('geocode/', GeocodeView.as_view(), name='geocode'),
     path('', include(router.urls)),

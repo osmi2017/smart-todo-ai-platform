@@ -16,11 +16,13 @@ import {
 } from 'react-icons/fi';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const Files = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { axiosInstance, user, isAdmin, isSuperAdmin } = useAuth();
+  const { t, i18n } = useTranslation();
   const fileInputRef = useRef(null);
 
   const { isOpen: isUploadOpen, onOpen: onUploadOpen, onClose: onUploadClose } = useDisclosure();
@@ -41,6 +43,8 @@ const Files = () => {
   const [shareGroupId, setShareGroupId] = useState('');
   const [shareCanEdit, setShareCanEdit] = useState(false);
   const [shareCanDelete, setShareCanDelete] = useState(false);
+
+  const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
 
   // Fetch files
   const { data: filesData = [], isLoading: filesLoading } = useQuery(
@@ -100,12 +104,12 @@ const Files = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('files');
         queryClient.invalidateQueries('storage-info');
-        toast({ title: 'Fichier supprime', status: 'info', duration: 3000 });
+        toast({ title: t('files.deletedSuccess'), status: 'info', duration: 3000 });
       },
       onError: (err) => {
         toast({
-          title: 'Erreur',
-          description: err.response?.data?.detail || err.response?.data?.error || 'Impossible de supprimer',
+          title: t('common.error'),
+          description: err.response?.data?.detail || err.response?.data?.error || t('files.deleteError'),
           status: 'error',
           duration: 3000,
         });
@@ -122,13 +126,13 @@ const Files = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('files');
-        toast({ title: 'Fichier mis a jour', status: 'success', duration: 3000 });
+        toast({ title: t('files.updatedSuccess'), status: 'success', duration: 3000 });
         handleEditClose();
       },
       onError: (err) => {
         toast({
-          title: 'Erreur',
-          description: JSON.stringify(err.response?.data || 'Erreur'),
+          title: t('common.error'),
+          description: JSON.stringify(err.response?.data || t('common.error')),
           status: 'error',
           duration: 3000,
         });
@@ -138,7 +142,7 @@ const Files = () => {
 
   const handleUpload = async () => {
     if (!uploadFile) {
-      toast({ title: 'Veuillez selectionner un fichier', status: 'warning', duration: 3000 });
+      toast({ title: t('files.selectFile'), status: 'warning', duration: 3000 });
       return;
     }
 
@@ -154,22 +158,22 @@ const Files = () => {
       });
       queryClient.invalidateQueries('files');
       queryClient.invalidateQueries('storage-info');
-      toast({ title: 'Fichier uploade avec succes', status: 'success', duration: 3000 });
+      toast({ title: t('files.uploadedSuccess'), status: 'success', duration: 3000 });
       handleUploadClose();
     } catch (err) {
       const errorData = err.response?.data;
       if (err.response?.status === 413) {
         toast({
-          title: 'Quota de stockage depasse',
-          description: errorData?.error || 'Impossible d\'uploader ce fichier. Quota atteint.',
+          title: t('files.quotaExceeded'),
+          description: errorData?.error || t('files.quotaExceededDesc'),
           status: 'error',
           duration: 6000,
           isClosable: true,
         });
       } else {
         toast({
-          title: 'Erreur d\'upload',
-          description: errorData?.error || 'Une erreur est survenue',
+          title: t('files.uploadError'),
+          description: errorData?.error || t('files.uploadErrorDesc'),
           status: 'error',
           duration: 3000,
         });
@@ -206,19 +210,19 @@ const Files = () => {
     } else if (shareType === 'group' && shareGroupId) {
       data.shared_with_group = parseInt(shareGroupId);
     } else {
-      toast({ title: 'Selectionnez un destinataire', status: 'warning', duration: 3000 });
+      toast({ title: t('files.selectRecipient'), status: 'warning', duration: 3000 });
       return;
     }
 
     try {
       await axiosInstance.post(`/files/${selectedFile.id}/share/`, data);
       queryClient.invalidateQueries('files');
-      toast({ title: 'Fichier partage', status: 'success', duration: 3000 });
+      toast({ title: t('files.sharedSuccess'), status: 'success', duration: 3000 });
       handleShareClose();
     } catch (err) {
       toast({
         title: 'Erreur',
-        description: err.response?.data?.error || 'Erreur de partage',
+        description: err.response?.data?.error || t('files.shareError'),
         status: 'error',
         duration: 3000,
       });
@@ -233,9 +237,9 @@ const Files = () => {
       // Refresh the file detail to update shares list
       const res = await axiosInstance.get(`/files/${selectedFile.id}/`);
       setSelectedFile(res.data);
-      toast({ title: 'Partage supprime', status: 'info', duration: 2000 });
+      toast({ title: t('files.shareRemoved'), status: 'info', duration: 2000 });
     } catch (err) {
-      toast({ title: 'Erreur', status: 'error', duration: 2000 });
+      toast({ title: t('common.error'), status: 'error', duration: 2000 });
     }
   };
 
@@ -277,7 +281,7 @@ const Files = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      toast({ title: 'Erreur de telechargement', status: 'error', duration: 3000 });
+      toast({ title: t('files.downloadError'), status: 'error', duration: 3000 });
     }
   };
 
@@ -316,9 +320,9 @@ const Files = () => {
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return `0 ${t('files.sizeB')}`;
     const k = 1024;
-    const sizes = ['B', 'Ko', 'Mo', 'Go', 'To'];
+    const sizes = [t('files.sizeB'), t('files.sizeKB'), t('files.sizeMB'), t('files.sizeGB'), t('files.sizeTB')];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
@@ -344,7 +348,7 @@ const Files = () => {
               <AlertIcon />
               <Box flex={1}>
                 <AlertTitle fontSize="sm">
-                  {n.notification_type === 'quota_reached' ? 'Quota atteint' : 'Avertissement stockage'}
+                  {n.notification_type === 'quota_reached' ? t('files.quotaReached') : t('files.storageWarning')}
                 </AlertTitle>
                 <AlertDescription fontSize="sm">{n.message}</AlertDescription>
               </Box>
@@ -352,7 +356,7 @@ const Files = () => {
                 size="xs"
                 icon={<FiX />}
                 onClick={() => handleMarkNotificationRead(n.id)}
-                aria-label="Fermer"
+                aria-label={t('common.close')}
                 variant="ghost"
               />
             </Alert>
@@ -362,14 +366,14 @@ const Files = () => {
 
       {/* Header */}
       <Flex mb={6} align="center" wrap="wrap" gap={4}>
-        <Heading size="lg">Fichiers</Heading>
+        <Heading size="lg">{t('files.title')}</Heading>
         <Spacer />
 
         {/* Storage usage bar */}
         {storageInfo && storageInfo.storage_tier !== 'unlimited' && (
           <Box minW="200px" maxW="300px">
             <HStack justify="space-between" mb={1}>
-              <Text fontSize="xs" color="gray.500">Stockage</Text>
+              <Text fontSize="xs" color="gray.500">{t('files.storage')}</Text>
               <Text fontSize="xs" color="gray.500">
                 {formatFileSize(storageInfo.storage_used)} / {formatFileSize(storageInfo.storage_limit_bytes)}
               </Text>
@@ -387,12 +391,12 @@ const Files = () => {
         )}
         {storageInfo && storageInfo.storage_tier === 'unlimited' && (
           <Badge colorScheme="green" fontSize="sm" px={3} py={1}>
-            Stockage illimite ({formatFileSize(storageInfo.storage_used)} utilise)
+            {t('files.unlimitedStorage')} ({formatFileSize(storageInfo.storage_used)} {t('files.usedLabel')})
           </Badge>
         )}
 
         <Button leftIcon={<FiUpload />} colorScheme="blue" onClick={onUploadOpen}>
-          Uploader un fichier
+          {t('files.uploadFile')}
         </Button>
       </Flex>
 
@@ -402,7 +406,7 @@ const Files = () => {
           <FiSearch color="gray.300" />
         </InputLeftElement>
         <Input
-          placeholder="Rechercher des fichiers..."
+          placeholder={t('files.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
@@ -412,19 +416,19 @@ const Files = () => {
       {files.length === 0 ? (
         <Alert status="info" borderRadius="md">
           <AlertIcon />
-          Aucun fichier. Cliquez sur "Uploader un fichier" pour commencer.
+          {t('files.noFiles')}
         </Alert>
       ) : (
         <Table variant="simple">
           <Thead>
             <Tr>
-              <Th>Nom</Th>
-              <Th>Type</Th>
-              <Th>Taille</Th>
-              <Th>Uploade par</Th>
-              <Th>Partages</Th>
-              <Th>Date</Th>
-              <Th>Actions</Th>
+              <Th>{t('common.name')}</Th>
+              <Th>{t('files.fileType')}</Th>
+              <Th>{t('files.fileSize')}</Th>
+              <Th>{t('files.uploadedBy')}</Th>
+              <Th>{t('files.shares')}</Th>
+              <Th>{t('files.date')}</Th>
+              <Th>{t('files.fileActions')}</Th>
             </Tr>
           </Thead>
           <Tbody>
@@ -441,7 +445,7 @@ const Files = () => {
                   </Td>
                   <Td>
                     <Badge colorScheme="gray" fontSize="xs">
-                      {file.mime_type?.split('/').pop() || 'inconnu'}
+                      {file.mime_type?.split('/').pop() || t('files.unknownType')}
                     </Badge>
                   </Td>
                   <Td>{formatFileSize(file.size_bytes)}</Td>
@@ -450,60 +454,60 @@ const Files = () => {
                     <Badge colorScheme="blue">{file.shares_count || 0}</Badge>
                   </Td>
                   <Td fontSize="sm" color="gray.500">
-                    {new Date(file.created_at).toLocaleDateString('fr-FR')}
+                    {new Date(file.created_at).toLocaleDateString(locale)}
                   </Td>
                   <Td>
                     <HStack spacing={1}>
                       {file.is_previewable && (
-                        <Tooltip label="Previsualiser">
+                        <Tooltip label={t('files.previewButton')}>
                           <IconButton
                             size="sm"
                             icon={<FiEye />}
                             onClick={() => handlePreview(file)}
-                            aria-label="Previsualiser"
+                            aria-label={t('files.previewButton')}
                             variant="ghost"
                           />
                         </Tooltip>
                       )}
-                      <Tooltip label="Telecharger">
+                      <Tooltip label={t('files.downloadButton')}>
                         <IconButton
                           size="sm"
                           icon={<FiDownload />}
                           onClick={() => handleDownload(file)}
-                          aria-label="Telecharger"
+                          aria-label={t('files.downloadButton')}
                           variant="ghost"
                         />
                       </Tooltip>
                       {(perms.is_owner || isAdmin) && (
-                        <Tooltip label="Partager">
+                        <Tooltip label={t('files.shareButton')}>
                           <IconButton
                             size="sm"
                             icon={<FiShare2 />}
                             onClick={() => handleOpenShare(file)}
-                            aria-label="Partager"
+                            aria-label={t('files.shareButton')}
                             variant="ghost"
                             colorScheme="blue"
                           />
                         </Tooltip>
                       )}
                       {perms.can_edit && (
-                        <Tooltip label="Modifier">
+                        <Tooltip label={t('files.editButton')}>
                           <IconButton
                             size="sm"
                             icon={<FiEdit2 />}
                             onClick={() => handleEditOpen(file)}
-                            aria-label="Modifier"
+                            aria-label={t('files.editButton')}
                             variant="ghost"
                           />
                         </Tooltip>
                       )}
                       {perms.can_delete && (
-                        <Tooltip label="Supprimer">
+                        <Tooltip label={t('files.deleteButton')}>
                           <IconButton
                             size="sm"
                             icon={<FiTrash2 />}
                             onClick={() => deleteMutation.mutate(file.id)}
-                            aria-label="Supprimer"
+                            aria-label={t('files.deleteButton')}
                             variant="ghost"
                             colorScheme="red"
                           />
@@ -522,7 +526,7 @@ const Files = () => {
       <Modal isOpen={isUploadOpen} onClose={handleUploadClose} size="lg">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Uploader un fichier</ModalHeader>
+          <ModalHeader>{t('files.uploadFile')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             {storageInfo && storageInfo.storage_tier !== 'unlimited' && (
@@ -534,14 +538,14 @@ const Files = () => {
               >
                 <AlertIcon />
                 <Text>
-                  Stockage: {formatFileSize(storageInfo.storage_used)} / {formatFileSize(storageInfo.storage_limit_bytes)}
+                  {t('files.storage')}: {formatFileSize(storageInfo.storage_used)} / {formatFileSize(storageInfo.storage_limit_bytes)}
                   {' '}({storageInfo.storage_percent_used}%)
                 </Text>
               </Alert>
             )}
 
             <FormControl mb={4}>
-              <FormLabel>Fichier</FormLabel>
+              <FormLabel>{t('files.fileName')}</FormLabel>
               <Input
                 type="file"
                 ref={fileInputRef}
@@ -555,31 +559,31 @@ const Files = () => {
               )}
             </FormControl>
             <FormControl mb={4}>
-              <FormLabel>Nom</FormLabel>
+              <FormLabel>{t('common.name')}</FormLabel>
               <Input
                 value={uploadForm.name}
                 onChange={(e) => setUploadForm({ ...uploadForm, name: e.target.value })}
-                placeholder="Nom du fichier"
+                placeholder={t('files.fileName')}
               />
             </FormControl>
             <FormControl mb={4}>
-              <FormLabel>Description</FormLabel>
+              <FormLabel>{t('common.description')}</FormLabel>
               <Textarea
                 value={uploadForm.description}
                 onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
-                placeholder="Description optionnelle"
+                placeholder={t('files.fileDescription')}
               />
             </FormControl>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={handleUploadClose}>Annuler</Button>
+            <Button variant="ghost" mr={3} onClick={handleUploadClose}>{t('common.cancel')}</Button>
             <Button
               colorScheme="blue"
               onClick={handleUpload}
               isLoading={uploading}
               leftIcon={<FiUpload />}
             >
-              Uploader
+              {t('files.uploadButton')}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -589,27 +593,27 @@ const Files = () => {
       <Modal isOpen={isShareOpen} onClose={handleShareClose} size="lg">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Partager: {selectedFile?.name}</ModalHeader>
+          <ModalHeader>{t('files.shareTitle')}: {selectedFile?.name}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             {/* Existing shares */}
             {selectedFile?.shares && selectedFile.shares.length > 0 && (
               <Box mb={4}>
-                <Text fontWeight="600" mb={2}>Partages existants</Text>
+                <Text fontWeight="600" mb={2}>{t('files.existingShares')}</Text>
                 <VStack spacing={2} align="stretch">
                   {selectedFile.shares.map((share) => (
                     <HStack key={share.id} p={2} bg="gray.50" borderRadius="md" justify="space-between">
                       <Box>
                         <Text fontSize="sm" fontWeight="500">
                           {share.shared_with_user_name
-                            ? `Utilisateur: ${share.shared_with_user_name} (${share.shared_with_user_email})`
-                            : `Groupe: ${share.shared_with_group_name}`
+                            ? `${t('files.userLabel')} ${share.shared_with_user_name} (${share.shared_with_user_email})`
+                            : `${t('files.groupLabel')} ${share.shared_with_group_name}`
                           }
                         </Text>
                         <HStack spacing={2} mt={1}>
-                          <Badge colorScheme="green" fontSize="xs">Lecture</Badge>
-                          {share.can_edit && <Badge colorScheme="orange" fontSize="xs">Modification</Badge>}
-                          {share.can_delete && <Badge colorScheme="red" fontSize="xs">Suppression</Badge>}
+                          <Badge colorScheme="green" fontSize="xs">{t('files.readAccess')}</Badge>
+                          {share.can_edit && <Badge colorScheme="orange" fontSize="xs">{t('files.writeAccess')}</Badge>}
+                          {share.can_delete && <Badge colorScheme="red" fontSize="xs">{t('files.deleteAccess')}</Badge>}
                         </HStack>
                       </Box>
                       <IconButton
@@ -618,7 +622,7 @@ const Files = () => {
                         colorScheme="red"
                         variant="ghost"
                         onClick={() => handleUnshare(share.id)}
-                        aria-label="Supprimer le partage"
+                        aria-label={t('files.removeShare')}
                       />
                     </HStack>
                   ))}
@@ -626,22 +630,22 @@ const Files = () => {
               </Box>
             )}
 
-            <Text fontWeight="600" mb={2}>Nouveau partage</Text>
+            <Text fontWeight="600" mb={2}>{t('files.newShare')}</Text>
             <FormControl mb={4}>
-              <FormLabel>Partager avec</FormLabel>
+              <FormLabel>{t('files.shareWith')}</FormLabel>
               <Select value={shareType} onChange={(e) => setShareType(e.target.value)}>
-                <option value="user">Un utilisateur</option>
-                <option value="group">Un groupe</option>
+                <option value="user">{t('files.shareUser')}</option>
+                <option value="group">{t('files.shareGroup')}</option>
               </Select>
             </FormControl>
 
             {shareType === 'user' ? (
               <FormControl mb={4}>
-                <FormLabel>Utilisateur</FormLabel>
+                <FormLabel>{t('files.selectUser')}</FormLabel>
                 <Select
                   value={shareUserId}
                   onChange={(e) => setShareUserId(e.target.value)}
-                  placeholder="Selectionner un utilisateur"
+                  placeholder={t('files.selectUser')}
                 >
                   {users
                     .filter((u) => u.id !== user?.id)
@@ -652,11 +656,11 @@ const Files = () => {
               </FormControl>
             ) : (
               <FormControl mb={4}>
-                <FormLabel>Groupe</FormLabel>
+                <FormLabel>{t('files.selectGroup')}</FormLabel>
                 <Select
                   value={shareGroupId}
                   onChange={(e) => setShareGroupId(e.target.value)}
-                  placeholder="Selectionner un groupe"
+                  placeholder={t('files.selectGroup')}
                 >
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>{g.name}</option>
@@ -670,7 +674,7 @@ const Files = () => {
                 isChecked={shareCanEdit}
                 onChange={(e) => setShareCanEdit(e.target.checked)}
               >
-                Peut modifier le fichier
+                {t('files.canEdit')}
               </Checkbox>
             </FormControl>
             <FormControl mb={4}>
@@ -678,14 +682,14 @@ const Files = () => {
                 isChecked={shareCanDelete}
                 onChange={(e) => setShareCanDelete(e.target.checked)}
               >
-                Peut supprimer le fichier
+                {t('files.canDelete')}
               </Checkbox>
             </FormControl>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={handleShareClose}>Fermer</Button>
+            <Button variant="ghost" mr={3} onClick={handleShareClose}>{t('common.close')}</Button>
             <Button colorScheme="blue" onClick={handleShare} leftIcon={<FiShare2 />}>
-              Partager
+              {t('files.shareButton')}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -707,18 +711,18 @@ const Files = () => {
       <Modal isOpen={isEditOpen} onClose={handleEditClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Modifier le fichier</ModalHeader>
+          <ModalHeader>{t('files.editFile')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
             <FormControl mb={4} isRequired>
-              <FormLabel>Nom</FormLabel>
+              <FormLabel>{t('common.name')}</FormLabel>
               <Input
                 value={editForm.name}
                 onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
               />
             </FormControl>
             <FormControl mb={4}>
-              <FormLabel>Description</FormLabel>
+              <FormLabel>{t('common.description')}</FormLabel>
               <Textarea
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
@@ -726,9 +730,9 @@ const Files = () => {
             </FormControl>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={handleEditClose}>Annuler</Button>
+            <Button variant="ghost" mr={3} onClick={handleEditClose}>{t('common.cancel')}</Button>
             <Button colorScheme="blue" onClick={handleEditSubmit} isLoading={updateMutation.isLoading}>
-              Mettre a jour
+              {t('common.update')}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -741,6 +745,7 @@ const Files = () => {
 const FilePreview = ({ file, getPreviewUrl, axiosInstance }) => {
   const [blobUrl, setBlobUrl] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
+  const { t } = useTranslation();
 
   React.useEffect(() => {
     let cancelled = false;
@@ -774,7 +779,7 @@ const FilePreview = ({ file, getPreviewUrl, axiosInstance }) => {
     return (
       <Alert status="error" borderRadius="md">
         <AlertIcon />
-        Impossible de charger la previsualisation.
+        {t('files.previewNotSupported')}
       </Alert>
     );
   }
@@ -799,7 +804,7 @@ const FilePreview = ({ file, getPreviewUrl, axiosInstance }) => {
           controls
           style={{ maxWidth: '100%', maxHeight: '70vh' }}
         >
-          Votre navigateur ne supporte pas la lecture video.
+          {t('files.videoNotSupported')}
         </video>
       </Box>
     );
@@ -822,7 +827,7 @@ const FilePreview = ({ file, getPreviewUrl, axiosInstance }) => {
   return (
     <Alert status="info" borderRadius="md">
       <AlertIcon />
-      Previsualisation non disponible pour ce type de fichier.
+      {t('files.previewUnavailable')}
     </Alert>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Box,
   Heading,
@@ -35,6 +36,7 @@ import { useMilestoneService } from '../services/milestoneService';
 import { useAuth } from '../context/AuthContext';
 
 const TaskForm = () => {
+  const { t } = useTranslation();
   const [searchParams] = useSearchParams();
   const { id } = useParams(); // Pour l'édition
   const projectIdFromUrl = searchParams.get('project');
@@ -186,8 +188,8 @@ const TaskForm = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('tasks');
         toast({
-          title: 'Succès',
-          description: 'Tâche créée avec succès',
+          title: t('common.success'),
+          description: t('tasks.createdSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -199,8 +201,8 @@ const TaskForm = () => {
           setErrors(errorData);
         }
         toast({
-          title: 'Erreur',
-          description: errorData?.message || 'Erreur lors de la création',
+          title: t('common.error'),
+          description: errorData?.message || t('tasks.createError'),
           status: 'error',
           duration: 3000,
         });
@@ -216,8 +218,8 @@ const TaskForm = () => {
         queryClient.invalidateQueries('tasks');
         queryClient.invalidateQueries(['task', id]);
         toast({
-          title: 'Succès',
-          description: 'Tâche mise à jour avec succès',
+          title: t('common.success'),
+          description: t('tasks.updatedSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -229,8 +231,8 @@ const TaskForm = () => {
           setErrors(errorData);
         }
         toast({
-          title: 'Erreur',
-          description: errorData?.message || 'Erreur lors de la mise à jour',
+          title: t('common.error'),
+          description: errorData?.message || t('tasks.updateError'),
           status: 'error',
           duration: 3000,
         });
@@ -243,12 +245,12 @@ const TaskForm = () => {
     
     // Validation de base
     if (!formData.title) {
-      setErrors({ title: ['Le titre est requis'] });
+      setErrors({ title: [t('tasks.titleRequired')] });
       return;
     }
     
     if (!formData.project) {
-      setErrors({ project: ['Le projet est requis'] });
+      setErrors({ project: [t('tasks.projectRequired')] });
       return;
     }
     
@@ -300,7 +302,7 @@ const TaskForm = () => {
     return (
       <Box textAlign="center" py={10}>
         <Spinner size="xl" color="blue.500" />
-        <Text mt={4}>Chargement de la tâche...</Text>
+        <Text mt={4}>{t('tasks.loading')}</Text>
       </Box>
     );
   }
@@ -308,7 +310,7 @@ const TaskForm = () => {
   return (
     <Box>
       <Heading size="lg" mb={6}>
-        {id ? 'Modifier la tâche' : projectIdFromUrl ? 'Nouvelle tâche dans le projet' : 'Nouvelle tâche'}
+        {id ? t('tasks.editTask') : projectIdFromUrl ? t('tasks.newTaskInProject') : t('tasks.newTask')}
       </Heading>
 
       <Card>
@@ -316,27 +318,27 @@ const TaskForm = () => {
           <form onSubmit={handleSubmit}>
             <VStack spacing={4} align="stretch">
               <FormControl isRequired isInvalid={!!errors.title}>
-                <FormLabel>Titre</FormLabel>
+                <FormLabel>{t('tasks.taskTitle')}</FormLabel>
                 <Input
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="Titre de la tâche"
+                  placeholder={t('tasks.taskTitlePlaceholder')}
                 />
                 <FormErrorMessage>{errors.title?.[0]}</FormErrorMessage>
               </FormControl>
 
               <FormControl>
-                <FormLabel>Description</FormLabel>
+                <FormLabel>{t('common.description')}</FormLabel>
                 <Textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Description détaillée..."
+                  placeholder={t('tasks.taskDescriptionPlaceholder')}
                   rows={4}
                 />
               </FormControl>
 
               <FormControl isRequired isInvalid={!!errors.project}>
-                <FormLabel>Projet</FormLabel>
+                <FormLabel>{t('tasks.project')}</FormLabel>
                 <Select
                   value={formData.project}
                   onChange={(e) => setFormData({ 
@@ -347,7 +349,7 @@ const TaskForm = () => {
                   })}
                   isDisabled={!!projectIdFromUrl}
                 >
-                  <option value="">Sélectionner un projet</option>
+                  <option value="">{t('tasks.selectProject')}</option>
                   {projects?.map(project => (
                     <option key={project.id} value={project.id}>
                       {project.name}
@@ -359,12 +361,12 @@ const TaskForm = () => {
 
               {formData.project && (
                 <FormControl>
-                  <FormLabel>Jalon (optionnel)</FormLabel>
+                  <FormLabel>{t('tasks.milestone')}</FormLabel>
                   <Select
                     value={formData.milestone}
                     onChange={(e) => setFormData({ ...formData, milestone: e.target.value })}
                   >
-                    <option value="">Aucun jalon</option>
+                    <option value="">{t('tasks.noMilestone')}</option>
                     {milestones?.map(milestone => (
                       <option key={milestone.id} value={milestone.id}>
                         {milestone.name}
@@ -376,36 +378,36 @@ const TaskForm = () => {
 
               <HStack spacing={4}>
                 <FormControl>
-                  <FormLabel>Statut</FormLabel>
+                  <FormLabel>{t('common.status')}</FormLabel>
                   <Select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   >
-                    <option value="todo">À faire</option>
-                    <option value="in_progress">En cours</option>
-                    <option value="review">En révision</option>
-                    <option value="blocked">Bloquée</option>
-                    <option value="completed">Terminée</option>
+                    <option value="todo">{t('common.todo')}</option>
+                    <option value="in_progress">{t('common.inProgress')}</option>
+                    <option value="review">{t('common.review')}</option>
+                    <option value="blocked">{t('common.blocked')}</option>
+                    <option value="completed">{t('common.completed')}</option>
                   </Select>
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Priorité</FormLabel>
+                  <FormLabel>{t('common.priority')}</FormLabel>
                   <Select
                     value={formData.priority}
                     onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
                   >
-                    <option value={1}>Basse</option>
-                    <option value={2}>Moyenne</option>
-                    <option value={3}>Haute</option>
-                    <option value={4}>Critique</option>
+                    <option value={1}>{t('common.low')}</option>
+                    <option value={2}>{t('common.medium')}</option>
+                    <option value={3}>{t('common.high')}</option>
+                    <option value={4}>{t('common.critical')}</option>
                   </Select>
                 </FormControl>
               </HStack>
 
               <HStack spacing={4}>
                 <FormControl>
-                  <FormLabel>Temps estimé (heures)</FormLabel>
+                  <FormLabel>{t('tasks.estimatedTime')}</FormLabel>
                   <NumberInput
                     value={formData.estimated_time}
                     onChange={(value) => setFormData({ ...formData, estimated_time: value })}
@@ -421,7 +423,7 @@ const TaskForm = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Date limite</FormLabel>
+                  <FormLabel>{t('common.deadline')}</FormLabel>
                   <Input
                     type="date"
                     value={formData.deadline}
@@ -432,14 +434,14 @@ const TaskForm = () => {
 
               {/* Champ "Assigné à" mis à jour avec les membres du projet */}
               <FormControl>
-                <FormLabel>Assigné à</FormLabel>
+                <FormLabel>{t('tasks.assignedTo')}</FormLabel>
                 <Select
                   value={formData.assigned_to}
                   onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
                   isLoading={isLoadingMembers}
-                  placeholder={isLoadingMembers ? "Chargement des membres..." : "Sélectionner un membre"}
+                  placeholder={isLoadingMembers ? t('common.loading') : t('tasks.selectMember')}
                 >
-                  <option value="">Non assigné</option>
+                  <option value="">{t('common.notAssigned')}</option>
                   {assignableUsers.map(user => (
                     <option key={user.id} value={user.id}>
                       {user.username} {user.id === projectDetail?.owner ? '⭐' : ''}
@@ -448,21 +450,21 @@ const TaskForm = () => {
                 </Select>
                 {assignableUsers.length === 0 && formData.project && !isLoadingMembers && (
                   <Text fontSize="sm" color="gray.500" mt={1}>
-                    Aucun membre disponible dans ce projet
+                    {t('tasks.noMembers')}
                   </Text>
                 )}
               </FormControl>
 
               <FormControl>
-                <FormLabel>Tags</FormLabel>
+                <FormLabel>{t('tasks.tags')}</FormLabel>
                 <HStack>
                   <Input
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
-                    placeholder="Ajouter un tag"
+                    placeholder={t('tasks.addTag')}
                     onKeyPress={handleKeyPress}
                   />
-                  <Button onClick={handleAddTag} size="sm">Ajouter</Button>
+                  <Button onClick={handleAddTag} size="sm">{t('common.add')}</Button>
                 </HStack>
                 <Wrap mt={2}>
                   {formData.tags.map(tag => (
@@ -478,14 +480,14 @@ const TaskForm = () => {
 
               <HStack spacing={4} justify="flex-end" mt={4}>
                 <Button variant="ghost" onClick={() => navigate('/tasks')}>
-                  Annuler
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   type="submit"
                   colorScheme="blue"
                   isLoading={createMutation.isLoading || updateMutation.isLoading}
                 >
-                  {id ? 'Mettre à jour' : 'Créer la tâche'}
+                  {id ? t('common.update') : t('tasks.createTask')}
                 </Button>
               </HStack>
             </VStack>

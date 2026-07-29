@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:14
     container_name: todo_ai_db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_NAME:-todo_ai}
       POSTGRES_USER: ${DB_USER:-postgres}
@@ -84,7 +85,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: todo_ai_backend
-    command: sh -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
+    command: sh -c "python manage.py migrate --noinput && daphne -b 0.0.0.0 -p 8000 core.asgi:application"
     ports:
       - "8000:8000"
     environment:
@@ -318,6 +319,35 @@ services:
         condition: service_completed_successfully
       ml-service:
         condition: service_started
+    volumes:
+      - ./backend:/app
+    networks:
+      - todo_ai_network
+
+  kafka-dashboard-consumer:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: python manage.py consume_events dashboard
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env}
+      DB_HOST: postgres
+      DB_NAME: ${DB_NAME:-todo_ai}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_ENABLED: "True"
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_EVENTS_TOPIC: ${KAFKA_EVENTS_TOPIC:-smart-todo.events}
+      KAFKA_DEAD_LETTER_TOPIC: ${KAFKA_DEAD_LETTER_TOPIC:-smart-todo.events.dlq}
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
     volumes:
       - ./backend:/app
     networks:

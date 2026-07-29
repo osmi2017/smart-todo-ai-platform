@@ -4,9 +4,6 @@ import {
   Flex,
   HStack,
   IconButton,
-  Input,
-  InputGroup,
-  InputLeftElement,
   Menu,
   MenuButton,
   MenuList,
@@ -33,19 +30,24 @@ import {
   FiSettings,
   FiHelpCircle,
   FiMenu,
-  FiX,
+  FiGlobe,
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
 import Sidebar from './Sidebar';
+import GlobalSearch from './GlobalSearch';
 
 const Header = ({ onMobileMenuToggle, isMobile }) => {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const bgColor = useColorModeValue('white', 'gray.900');
   const borderColor = useColorModeValue('gray.100', 'gray.800');
   const { isOpen, onOpen, onClose } = useDisclosure();
+
+  const currentLang = i18n.language;
 
   const handleLogout = () => {
     logout();
@@ -68,7 +70,6 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
         backgroundColor="rgba(255,255,255,0.9)"
       >
         <Flex justify="space-between" align="center">
-          {/* Left: Mobile menu + Search */}
           <HStack spacing={3} flex={1}>
             {isMobile && (
               <IconButton
@@ -79,24 +80,10 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
                 aria-label="Open menu"
               />
             )}
-            <InputGroup maxW={{ base: '200px', md: '400px' }} display={{ base: 'none', sm: 'block' }}>
-              <InputLeftElement pointerEvents="none">
-                <FiSearch color="gray.300" />
-              </InputLeftElement>
-              <Input
-                type="search"
-                placeholder="Rechercher..."
-                borderRadius="full"
-                bg="gray.50"
-                fontSize="sm"
-                _focus={{ bg: 'white', boxShadow: '0 0 0 2px', boxShadowColor: 'brand.200' }}
-              />
-            </InputGroup>
+            <GlobalSearch />
           </HStack>
 
-          {/* Right section */}
           <HStack spacing={{ base: 1, md: 3 }}>
-            {/* Mobile search */}
             {isMobile && (
               <IconButton
                 icon={<FiSearch />}
@@ -106,10 +93,36 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
               />
             )}
 
-            {/* Notifications */}
+            <Menu>
+              <MenuButton
+                as={IconButton}
+                icon={<FiGlobe />}
+                variant="ghost"
+                size="sm"
+                aria-label={t('header.language')}
+              />
+              <MenuList minW="120px" p={1}>
+                <MenuItem
+                  borderRadius="lg"
+                  onClick={() => i18n.changeLanguage('fr')}
+                  bg={currentLang === 'fr' ? 'blue.50' : undefined}
+                  fontWeight={currentLang === 'fr' ? '600' : '400'}
+                >
+                  FR - Français
+                </MenuItem>
+                <MenuItem
+                  borderRadius="lg"
+                  onClick={() => i18n.changeLanguage('en')}
+                  bg={currentLang === 'en' ? 'blue.50' : undefined}
+                  fontWeight={currentLang === 'en' ? '600' : '400'}
+                >
+                  EN - English
+                </MenuItem>
+              </MenuList>
+            </Menu>
+
             <NotificationBell />
 
-            {/* User menu */}
             <Menu>
               <MenuButton>
                 <HStack spacing={2}>
@@ -135,21 +148,21 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
                   borderRadius="lg"
                   onClick={() => navigate('/profile')}
                 >
-                  Mon profil
+                  {t('header.myProfile')}
                 </MenuItem>
                 <MenuItem
                   icon={<FiSettings />}
                   borderRadius="lg"
                   onClick={() => navigate('/settings')}
                 >
-                  Paramètres
+                  {t('header.settings')}
                 </MenuItem>
                 <MenuItem
                   icon={<FiHelpCircle />}
                   borderRadius="lg"
                   onClick={() => window.open('/docs', '_blank')}
                 >
-                  Aide
+                  {t('header.help')}
                 </MenuItem>
                 <MenuDivider />
                 <MenuItem
@@ -158,7 +171,7 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
                   borderRadius="lg"
                   onClick={handleLogout}
                 >
-                  Déconnexion
+                  {t('header.logout')}
                 </MenuItem>
               </MenuList>
             </Menu>
@@ -166,7 +179,6 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
         </Flex>
       </Box>
 
-      {/* Mobile Drawer */}
       {isMobile && (
         <Drawer isOpen={isOpen} placement="left" onClose={onClose} size="xs">
           <DrawerOverlay />

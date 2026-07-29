@@ -24,6 +24,7 @@ import {
 } from '@chakra-ui/react';
 import { FiEye, FiEyeOff, FiCpu, FiZap, FiShield, FiCheckCircle } from 'react-icons/fi';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 
 const Register = () => {
@@ -43,6 +44,7 @@ const Register = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const { register } = useAuth();
+  const { t } = useTranslation();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -54,15 +56,15 @@ const Register = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.username) newErrors.username = "Nom d'utilisateur requis";
-    else if (formData.username.length < 3) newErrors.username = "Minimum 3 caractères";
-    if (!formData.email) newErrors.email = "Email requis";
-    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = "Email invalide";
-    if (!formData.password) newErrors.password = "Mot de passe requis";
-    else if (formData.password.length < 6) newErrors.password = "Minimum 6 caractères";
-    if (!formData.password2) newErrors.password2 = "Confirmation requise";
+    if (!formData.username) newErrors.username = t('auth.usernameRequired');
+    else if (formData.username.length < 3) newErrors.username = t('auth.usernameMinLength');
+    if (!formData.email) newErrors.email = t('auth.emailRequired');
+    else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = t('auth.emailInvalid');
+    if (!formData.password) newErrors.password = t('auth.passwordRequired');
+    else if (formData.password.length < 6) newErrors.password = t('auth.passwordMinLength');
+    if (!formData.password2) newErrors.password2 = t('auth.confirmationRequired');
     else if (formData.password !== formData.password2) {
-      newErrors.password2 = "Les mots de passe ne correspondent pas";
+      newErrors.password2 = t('auth.passwordsNoMatch');
     }
     return newErrors;
   };
@@ -78,8 +80,8 @@ const Register = () => {
     const result = await register(formData);
     if (result.success) {
       toast({
-        title: 'Inscription réussie',
-        description: 'Vous pouvez maintenant vous connecter',
+        title: t('auth.registerSuccess'),
+        description: t('auth.registerSuccessDesc'),
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -90,9 +92,9 @@ const Register = () => {
   };
 
   const features = [
-    { icon: FiZap, text: 'Gestion intelligente des tâches' },
-    { icon: FiShield, text: 'Sécurité multi-tenant' },
-    { icon: FiCheckCircle, text: 'Analytics et prédictions IA' },
+    { icon: FiZap, text: t('auth.features.taskManagement') },
+    { icon: FiShield, text: t('auth.features.multiTenant') },
+    { icon: FiCheckCircle, text: t('auth.features.ai') },
   ];
 
   const inputProps = {
@@ -156,7 +158,7 @@ const Register = () => {
               SmartTodoAI
             </Heading>
             <Text color="whiteAlpha.800" fontSize="lg" maxW="sm">
-              Rejoignez des milliers d'équipes qui optimisent leur productivité
+              {t('auth.registerSubtitle')}
             </Text>
           </VStack>
 
@@ -211,10 +213,10 @@ const Register = () => {
 
           <VStack spacing={2} mb={8} textAlign="center">
             <Heading size="xl" fontWeight="700" color="gray.800">
-              Créer un compte
+              {t('auth.createAccount')}
             </Heading>
             <Text color="gray.500" fontSize="md">
-              Commencez à gérer vos projets intelligemment
+              {t('auth.registerSubtitleDesc')}
             </Text>
           </VStack>
 
@@ -223,7 +225,7 @@ const Register = () => {
               <Stack spacing={5}>
                 <HStack spacing={4}>
                   <FormControl isRequired isInvalid={!!errors.first_name}>
-                    <FormLabel fontSize="sm" fontWeight="500" color="gray.700">Prénom</FormLabel>
+                    <FormLabel fontSize="sm" fontWeight="500" color="gray.700">{t('auth.firstName')}</FormLabel>
                     <Input
                       name="first_name"
                       value={formData.first_name}
@@ -234,7 +236,7 @@ const Register = () => {
                     <FormErrorMessage>{errors.first_name}</FormErrorMessage>
                   </FormControl>
                   <FormControl isRequired isInvalid={!!errors.last_name}>
-                    <FormLabel fontSize="sm" fontWeight="500" color="gray.700">Nom</FormLabel>
+                    <FormLabel fontSize="sm" fontWeight="500" color="gray.700">{t('auth.lastName')}</FormLabel>
                     <Input
                       name="last_name"
                       value={formData.last_name}
@@ -247,7 +249,7 @@ const Register = () => {
                 </HStack>
 
                 <FormControl isRequired isInvalid={!!errors.username}>
-                  <FormLabel fontSize="sm" fontWeight="500" color="gray.700">Nom d'utilisateur</FormLabel>
+                  <FormLabel fontSize="sm" fontWeight="500" color="gray.700">{t('auth.username')}</FormLabel>
                   <Input
                     name="username"
                     value={formData.username}
@@ -259,7 +261,7 @@ const Register = () => {
                 </FormControl>
 
                 <FormControl isRequired isInvalid={!!errors.email}>
-                  <FormLabel fontSize="sm" fontWeight="500" color="gray.700">Email</FormLabel>
+                  <FormLabel fontSize="sm" fontWeight="500" color="gray.700">{t('auth.email')}</FormLabel>
                   <Input
                     name="email"
                     type="email"
@@ -272,7 +274,7 @@ const Register = () => {
                 </FormControl>
 
                 <FormControl isRequired isInvalid={!!errors.password}>
-                  <FormLabel fontSize="sm" fontWeight="500" color="gray.700">Mot de passe</FormLabel>
+                  <FormLabel fontSize="sm" fontWeight="500" color="gray.700">{t('auth.password')}</FormLabel>
                   <InputGroup size="lg">
                     <Input
                       name="password"
@@ -296,7 +298,7 @@ const Register = () => {
                 </FormControl>
 
                 <FormControl isRequired isInvalid={!!errors.password2}>
-                  <FormLabel fontSize="sm" fontWeight="500" color="gray.700">Confirmer le mot de passe</FormLabel>
+                  <FormLabel fontSize="sm" fontWeight="500" color="gray.700">{t('auth.confirmPassword')}</FormLabel>
                   <InputGroup size="lg">
                     <Input
                       name="password2"
@@ -325,7 +327,7 @@ const Register = () => {
                   fontSize="md"
                   fontWeight="600"
                   isLoading={isLoading}
-                  loadingText="Inscription..."
+                  loadingText={t('auth.registerLoading')}
                   bgGradient="linear(135deg, brand.500, brand.600)"
                   color="white"
                   _hover={{
@@ -336,14 +338,14 @@ const Register = () => {
                   _active={{ transform: 'translateY(0)' }}
                   w="full"
                 >
-                  S'inscrire
+                  {t('auth.registerButton')}
                 </Button>
               </Stack>
             </form>
 
             <VStack spacing={3} mt={6}>
               <Text fontSize="sm" color="gray.500">
-                Déjà un compte ?{' '}
+                {t('auth.hasAccount')}{' '}
                 <Link
                   as={RouterLink}
                   to="/login"
@@ -351,7 +353,7 @@ const Register = () => {
                   fontWeight="600"
                   _hover={{ color: 'brand.600', textDecoration: 'underline' }}
                 >
-                  Se connecter
+                  {t('auth.loginRedirect')}
                 </Link>
               </Text>
             </VStack>
