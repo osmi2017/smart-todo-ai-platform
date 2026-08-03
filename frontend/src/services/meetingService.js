@@ -120,6 +120,16 @@ export const useMeetingService = () => {
     }
   };
 
+  const updateActionItem = async (itemId, data) => {
+    try {
+      const response = await axiosInstance.patch(`/meeting-action-items/${itemId}/`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Error updating action item:', error);
+      throw error;
+    }
+  };
+
   const shareToSlack = async (meetingId, channelId) => {
     try {
       const response = await axiosInstance.post(
@@ -145,6 +155,59 @@ export const useMeetingService = () => {
     }
   };
 
+  const getChatMessages = async (meetingId) => {
+    try {
+      const response = await axiosInstance.get('/meeting-chat-messages/', {
+        params: { meeting: meetingId },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error loading chat messages:', error);
+      throw error;
+    }
+  };
+
+  const createChatMessage = async (meetingId, message, fileId = null) => {
+    try {
+      const response = await axiosInstance.post('/meeting-chat-messages/', {
+        meeting: meetingId,
+        message,
+        file: fileId,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error sending chat message:', error);
+      throw error;
+    }
+  };
+
+  const uploadChatFile = async (meetingId, file) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('meeting', meetingId);
+      const response = await axiosInstance.post('/files/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error uploading chat file:', error);
+      throw error;
+    }
+  };
+
+  const downloadChatFile = async (fileId) => {
+    try {
+      const response = await axiosInstance.get(`/files/${fileId}/download/`, {
+        responseType: 'blob',
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error downloading chat file:', error);
+      throw error;
+    }
+  };
+
   return {
     getMeetings,
     getMeeting,
@@ -156,7 +219,12 @@ export const useMeetingService = () => {
     addParticipant,
     removeParticipant,
     convertActionItem,
+    updateActionItem,
     shareToSlack,
     syncCalendar,
+    getChatMessages,
+    createChatMessage,
+    uploadChatFile,
+    downloadChatFile,
   };
 };

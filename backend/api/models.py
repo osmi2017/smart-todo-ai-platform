@@ -620,6 +620,25 @@ class MeetingActionItem(models.Model):
         return task
 
 
+class MeetingChatMessage(models.Model):
+    """Messages de chat persistés d'une réunion vidéo"""
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name='chat_messages')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='meeting_chat_messages')
+    message = models.TextField(blank=True)
+    file = models.ForeignKey('File', on_delete=models.SET_NULL, null=True, blank=True, related_name='chat_messages')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'meeting_chat_messages'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['meeting', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"Chat {self.user.username} -> {self.meeting.title}"
+
+
 def file_upload_path(instance, filename):
     return f'files/company_{instance.company_id}/{filename}'
 
@@ -634,6 +653,9 @@ class File(models.Model):
     size_bytes = models.BigIntegerField()
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='files')
     uploaded_by = models.ForeignKey('User', on_delete=models.CASCADE, related_name='uploaded_files')
+    meeting = models.ForeignKey(Meeting, on_delete=models.SET_NULL, null=True, blank=True, related_name='files')
+    mission = models.ForeignKey('Mission', on_delete=models.SET_NULL, null=True, blank=True, related_name='files')
+    category = models.CharField(max_length=30, blank=True, default='')
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -871,6 +893,7 @@ class Mission(models.Model):
     destination_name = models.CharField(max_length=255)
     destination_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     destination_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    distance_km = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     start_date = models.DateField()
     end_date = models.DateField(null=True, blank=True)

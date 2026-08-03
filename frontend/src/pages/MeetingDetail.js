@@ -11,16 +11,18 @@ import {
   Flex, IconButton, Tooltip, Progress,
   AlertDialog, AlertDialogOverlay, AlertDialogContent,
   AlertDialogHeader, AlertDialogBody, AlertDialogFooter,
-  Skeleton, SkeletonText,
+  Skeleton, SkeletonText, SimpleGrid, Stat, StatLabel, StatNumber,
+  Card, CardBody, Input, InputGroup, InputLeftElement,
 } from '@chakra-ui/react';
 import {
   FiMic, FiCpu, FiCheck, FiClock, FiAlertTriangle,
   FiArrowLeft, FiShare2, FiCalendar, FiUser, FiEdit2,
   FiPlay, FiXCircle, FiRefreshCw, FiFileText, FiTrash2,
-  FiExternalLink, FiVideo,
+  FiExternalLink, FiVideo, FiUsers, FiPlus, FiCopy, FiSearch,
 } from 'react-icons/fi';
 import { useMeetingService } from '../services/meetingService';
 import { useProjectService } from '../services/projectService';
+import { useAuth } from '../context/AuthContext';
 
 const priorityColors = { 1: 'gray', 2: 'blue', 3: 'orange', 4: 'red' };
 const priorityLabels = { 1: 'Low', 2: 'Medium', 3: 'High', 4: 'Critical' };
@@ -45,12 +47,20 @@ const MeetingDetail = () => {
   const [selectedProject, setSelectedProject] = useState('');
   const [convertingItemId, setConvertingItemId] = useState(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingItemId, setUpdatingItemId] = useState(null);
+  const [tabIndex, setTabIndex] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [addSearch, setAddSearch] = useState('');
+  const [addingParticipant, setAddingParticipant] = useState(false);
   const { isOpen: isConvertOpen, onOpen: onConvertOpen, onClose: onConvertClose } = useDisclosure();
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+  const { isOpen: isAddOpen, onOpen: onAddOpen, onClose: onAddClose } = useDisclosure();
   const deleteRef = React.useRef();
 
-  const { getMeeting, processMeeting, convertActionItem, updateMeeting, deleteMeeting } = useMeetingService();
+  const { getMeeting, processMeeting, convertActionItem, updateMeeting, deleteMeeting, updateActionItem, removeParticipant, addParticipant } = useMeetingService();
   const { getProjects } = useProjectService();
+  const { axiosInstance } = useAuth();
   const toast = useToast();
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
@@ -110,6 +120,101 @@ const MeetingDetail = () => {
       toast({ title: 'Error updating status', status: 'error', duration: 3000 });
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleActionItemStatusChange = async (item, newStatus) => {
+    if (newStatus === item.status) return;
+    setUpdatingItemId(item.id);
+    try {
+      await updateActionItem(item.id, { status: newStatus });
+      setMeeting(prev => ({
+        ...prev,
+        action_items: prev.action_items?.map(i =>
+          i.id === item.id ? { ...i, status: newStatus } : i
+        ),
+      }));
+    } catch (error) {
+      toast({ title: 'Error updating action item', status: 'error', duration: 3000 });
+    } finally {
+      setUpdatingItemId(null);
+    }
+  };
+
+  const handleRemoveParticipant = async (participant) => {
+    try {
+      await removeParticipant(id, participant.user);
+      setMeeting(prev => ({
+        ...prev,
+        participants: prev.participants?.filter(p => p.id !== participant.id),
+      }));
+      toast({ title: 'Participant removed', status: 'success', duration: 2000 });
+    } catch (error) {
+      toast({
+        title: 'Error removing participant',
+        description: error.response?.data?.error || 'Unknown error',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleActionItemPriorityChange = async (item, newPriority) => {
+    if (String(item.priority) === String(newPriority)) return;
+    setUpdatingItemId(item.id);
+    try {
+      await updateActionItem(item.id, { priority: parseInt(newPriority, 10) });
+      setMeeting(prev => ({
+        ...prev,
+        action_items: prev.action_items?.map(i =>
+          i.id === item.id ? { ...i, priority: parseInt(newPriority, 10) } : i
+        ),
+      }));
+    } catch (error) {
+      toast({ title: 'Error updating action item', status: 'error', duration: 3000 });
+    } finally {
+      setUpdatingItemId(null);
+    }
+  };
+
+  const openAddParticipant = async () => {
+    try {
+      const response = await axiosInstance.get('/users/');
+      setAvailableUsers(Array.isArray(response.data) ? response.data : response.data.results || []);
+    } catch (error) {
+      toast({ title: 'Unable to load users', status: 'error', duration: 3000 });
+    }
+    setAddSearch('');
+    onAddOpen();
+  };
+
+  const handleAddParticipant = async (user) => {
+    if (addingParticipant) return;
+    setAddingParticipant(true);
+    try {
+      await addParticipant(id, user.id);
+      toast({ title: 'Participant added', status: 'success', duration: 2000 });
+      await loadMeeting();
+      onAddClose();
+    } catch (error) {
+      toast({
+        title: 'Error adding participant',
+        description: error.response?.data?.error || 'Unknown error',
+        status: 'error',
+        duration: 3000,
+      });
+    } finally {
+      setAddingParticipant(false);
+    }
+  };
+
+  const copySummary = async () => {
+    try {
+      await navigator.clipboard.writeText(meeting.summary?.summary_text || '');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      // clipboard unavailable
     }
   };
 
@@ -176,6 +281,44 @@ const MeetingDetail = () => {
   const actionItemsCount = meeting.action_items?.length || 0;
   const completedItems = meeting.action_items?.filter(i => i.status === 'completed').length || 0;
 
+  const participantUserIds = new Set((meeting.participants || []).map(p => p.user));
+  const availableToAdd = availableUsers.filter(u => !participantUserIds.has(u.id)).filter(u => {
+    if (!addSearch.trim()) return true;
+    const q = addSearch.trim().toLowerCase();
+    return (u.username || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.first_name || '').toLowerCase().includes(q);
+  });
+
+  const kpiCards = [
+    {
+      label: 'Scheduled',
+      value: meeting.scheduled_at ? new Date(meeting.scheduled_at).toLocaleDateString() : '—',
+      icon: FiCalendar,
+      color: 'blue.500',
+    },
+    {
+      label: 'Participants',
+      value: meeting.participants_count || 0,
+      icon: FiUsers,
+      color: 'green.500',
+      onClick: () => setTabIndex(3),
+    },
+    {
+      label: 'Action Items',
+      value: actionItemsCount > 0 ? `${completedItems}/${actionItemsCount}` : '0',
+      icon: FiCheck,
+      color: 'orange.500',
+      onClick: () => setTabIndex(1),
+    },
+    {
+      label: 'Duration',
+      value: meeting.duration_minutes ? `${meeting.duration_minutes} min` : '—',
+      icon: FiClock,
+      color: 'purple.500',
+    },
+  ];
+
   return (
     <Box>
       <Button leftIcon={<FiArrowLeft />} variant="ghost" mb={4} onClick={() => navigate('/meetings')}>
@@ -192,6 +335,15 @@ const MeetingDetail = () => {
               {meeting.description && <Text color="gray.500" fontSize="md">{meeting.description}</Text>}
             </VStack>
             <HStack spacing={2}>
+              <Tooltip label="Refresh">
+                <IconButton
+                  icon={<FiRefreshCw />}
+                  variant="ghost"
+                  size="sm"
+                  onClick={loadMeeting}
+                  aria-label="Refresh meeting"
+                />
+              </Tooltip>
               {(meeting.status === 'scheduled' || meeting.status === 'in_progress') && (
                 <Button
                   as={RouterLink}
@@ -348,6 +500,26 @@ const MeetingDetail = () => {
         )}
       </Box>
 
+      {/* KPIs cliquables */}
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={6}>
+        {kpiCards.map(card => (
+          <Card
+            key={card.label}
+            onClick={card.onClick}
+            cursor={card.onClick ? 'pointer' : 'default'}
+            _hover={card.onClick ? { shadow: 'md', transform: 'translateY(-2px)' } : undefined}
+            transition="all 0.2s"
+          >
+            <CardBody>
+              <Stat>
+                <StatLabel>{card.label}</StatLabel>
+                <StatNumber color={card.color}>{card.value}</StatNumber>
+              </Stat>
+            </CardBody>
+          </Card>
+        ))}
+      </SimpleGrid>
+
       {/* Action Items Progress (shown if there are items) */}
       {actionItemsCount > 0 && (
         <Box bg={bgColor} borderRadius="xl" shadow="sm" borderWidth="1px" borderColor={borderColor} p={4} mb={6}>
@@ -366,7 +538,7 @@ const MeetingDetail = () => {
 
       {/* Tabs */}
       <Box bg={bgColor} borderRadius="xl" shadow="sm" borderWidth="1px" borderColor={borderColor} overflow="hidden">
-        <Tabs colorScheme="blue">
+        <Tabs colorScheme="blue" index={tabIndex} onChange={setTabIndex}>
           <TabList px={4}>
             <Tab>Summary</Tab>
             <Tab>
@@ -390,7 +562,17 @@ const MeetingDetail = () => {
               {meeting.summary ? (
                 <VStack spacing={6} align="stretch">
                   <Box>
-                    <Heading size="sm" mb={3}>Summary</Heading>
+                    <Flex justify="space-between" align="center" mb={3}>
+                      <Heading size="sm">Summary</Heading>
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        leftIcon={<FiCopy />}
+                        onClick={copySummary}
+                      >
+                        {copied ? 'Copied!' : 'Copy'}
+                      </Button>
+                    </Flex>
                     <Text whiteSpace="pre-wrap" lineHeight="tall">{meeting.summary.summary_text}</Text>
                     <Text fontSize="xs" color="gray.400" mt={3}>
                       Generated by {meeting.summary.model_used} on {new Date(meeting.summary.generated_at).toLocaleString()}
@@ -477,9 +659,33 @@ const MeetingDetail = () => {
                             <Badge colorScheme={priorityColors[item.priority]} size="sm">
                               {priorityLabels[item.priority]}
                             </Badge>
-                            <Badge colorScheme={actionItemStatusColors[item.status]} size="sm">
-                              {item.status}
-                            </Badge>
+                            <Select
+                              size="xs"
+                              variant="filled"
+                              width="auto"
+                              value={String(item.priority)}
+                              isLoading={updatingItemId === item.id}
+                              onChange={(e) => handleActionItemPriorityChange(item, e.target.value)}
+                            >
+                              <option value="1">Low</option>
+                              <option value="2">Medium</option>
+                              <option value="3">High</option>
+                              <option value="4">Critical</option>
+                            </Select>
+                            <Select
+                              size="xs"
+                              variant="filled"
+                              width="auto"
+                              value={item.status}
+                              colorScheme={actionItemStatusColors[item.status]}
+                              isLoading={updatingItemId === item.id}
+                              onChange={(e) => handleActionItemStatusChange(item, e.target.value)}
+                            >
+                              <option value="pending">pending</option>
+                              <option value="in_progress">in_progress</option>
+                              <option value="completed">completed</option>
+                              <option value="cancelled">cancelled</option>
+                            </Select>
                           </HStack>
                           {item.description && <Text fontSize="sm" color="gray.500">{item.description}</Text>}
                           <HStack fontSize="xs" color="gray.400" spacing={4} flexWrap="wrap">
@@ -502,7 +708,14 @@ const MeetingDetail = () => {
                             Convert to Task
                           </Button>
                         ) : (
-                          <Tag colorScheme="green" size="md">
+                          <Tag
+                            as={RouterLink}
+                            to={`/tasks/${item.linked_task_id}`}
+                            colorScheme="green"
+                            size="md"
+                            cursor="pointer"
+                            _hover={{ textDecoration: 'underline' }}
+                          >
                             <TagLabel>Linked to Task #{item.linked_task_id}</TagLabel>
                           </Tag>
                         )}
@@ -571,6 +784,18 @@ const MeetingDetail = () => {
 
             {/* Participants Tab */}
             <TabPanel>
+              <Flex justify="space-between" align="center" mb={4}>
+                <Text fontWeight="600" fontSize="sm">Participants</Text>
+                <Button
+                  size="xs"
+                  colorScheme="blue"
+                  variant="outline"
+                  leftIcon={<FiPlus />}
+                  onClick={openAddParticipant}
+                >
+                  Add participant
+                </Button>
+              </Flex>
               {meeting.participants?.length > 0 ? (
                 <VStack spacing={2} align="stretch">
                   {meeting.participants.map(p => (
@@ -593,6 +818,18 @@ const MeetingDetail = () => {
                       <HStack>
                         <Badge textTransform="capitalize">{p.role}</Badge>
                         {p.attended && <Badge colorScheme="green">Attended</Badge>}
+                        {p.role !== 'organizer' && (
+                          <Tooltip label="Remove participant">
+                            <IconButton
+                              icon={<FiXCircle />}
+                              variant="ghost"
+                              size="sm"
+                              colorScheme="red"
+                              aria-label="Remove participant"
+                              onClick={() => handleRemoveParticipant(p)}
+                            />
+                          </Tooltip>
+                        )}
                       </HStack>
                     </Flex>
                   ))}
@@ -632,6 +869,65 @@ const MeetingDetail = () => {
             <Button colorScheme="blue" onClick={handleConvertItem} isDisabled={!selectedProject}>
               Convert
             </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Add Participant Modal */}
+      <Modal isOpen={isAddOpen} onClose={onAddClose}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Add Participant</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <InputGroup mb={3}>
+              <InputLeftElement pointerEvents="none">
+                <Icon as={FiSearch} color="gray.400" />
+              </InputLeftElement>
+              <Input
+                placeholder="Search by name or email"
+                value={addSearch}
+                onChange={(e) => setAddSearch(e.target.value)}
+              />
+            </InputGroup>
+            <VStack spacing={2} align="stretch" maxH="60vh" overflowY="auto">
+              {availableToAdd.length === 0 ? (
+                <Text color="gray.400" textAlign="center" py={6}>
+                  {availableUsers.length === 0 ? 'No users available.' : 'No matching users.'}
+                </Text>
+              ) : (
+                availableToAdd.map(user => (
+                  <Flex
+                    key={user.id}
+                    p={3}
+                    borderRadius="lg"
+                    borderWidth="1px"
+                    borderColor={borderColor}
+                    justify="space-between"
+                    align="center"
+                  >
+                    <HStack>
+                      <Icon as={FiUser} color="gray.400" />
+                      <Box>
+                        <Text fontWeight="500">{user.first_name || user.last_name ? `${user.first_name} ${user.last_name}`.trim() : user.username}</Text>
+                        <Text fontSize="xs" color="gray.500">{user.email}</Text>
+                      </Box>
+                    </HStack>
+                    <Button
+                      size="xs"
+                      colorScheme="blue"
+                      isLoading={addingParticipant}
+                      onClick={() => handleAddParticipant(user)}
+                    >
+                      Add
+                    </Button>
+                  </Flex>
+                ))
+              )}
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" onClick={onAddClose}>Close</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>

@@ -12,11 +12,20 @@ import {
 import {
   FiPlus, FiEdit2, FiTrash2, FiDownload, FiShare2, FiEye,
   FiFile, FiImage, FiVideo, FiFileText, FiSearch, FiMoreVertical,
-  FiUpload, FiX,
+  FiUpload, FiX, FiRefreshCw,
 } from 'react-icons/fi';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import EmptyState from '../components/EmptyState';
+import PageGuide from '../components/PageGuide';
+import { FiFolder } from 'react-icons/fi';
+
+const FILES_STEPS = [
+  { key: 'overview', icon: FiFolder },
+  { key: 'upload', icon: FiUpload },
+  { key: 'organize', icon: FiFileText },
+];
 
 const Files = () => {
   const toast = useToast();
@@ -46,8 +55,8 @@ const Files = () => {
 
   const locale = i18n.language === 'fr' ? 'fr-FR' : 'en-US';
 
-  // Fetch files
-  const { data: filesData = [], isLoading: filesLoading } = useQuery(
+  // Fetch files (auto-refresh so the page stays up to date without a manual reload)
+  const { data: filesData = [], isLoading: filesLoading, refetch: refetchFiles, isFetching } = useQuery(
     ['files', searchQuery],
     async () => {
       const params = {};
@@ -55,15 +64,17 @@ const Files = () => {
       const res = await axiosInstance.get('/files/', { params });
       return res.data;
     },
+    { refetchInterval: 10000 },
   );
 
   // Fetch storage info
-  const { data: storageInfo } = useQuery(
+  const { data: storageInfo, refetch: refetchStorage } = useQuery(
     'storage-info',
     async () => {
       const res = await axiosInstance.get('/files/storage_info/');
       return res.data;
     },
+    { refetchInterval: 30000 },
   );
 
   // Fetch users for sharing
@@ -395,6 +406,14 @@ const Files = () => {
           </Badge>
         )}
 
+        <Button
+          leftIcon={<FiRefreshCw />}
+          variant="outline"
+          onClick={() => { refetchFiles(); refetchStorage(); }}
+          isLoading={isFetching}
+        >
+          {t('common.refresh')}
+        </Button>
         <Button leftIcon={<FiUpload />} colorScheme="blue" onClick={onUploadOpen}>
           {t('files.uploadFile')}
         </Button>
@@ -414,10 +433,15 @@ const Files = () => {
 
       {/* Files table */}
       {files.length === 0 ? (
-        <Alert status="info" borderRadius="md">
-          <AlertIcon />
-          {t('files.noFiles')}
-        </Alert>
+        <EmptyState
+          icon={FiUpload}
+          iconBg="brand.50"
+          iconColor="brand.300"
+          message={t('files.noFiles')}
+          description={t('files.emptyDescription')}
+          actionLabel={t('files.uploadFile')}
+          onAction={onUploadOpen}
+        />
       ) : (
         <Table variant="simple">
           <Thead>
@@ -436,7 +460,12 @@ const Files = () => {
               const FileIcon = getFileIcon(file.mime_type);
               const perms = file.user_permissions || {};
               return (
-                <Tr key={file.id}>
+                <Tr
+                  key={file.id}
+                  _hover={{ bg: 'gray.50' }}
+                  cursor="default"
+                  transition="background 0.2s"
+                >
                   <Td>
                     <HStack>
                       <FileIcon />
@@ -737,6 +766,11 @@ const Files = () => {
           </ModalFooter>
         </ModalContent>
       </Modal>
+      <PageGuide
+        guideId="files"
+        i18nPrefix="pageGuides.files"
+        steps={FILES_STEPS}
+      />
     </Box>
   );
 };

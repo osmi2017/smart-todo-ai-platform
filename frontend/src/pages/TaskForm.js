@@ -40,6 +40,8 @@ const TaskForm = () => {
   const [searchParams] = useSearchParams();
   const { id } = useParams(); // Pour l'édition
   const projectIdFromUrl = searchParams.get('project');
+  const statusFromUrl = searchParams.get('status');
+  const milestoneFromUrl = searchParams.get('milestone');
   
   const navigate = useNavigate();
   const toast = useToast();
@@ -50,11 +52,11 @@ const TaskForm = () => {
     title: '',
     description: '',
     priority: 2,
-    status: 'todo',
+    status: statusFromUrl || 'todo',
     deadline: '',
     estimated_time: '',
     project: projectIdFromUrl || '',
-    milestone: '',
+    milestone: milestoneFromUrl || '',
     assigned_to: '',
     tags: [],
     checklist: [],

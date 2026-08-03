@@ -140,5 +140,6 @@ export const useKanbanService = () => {
     },
     updateTaskStatus: service.updateTaskStatus,
     updateTaskOrder: service.updateTaskOrder,
+    removeTask: service.remove,
   };
 };

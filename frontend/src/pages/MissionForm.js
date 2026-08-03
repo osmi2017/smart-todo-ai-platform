@@ -8,15 +8,17 @@ import {
   Skeleton, Tag, TagLabel, TagCloseButton, Wrap, WrapItem,
   Divider, Flex, Spinner, Avatar, Icon, Badge,
   NumberInput, NumberInputField, NumberInputStepper, NumberIncrementStepper, NumberDecrementStepper,
+  Alert, AlertIcon,
 } from '@chakra-ui/react';
 import {
   FiArrowLeft, FiSave, FiPlus, FiMapPin, FiDollarSign,
-  FiUsers, FiTrash2, FiExternalLink, FiLink,
+  FiUsers, FiTrash2, FiExternalLink, FiLink, FiCalendar,
 } from 'react-icons/fi';
 import { useMissionService } from '../services/missionService';
 import { useCrudService } from '../utils/createCrudService';
 import { useAuth } from '../context/AuthContext';
 import LocationSearch from '../components/LocationSearch';
+import SearchableSelect from '../components/SearchableSelect';
 
 const MissionForm = () => {
   const { t } = useTranslation();
@@ -49,6 +51,7 @@ const MissionForm = () => {
     destination_name: '',
     destination_lat: null,
     destination_lng: null,
+    distance_km: null,
     start_date: '',
     end_date: '',
     cost_per_diem: 0,
@@ -153,6 +156,7 @@ const MissionForm = () => {
         destination_name: data.destination_name || '',
         destination_lat: data.destination_lat ? parseFloat(data.destination_lat) : null,
         destination_lng: data.destination_lng ? parseFloat(data.destination_lng) : null,
+        distance_km: data.distance_km ? parseFloat(data.distance_km) : null,
         start_date: data.start_date || '',
         end_date: data.end_date || '',
         cost_per_diem: data.cost_per_diem || 0,
@@ -216,6 +220,24 @@ const MissionForm = () => {
     );
   };
 
+  const missionDays = (() => {
+    if (formData.start_date && formData.end_date) {
+      const start = new Date(formData.start_date);
+      const end = new Date(formData.end_date);
+      if (!isNaN(start) && !isNaN(end) && end >= start) {
+        return Math.round((end - start) / 86400000) + 1;
+      }
+    }
+    return 1;
+  })();
+  const accomDays = Math.max(missionDays - 1, 0);
+  const perDiemTotal = (parseFloat(formData.cost_per_diem) || 0) * missionDays;
+  const accomTotal = (parseFloat(formData.cost_accommodation) || 0) * accomDays;
+  const transportTotal = parseFloat(formData.cost_transport) || 0;
+  const otherTotal = parseFloat(formData.cost_other) || 0;
+  const estimatedTotal = perDiemTotal + accomTotal + transportTotal + otherTotal;
+  const currencyCode = formData.currency.toUpperCase();
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) {
@@ -228,6 +250,10 @@ const MissionForm = () => {
     }
     if (!formData.start_date) {
       toast({ title: t('missions.form.startDateRequired'), status: 'warning', duration: 2000 });
+      return;
+    }
+    if (formData.end_date && new Date(formData.end_date) < new Date(formData.start_date)) {
+      toast({ title: t('missions.form.dateRangeInvalid'), status: 'warning', duration: 3000 });
       return;
     }
     if (selectedMemberIds.length === 0) {
@@ -245,6 +271,7 @@ const MissionForm = () => {
         ...formData,
         destination_lat: formData.destination_lat != null ? parseFloat(formData.destination_lat) : null,
         destination_lng: formData.destination_lng != null ? parseFloat(formData.destination_lng) : null,
+        distance_km: destinationDistance != null ? parseFloat(destinationDistance) : (formData.distance_km || null),
         member_ids: selectedMemberIds,
         leader_id: parseInt(selectedLeaderId),
         tasks: selectedTaskIds,
@@ -374,7 +401,10 @@ const MissionForm = () => {
               {formData.project && (
                 <>
                   <FormControl>
-                    <FormLabel>{t('missions.form.associatedTasks')}</FormLabel>
+                    <FormLabel>
+                      {t('missions.form.associatedTasks')}
+                      {selectedTaskIds.length > 0 && <Badge ml={2} colorScheme="blue">{selectedTaskIds.length}</Badge>}
+                    </FormLabel>
                     {loadingLinked ? (
                       <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">{t('common.loading')}</Text></HStack>
                     ) : projectTasks.length > 0 ? (
@@ -402,7 +432,10 @@ const MissionForm = () => {
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>{t('missions.form.associatedMilestones')}</FormLabel>
+                    <FormLabel>
+                      {t('missions.form.associatedMilestones')}
+                      {selectedMilestoneIds.length > 0 && <Badge ml={2} colorScheme="purple">{selectedMilestoneIds.length}</Badge>}
+                    </FormLabel>
                     {loadingLinked ? (
                       <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">{t('common.loading')}</Text></HStack>
                     ) : projectMilestones.length > 0 ? (
@@ -492,7 +525,14 @@ const MissionForm = () => {
               {/* Dates */}
               <Divider />
               <Heading size="sm" color="gray.600" textTransform="uppercase" letterSpacing="wider">
-                <HStack><Icon as={FiUsers} /> {t('missions.form.dates')}</HStack>
+                <HStack>
+                  <Icon as={FiCalendar} /> {t('missions.form.dates')}
+                  {formData.start_date && (
+                    <Badge colorScheme="teal" borderRadius="full">
+                      {missionDays} {t('missions.days')}{missionDays > 1 ? t('missions.daysPlural') : ''}
+                    </Badge>
+                  )}
+                </HStack>
               </Heading>
 
               <HStack spacing={4}>
@@ -519,7 +559,10 @@ const MissionForm = () => {
               {/* Membres */}
               <Divider />
               <Heading size="sm" color="gray.600" textTransform="uppercase" letterSpacing="wider">
-                <HStack><Icon as={FiUsers} /> {t('missions.form.team')}</HStack>
+                <HStack>
+                  <Icon as={FiUsers} /> {t('missions.form.team')}
+                  {selectedMemberIds.length > 0 && <Badge colorScheme="blue" borderRadius="full">{selectedMemberIds.length}</Badge>}
+                </HStack>
               </Heading>
 
               <FormControl>
@@ -599,22 +642,23 @@ const MissionForm = () => {
                 {loadingCurrencies ? (
                   <HStack><Spinner size="sm" /><Text fontSize="sm" color="gray.500">{t('missions.form.loadingCurrencies')}</Text></HStack>
                 ) : (
-                  <Select
+                  <SearchableSelect
                     value={formData.currency}
-                    onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
-                  >
-                    {Object.entries(currencies).map(([code, name]) => (
-                      <option key={code} value={code}>
-                        {code.toUpperCase()} — {Array.isArray(name) ? name[0] : name}
-                      </option>
-                    ))}
-                  </Select>
+                    onChange={(val) => setFormData(prev => ({ ...prev, currency: val }))}
+                    options={Object.entries(currencies).map(([code, name]) => ({
+                      value: code,
+                      label: `${code.toUpperCase()} — ${Array.isArray(name) ? name[0] : name}`,
+                    }))}
+                    placeholder={t('missions.form.currency')}
+                    searchPlaceholder={t('missions.form.selectCurrency')}
+                    emptyMessage={t('missions.form.noResults')}
+                  />
                 )}
               </FormControl>
 
               <HStack spacing={4} flexWrap="wrap">
                 <FormControl>
-                  <FormLabel>{t('missions.form.allowance')} ({formData.currency.toUpperCase()}/jour)</FormLabel>
+                  <FormLabel>{t('missions.form.allowance')} ({formData.currency.toUpperCase()} / {t('missions.form.perDay')})</FormLabel>
                   <NumberInput
                     value={formData.cost_per_diem}
                     onChange={(val) => setFormData(prev => ({ ...prev, cost_per_diem: parseFloat(val) || 0 }))}
@@ -672,6 +716,35 @@ const MissionForm = () => {
                   </NumberInput>
                 </FormControl>
               </HStack>
+
+              <Alert status="info" borderRadius="md" fontSize="sm" flexDirection="column" alignItems="stretch" py={3}>
+                <AlertIcon alignSelf="flex-start" />
+                <VStack spacing={1.5} align="stretch" w="full" mt={1}>
+                  <Flex justify="space-between">
+                    <Text>{t('missions.form.allowance')} × {missionDays} {t('missions.days')}{missionDays > 1 ? t('missions.daysPlural') : ''}</Text>
+                    <Text fontWeight="600">{perDiemTotal.toLocaleString()} {currencyCode}</Text>
+                  </Flex>
+                  <Flex justify="space-between">
+                    <Text>{t('missions.form.housing')} × {accomDays} {t('missions.days')}{accomDays > 1 ? t('missions.daysPlural') : ''}</Text>
+                    <Text fontWeight="600">{accomTotal.toLocaleString()} {currencyCode}</Text>
+                  </Flex>
+                  <Flex justify="space-between">
+                    <Text>{t('missions.form.transport')}</Text>
+                    <Text fontWeight="600">{transportTotal.toLocaleString()} {currencyCode}</Text>
+                  </Flex>
+                  <Flex justify="space-between">
+                    <Text>{t('missions.form.otherExpenses')}</Text>
+                    <Text fontWeight="600">{otherTotal.toLocaleString()} {currencyCode}</Text>
+                  </Flex>
+                  <Divider />
+                  <Flex justify="space-between">
+                    <Text fontWeight="700">{t('missions.form.total')}</Text>
+                    <Text fontWeight="700" color="blue.600">
+                      {estimatedTotal.toLocaleString()} {currencyCode}
+                    </Text>
+                  </Flex>
+                </VStack>
+              </Alert>
 
               {/* Rapports */}
               <Divider />

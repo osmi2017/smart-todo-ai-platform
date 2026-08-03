@@ -8,8 +8,9 @@ from rest_framework import viewsets, status, filters, permissions
 from rest_framework.decorators import action
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
+from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import File, FileShare, StorageNotification, CompanyGroup, User
+from .models import File, FileShare, StorageNotification, CompanyGroup, User, Meeting, Mission
 from .serializers import (
     FileSerializer, FileDetailSerializer, StorageNotificationSerializer,
 )
@@ -24,7 +25,8 @@ class FileViewSet(viewsets.ModelViewSet):
     serializer_class = FileSerializer
     permission_classes = [permissions.IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['meeting', 'mission', 'category']
     search_fields = ['name', 'description']
     ordering_fields = ['name', 'created_at', 'size_bytes']
 
@@ -39,14 +41,23 @@ class FileViewSet(viewsets.ModelViewSet):
             return File.objects.all()
         if not user.company:
             return File.objects.none()
+        # Meeting-attached files are only accessible to the meeting's
+        # organizer/participants (and whoever uploaded them).
+        meeting_access = Q(meeting__organizer=user) | Q(meeting__participants__user=user)
+        # Mission-attached files are accessible to the mission's members/leader.
+        mission_access = Q(mission__members__user=user)
         if user.role == 'admin':
-            return File.objects.filter(company=user.company)
+            return File.objects.filter(company=user.company).filter(
+                Q(meeting__isnull=True) | Q(uploaded_by=user) | meeting_access | mission_access
+            ).distinct()
         user_groups = user.company_groups.all()
-        return File.objects.filter(
+        return File.objects.filter(company=user.company).filter(
             Q(uploaded_by=user) |
             Q(shares__shared_with_user=user) |
-            Q(shares__shared_with_group__in=user_groups)
-        ).filter(company=user.company).distinct()
+            Q(shares__shared_with_group__in=user_groups) |
+            meeting_access |
+            mission_access
+        ).distinct()
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
@@ -81,6 +92,47 @@ class FileViewSet(viewsets.ModelViewSet):
         mime_type = uploaded_file.content_type or mimetypes.guess_type(uploaded_file.name)[0] or 'application/octet-stream'
         name = request.data.get('name') or uploaded_file.name
 
+        meeting = None
+        meeting_id = request.data.get('meeting')
+        if meeting_id:
+            try:
+                meeting = Meeting.objects.get(id=meeting_id)
+            except Meeting.DoesNotExist:
+                return Response(
+                    {'error': 'Réunion non trouvée.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            if not meeting.participants.filter(user=user).exists() and meeting.organizer != user:
+                return Response(
+                    {'error': 'Seuls les participants de la réunion peuvent y joindre des fichiers.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        mission = None
+        mission_id = request.data.get('mission')
+        if mission_id:
+            try:
+                mission = Mission.objects.get(id=mission_id)
+            except Mission.DoesNotExist:
+                return Response(
+                    {'error': 'Mission non trouvée.'},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            is_mission_member = (
+                mission.members.filter(user=user).exists()
+                or mission.created_by == user
+                or user.role == 'superadmin'
+            )
+            if not is_mission_member and not (
+                user.role == 'admin' and user.company and mission.company_id == user.company_id
+            ):
+                return Response(
+                    {'error': 'Seuls les membres de la mission peuvent y joindre des fichiers.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        category = request.data.get('category', '')
+
         file_obj = File.objects.create(
             name=name,
             file=uploaded_file,
@@ -88,6 +140,9 @@ class FileViewSet(viewsets.ModelViewSet):
             size_bytes=file_size,
             company=company,
             uploaded_by=user,
+            meeting=meeting,
+            mission=mission,
+            category=category,
             description=request.data.get('description', ''),
         )
 

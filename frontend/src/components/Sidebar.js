@@ -41,12 +41,14 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { useQuery } from 'react-query';
 import { useTaskService } from '../services/taskService';
+import { useProjectService } from '../services/projectService';
 
 const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
   const location = useLocation();
   const { t } = useTranslation();
   const { user, isAdmin, isSuperAdmin, company } = useAuth();
   const taskService = useTaskService();
+  const projectService = useProjectService();
   const bgColor = useColorModeValue('white', 'gray.900');
   const borderColor = useColorModeValue('gray.100', 'gray.800');
   const hoverBg = useColorModeValue('gray.50', 'gray.800');
@@ -61,6 +63,13 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
     { staleTime: 2 * 60 * 1000 }
   );
   const taskCount = Array.isArray(tasks) ? tasks.length : (tasks?.results?.length || 0);
+
+  const { data: projects } = useQuery(
+    'sidebar-project-count',
+    () => projectService.getProjects(),
+    { staleTime: 2 * 60 * 1000 }
+  );
+  const projectCount = Array.isArray(projects) ? projects.length : (projects?.results?.length || 0);
 
   const menuItems = [
     { path: '/dashboard', name: t('sidebar.dashboard'), icon: FiHome },
@@ -185,6 +194,17 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
                   {taskCount > 99 ? '99+' : taskCount}
                 </Badge>
               )}
+              {!collapsed && item.path === '/projects' && projectCount > 0 && (
+                <Badge
+                  colorScheme="blue"
+                  ml="auto"
+                  borderRadius="full"
+                  fontSize="xs"
+                  px={2}
+                >
+                  {projectCount > 99 ? '99+' : projectCount}
+                </Badge>
+              )}
             </HStack>
           );
 
@@ -242,6 +262,7 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
   return (
     <Box
       as="aside"
+      data-onboard="sidebar"
       position="fixed"
       left={0}
       top={0}

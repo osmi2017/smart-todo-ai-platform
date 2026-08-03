@@ -30,6 +30,7 @@ import {
   TagLabel,
   TagLeftIcon,
   Tooltip,
+  IconButton,
 } from '@chakra-ui/react';
 import {
   FiClock,
@@ -45,11 +46,23 @@ import {
   FiMic,
   FiPlay,
   FiPlus,
+  FiRefreshCw,
+  FiChevronRight,
 } from 'react-icons/fi';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useQuery } from 'react-query';
 import { useStatsService } from '../services/statsService';
 import { useMeetingService } from '../services/meetingService';
+import { useMissionService } from '../services/missionService';
+import GetStartedChecklist from '../components/GetStartedChecklist';
+import PageGuide from '../components/PageGuide';
+import { FiHome, FiCheckSquare, FiZap } from 'react-icons/fi';
+
+const DASHBOARD_STEPS = [
+  { key: 'overview', icon: FiHome },
+  { key: 'checklist', icon: FiCheckSquare },
+  { key: 'quickAccess', icon: FiZap },
+];
 import { format, formatDistance } from 'date-fns';
 import { fr as frLocale, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
@@ -78,9 +91,12 @@ import {
 const Dashboard = () => {
   const { t, i18n } = useTranslation();
   const [timeRange, setTimeRange] = useState('week');
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const navigate = useNavigate();
   const statsService = useStatsService();
   const { getMeetings } = useMeetingService();
-  const { user, token } = useAuth();
+  const { user, token, axiosInstance } = useAuth();
+  const { getMissions } = useMissionService();
   const cardBg = useColorModeValue('white', 'gray.700');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
 
@@ -99,18 +115,47 @@ const Dashboard = () => {
       try {
         const data = await getMeetings();
         const list = Array.isArray(data) ? data : data.results || [];
-        return list.slice(0, 5);
+        return { recent: list.slice(0, 5), total: list.length };
       } catch {
-        return [];
+        return { recent: [], total: 0 };
       }
     },
     { refetchInterval: 60000 }
   );
-  const recentMeetings = meetingsData || [];
+  const recentMeetings = meetingsData?.recent || [];
+  const meetingsTotal = meetingsData?.total || 0;
+
+  const { data: missionsTotal = 0 } = useQuery(
+    'dashboard-missions-count',
+    async () => {
+      try {
+        const data = await getMissions();
+        return Array.isArray(data) ? data.length : (data?.results?.length || 0);
+      } catch {
+        return 0;
+      }
+    },
+    { staleTime: 5 * 60 * 1000 }
+  );
+
+  const { data: filesTotal = 0 } = useQuery(
+    'dashboard-files-count',
+    async () => {
+      try {
+        const res = await axiosInstance.get('/files/');
+        const data = res.data;
+        return Array.isArray(data) ? data.length : (data?.results?.length || 0);
+      } catch {
+        return 0;
+      }
+    },
+    { staleTime: 5 * 60 * 1000 }
+  );
 
   const handleRefresh = useCallback((reason) => {
     refetch();
     refetchMeetings();
+    setLastUpdated(new Date());
   }, [refetch, refetchMeetings]);
 
   useDashboardSocket(token, handleRefresh);
@@ -135,19 +180,36 @@ const Dashboard = () => {
     project_progress: Array.isArray(stats?.project_progress) ? stats.project_progress : [],
   };
 
+  const GETSTARTED_DISMISS_KEY = 'smarttodo_getstarted_dismissed_v1';
+  const [getStartedDismissed, setGetStartedDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(GETSTARTED_DISMISS_KEY) === '1';
+    } catch (e) {
+      return false;
+    }
+  });
+  const dismissGetStarted = () => {
+    try {
+      localStorage.setItem(GETSTARTED_DISMISS_KEY, '1');
+    } catch (e) {
+      // ignore
+    }
+    setGetStartedDismissed(true);
+  };
+
   const priorityData = [
-    { name: t('common.low'), value: Number(safeStats.tasks_by_priority.low) || 0, color: '#718096' },
-    { name: t('common.medium'), value: Number(safeStats.tasks_by_priority.medium) || 0, color: '#4299E1' },
-    { name: t('common.high'), value: Number(safeStats.tasks_by_priority.high) || 0, color: '#ED8936' },
-    { name: t('common.critical'), value: Number(safeStats.tasks_by_priority.critical) || 0, color: '#F56565' },
+    { name: t('common.low'), value: Number(safeStats.tasks_by_priority.low) || 0, color: '#718096', priority: 1 },
+    { name: t('common.medium'), value: Number(safeStats.tasks_by_priority.medium) || 0, color: '#4299E1', priority: 2 },
+    { name: t('common.high'), value: Number(safeStats.tasks_by_priority.high) || 0, color: '#ED8936', priority: 3 },
+    { name: t('common.critical'), value: Number(safeStats.tasks_by_priority.critical) || 0, color: '#F56565', priority: 4 },
   ].filter(item => item.value > 0);
 
   const statusData = [
-    { name: t('common.todo'), value: Number(safeStats.tasks_by_status.todo) || 0, color: '#A0AEC0' },
-    { name: t('common.inProgress'), value: Number(safeStats.tasks_by_status.in_progress) || 0, color: '#4299E1' },
-    { name: t('common.review'), value: Number(safeStats.tasks_by_status.review) || 0, color: '#9F7AEA' },
-    { name: t('common.blocked'), value: Number(safeStats.tasks_by_status.blocked) || 0, color: '#F56565' },
-    { name: t('common.completed'), value: Number(safeStats.tasks_by_status.completed) || 0, color: '#48BB78' },
+    { name: t('common.todo'), value: Number(safeStats.tasks_by_status.todo) || 0, color: '#A0AEC0', status: 'todo' },
+    { name: t('common.inProgress'), value: Number(safeStats.tasks_by_status.in_progress) || 0, color: '#4299E1', status: 'in_progress' },
+    { name: t('common.review'), value: Number(safeStats.tasks_by_status.review) || 0, color: '#9F7AEA', status: 'review' },
+    { name: t('common.blocked'), value: Number(safeStats.tasks_by_status.blocked) || 0, color: '#F56565', status: 'blocked' },
+    { name: t('common.completed'), value: Number(safeStats.tasks_by_status.completed) || 0, color: '#48BB78', status: 'completed' },
   ].filter(item => item.value > 0);
 
   if (isLoading) {
@@ -180,9 +242,23 @@ const Dashboard = () => {
 
   return (
     <Box>
-      <Flex justify="space-between" align="center" mb={6}>
+      <Flex justify="space-between" align="center" mb={6} wrap="wrap" gap={3}>
         <Heading size="lg">{t('dashboard.title')}</Heading>
         <HStack spacing={2}>
+          <Tooltip
+            label={`${t('common.lastUpdate')} ${format(lastUpdated, 'HH:mm:ss')}`}
+            hasArrow
+          >
+            <IconButton
+              size="sm"
+              variant="ghost"
+              aria-label={t('common.refresh')}
+              icon={<FiRefreshCw />}
+              onClick={() => handleRefresh('manual')}
+              _active={{ transform: 'rotate(180deg)' }}
+              transition="all 0.3s"
+            />
+          </Tooltip>
           <Button
             size="sm"
             variant={timeRange === 'week' ? 'solid' : 'ghost'}
@@ -210,14 +286,38 @@ const Dashboard = () => {
         </HStack>
       </Flex>
 
+      {!getStartedDismissed && (
+        <GetStartedChecklist
+          counts={{
+            projects: safeStats.total_projects,
+            tasks: safeStats.total_tasks,
+            meetings: meetingsTotal,
+            missions: missionsTotal,
+            files: filesTotal,
+          }}
+          onDismiss={dismissGetStarted}
+        />
+      )}
+
       <SimpleGrid columns={{ base: 1, sm: 2, lg: 4 }} spacing={4} mb={6}>
         {[
-          { label: t('dashboard.activeProjects'), value: safeStats.active_projects, sub: `${safeStats.total_projects} ${t('dashboard.total')}`, icon: FiFolder, color: 'brand.500', bg: 'brand.50' },
-          { label: t('dashboard.completedTasks'), value: safeStats.completed_tasks, sub: `${safeStats.total_tasks} ${t('dashboard.total')}`, icon: FiCheckCircle, color: 'success.500', bg: 'success.50' },
-          { label: t('dashboard.tasksInProgress'), value: safeStats.in_progress_tasks, sub: `${safeStats.delayed_tasks} ${t('dashboard.overdueTasks')}`, icon: FiClock, color: 'warning.500', bg: 'warning.50' },
-          { label: t('dashboard.productivityScore'), value: `${safeStats.productivity_score}%`, sub: `+5% ${t('dashboard.vsYesterday')}`, icon: FiTarget, color: 'accent.500', bg: 'accent.50' },
+          { label: t('dashboard.activeProjects'), value: safeStats.active_projects, sub: `${safeStats.total_projects} ${t('dashboard.total')}`, icon: FiFolder, color: 'brand.500', bg: 'brand.50', to: '/projects' },
+          { label: t('dashboard.completedTasks'), value: safeStats.completed_tasks, sub: `${safeStats.total_tasks} ${t('dashboard.total')}`, icon: FiCheckCircle, color: 'success.500', bg: 'success.50', to: '/tasks' },
+          { label: t('dashboard.tasksInProgress'), value: safeStats.in_progress_tasks, sub: `${safeStats.delayed_tasks} ${t('dashboard.overdueTasks')}`, icon: FiClock, color: 'warning.500', bg: 'warning.50', to: '/tasks?status=in_progress' },
+          { label: t('dashboard.productivityScore'), value: `${safeStats.productivity_score}%`, sub: `+5% ${t('dashboard.vsYesterday')}`, icon: FiTarget, color: 'accent.500', bg: 'accent.50', to: '/analytics' },
         ].map((kpi, i) => (
-          <Card key={i} bg={cardBg} borderWidth="1px" borderColor={borderColor} className="card-hover">
+          <Card
+            key={i}
+            as={RouterLink}
+            to={kpi.to}
+            bg={cardBg}
+            borderWidth="1px"
+            borderColor={borderColor}
+            className="card-hover"
+            cursor="pointer"
+            _hover={{ transform: 'translateY(-2px)', shadow: 'md', borderColor: 'blue.200' }}
+            transition="all 0.2s"
+          >
             <CardBody p={5}>
               <Flex justify="space-between" align="flex-start">
                 <VStack align="flex-start" spacing={1}>
@@ -287,6 +387,8 @@ const Dashboard = () => {
                     fillOpacity={1}
                     fill="url(#colorTasks)"
                     name={t('sidebar.tasks')}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => navigate('/tasks')}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -324,6 +426,10 @@ const Dashboard = () => {
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
+                    style={{ cursor: 'pointer' }}
+                    onClick={(entry) => {
+                      if (entry?.priority) navigate(`/tasks?priority=${entry.priority}`);
+                    }}
                   >
                     {priorityData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -338,13 +444,32 @@ const Dashboard = () => {
 
         <Card bg={cardBg} borderWidth="1px" borderColor={borderColor}>
           <CardHeader>
-            <Heading size="md" fontWeight="600">{t('dashboard.projectProgress')}</Heading>
+            <Flex justify="space-between" align="center">
+              <Heading size="md" fontWeight="600">{t('dashboard.projectProgress')}</Heading>
+              <Button
+                size="xs"
+                variant="ghost"
+                as={RouterLink}
+                to="/projects"
+                rightIcon={<FiChevronRight />}
+              >
+                {t('dashboard.viewAll')}
+              </Button>
+            </Flex>
           </CardHeader>
           <CardBody>
-            <VStack spacing={4} align="stretch">
+            <VStack spacing={3} align="stretch">
               {safeStats.project_progress.length > 0 ? (
                 safeStats.project_progress.map((project, index) => (
-                  <Box key={index}>
+                  <Box
+                    key={project.id ?? index}
+                    as={project.id ? RouterLink : undefined}
+                    to={project.id ? `/projects/${project.id}` : undefined}
+                    p={2}
+                    borderRadius="md"
+                    _hover={{ bg: 'gray.50' }}
+                    transition="all 0.15s"
+                  >
                     <Flex justify="space-between" mb={1}>
                       <Text fontWeight="medium">{String(project.name || t('dashboard.project'))}</Text>
                       <Text fontWeight="bold" color={project.color || 'blue.500'}>
@@ -382,7 +507,14 @@ const Dashboard = () => {
                   <XAxis type="number" />
                   <YAxis type="category" dataKey="name" />
                   <RechartsTooltip />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  <Bar
+                    dataKey="value"
+                    radius={[0, 4, 4, 0]}
+                    style={{ cursor: 'pointer' }}
+                    onClick={(entry) => {
+                      if (entry?.status) navigate(`/tasks?status=${entry.status}`);
+                    }}
+                  >
                     {statusData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -463,7 +595,17 @@ const Dashboard = () => {
             <Heading size="md" fontWeight="600">{t('dashboard.recentActivity')}</Heading>
           </CardHeader>
           <CardBody>
-            <VStack spacing={4} align="stretch">
+            <VStack
+              spacing={4}
+              align="stretch"
+              maxH="320px"
+              overflowY="auto"
+              pr={2}
+              css={{
+                '&::-webkit-scrollbar': { width: '4px' },
+                '&::-webkit-scrollbar-thumb': { background: 'gray.200', borderRadius: '24px' },
+              }}
+            >
               {safeStats.recent_activities.length > 0 ? (
                 safeStats.recent_activities.map((activity) => (
                   <Flex key={activity.id} align="center">
@@ -665,6 +807,11 @@ const Dashboard = () => {
           </Flex>
         </CardBody>
       </Card>
+      <PageGuide
+        guideId="dashboard"
+        i18nPrefix="pageGuides.dashboard"
+        steps={DASHBOARD_STEPS}
+      />
     </Box>
   );
 };

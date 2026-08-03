@@ -234,7 +234,7 @@ io.on('connection', (socket) => {
   });
 
   // Chat message
-  socket.on('chat-message', ({ message }) => {
+  socket.on('chat-message', ({ message, id, created_at, file_id, file_name, file_size, file_mime_type, clientId, status }) => {
     if (!currentRoom || !currentPeerId) return;
     const room = rooms.get(currentRoom);
     if (!room) return;
@@ -243,7 +243,14 @@ io.on('connection', (socket) => {
       from: currentPeerId,
       username: participant?.username || 'Guest',
       message,
-      timestamp: new Date().toISOString(),
+      id: id || null,
+      created_at: created_at || new Date().toISOString(),
+      file_id: file_id || null,
+      file_name: file_name || null,
+      file_size: file_size || null,
+      file_mime_type: file_mime_type || null,
+      clientId: clientId || null,
+      status: status || null,
     });
   });
 

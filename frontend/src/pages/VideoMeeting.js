@@ -5,11 +5,12 @@ import {
   Avatar, Badge, Tooltip, Input, Button,
   useToast, useColorModeValue,
   Drawer, DrawerOverlay, DrawerContent, DrawerHeader, DrawerBody,
-  DrawerCloseButton, useDisclosure,
+  DrawerCloseButton, useDisclosure, Spinner,
 } from '@chakra-ui/react';
 import {
   FiMic, FiMicOff, FiVideo, FiVideoOff, FiMonitor,
-  FiPhoneOff, FiMessageSquare, FiUsers, FiSend,
+  FiPhoneOff, FiMessageSquare, FiUsers, FiSend, FiPaperclip,
+  FiFile, FiDownload,
 } from 'react-icons/fi';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
@@ -24,11 +25,58 @@ const ICE_SERVERS = {
   ],
 };
 
+const formatFileSize = (bytes) => {
+  if (!bytes) return '';
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(1)} MB`;
+};
+
+// Merge a message into the chat list. Identity is the clientId while a
+// message is optimistic (id null), then the persisted id once known.
+const mergeMessage = (prev, msg) => {
+  if (msg.status === 'removed') {
+    return prev.filter((m) => m.clientId && m.clientId === msg.clientId);
+  }
+  if (msg.clientId) {
+    const idx = prev.findIndex((m) => m.clientId === msg.clientId);
+    if (idx !== -1) {
+      return [
+        ...prev.slice(0, idx),
+        { ...prev[idx], ...msg },
+        ...prev.slice(idx + 1).filter((m) => !(msg.id && m.id === msg.id)),
+      ];
+    }
+  }
+  if (msg.id) {
+    const idx = prev.findIndex((m) => m.id === msg.id);
+    if (idx !== -1) {
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...msg };
+      return next;
+    }
+  }
+  return [...prev, msg];
+};
+
+const toChatMessage = (m, myUsername) => ({
+  id: m.id,
+  from: `user-${m.user}`,
+  username: m.username,
+  message: m.message,
+  timestamp: m.created_at,
+  isMine: (m.username || '') === (myUsername || ''),
+  file_id: m.file,
+  file_name: m.file_name,
+  file_size: m.file_size,
+  file_mime_type: m.file_mime_type,
+});
+
 const VideoMeeting = () => {
   const { id: meetingId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getMeeting, updateMeeting } = useMeetingService();
+  const { getMeeting, updateMeeting, getChatMessages, createChatMessage, uploadChatFile, downloadChatFile } = useMeetingService();
   const toast = useToast();
 
   const bgColor = useColorModeValue('gray.900', 'gray.900');
@@ -53,6 +101,7 @@ const VideoMeeting = () => {
   const peerConnectionsRef = useRef(new Map());
   const peerIdRef = useRef(`peer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const chatEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const createPeerConnection = useCallback((remotePeerId, remoteUsername) => {
     if (peerConnectionsRef.current.has(remotePeerId)) {
@@ -291,9 +340,24 @@ const VideoMeeting = () => {
         );
       });
 
-      socket.on('chat-message', ({ from, username, message, timestamp }) => {
+      socket.on('chat-message', ({ from, username, message, created_at, id, file_id, file_name, file_size, file_mime_type, clientId, status }) => {
         if (!mounted) return;
-        setChatMessages((prev) => [...prev, { from, username, message, timestamp, isMine: false }]);
+        setChatMessages((prev) =>
+          mergeMessage(prev, {
+            id: id || null,
+            clientId: clientId || null,
+            from,
+            username: username || 'Guest',
+            message: message || '',
+            timestamp: created_at || new Date().toISOString(),
+            isMine: false,
+            file_id: file_id || null,
+            file_name: file_name || null,
+            file_size: file_size || null,
+            file_mime_type: file_mime_type || null,
+            status: status || null,
+          })
+        );
       });
 
       socket.on('disconnect', () => {
@@ -320,6 +384,30 @@ const VideoMeeting = () => {
       }
     };
   }, [meetingId]);
+
+  // Load persisted chat history and keep polling so messages still appear
+  // even if the socket connection is down/unreachable for this client.
+  useEffect(() => {
+    let mounted = true;
+    const poll = async () => {
+      try {
+        const history = await getChatMessages(meetingId);
+        if (!mounted) return;
+        const messages = Array.isArray(history) ? history : history.results || [];
+        setChatMessages((prev) =>
+          messages.reduce(
+            (acc, m) => mergeMessage(acc, toChatMessage(m, user?.username)),
+            prev
+          )
+        );
+      } catch {
+        // History unavailable - live chat still works
+      }
+    };
+    poll();
+    const timer = setInterval(poll, 3000);
+    return () => { mounted = false; clearInterval(timer); };
+  }, [meetingId, user?.username]);
 
   // Scroll chat to bottom
   useEffect(() => {
@@ -406,20 +494,132 @@ const VideoMeeting = () => {
     navigate(`/meetings/${meetingId}`);
   };
 
-  const sendChatMessage = () => {
-    if (!chatInput.trim() || !socketRef.current) return;
-    socketRef.current.emit('chat-message', { message: chatInput.trim() });
-    setChatMessages((prev) => [
-      ...prev,
-      {
-        from: peerIdRef.current,
-        username: user?.username || 'You',
-        message: chatInput.trim(),
-        timestamp: new Date().toISOString(),
-        isMine: true,
-      },
-    ]);
+  const upsertLocal = (msg) => {
+    setChatMessages((prev) => mergeMessage(prev, msg));
+  };
+
+  const emitChat = (payload) => {
+    socketRef.current?.emit('chat-message', payload);
+  };
+
+  const sendChatMessage = async () => {
+    const text = chatInput.trim();
+    if (!text || !socketRef.current) return;
     setChatInput('');
+
+    const clientId = `${peerIdRef.current}-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    // Show + broadcast immediately, persist in the background
+    upsertLocal({
+      clientId,
+      id: null,
+      from: peerIdRef.current,
+      username: user?.username || 'You',
+      message: text,
+      timestamp: now,
+      isMine: true,
+    });
+    emitChat({ clientId, message: text, id: null, created_at: now });
+
+    try {
+      const persisted = await createChatMessage(meetingId, text);
+      const update = { clientId, id: persisted.id, timestamp: persisted.created_at };
+      upsertLocal(update);
+      emitChat({ clientId, message: text, id: persisted.id, created_at: persisted.created_at });
+    } catch {
+      // Persistence failed - optimistic message stays
+    }
+  };
+
+  const handleChatFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    const clientId = `${peerIdRef.current}-${Date.now()}`;
+    const now = new Date().toISOString();
+
+    // Show an "uploading" bubble immediately so the file send feels instant
+    const uploading = {
+      clientId,
+      id: null,
+      from: peerIdRef.current,
+      username: user?.username || 'You',
+      message: '',
+      timestamp: now,
+      isMine: true,
+      file_id: null,
+      file_name: file.name,
+      file_size: file.size,
+      file_mime_type: file.type,
+      status: 'uploading',
+    };
+    upsertLocal(uploading);
+    emitChat({
+      clientId,
+      message: '',
+      id: null,
+      created_at: now,
+      file_id: null,
+      file_name: file.name,
+      file_size: file.size,
+      file_mime_type: file.type,
+      status: 'uploading',
+    });
+
+    try {
+      const uploaded = await uploadChatFile(meetingId, file);
+      const persisted = await createChatMessage(meetingId, '', uploaded.id);
+      const ready = {
+        clientId,
+        id: persisted.id,
+        timestamp: persisted.created_at,
+        isMine: true,
+        file_id: persisted.file,
+        file_name: persisted.file_name,
+        file_size: persisted.file_size,
+        file_mime_type: persisted.file_mime_type,
+        status: 'ready',
+      };
+      upsertLocal(ready);
+      emitChat({
+        clientId,
+        id: persisted.id,
+        created_at: persisted.created_at,
+        file_id: persisted.file,
+        file_name: persisted.file_name,
+        file_size: persisted.file_size,
+        file_mime_type: persisted.file_mime_type,
+        status: 'ready',
+      });
+    } catch (err) {
+      upsertLocal({ clientId, status: 'removed' });
+      emitChat({ clientId, status: 'removed' });
+      toast({
+        title: 'Error uploading file',
+        description: err.response?.data?.error || 'Unknown error',
+        status: 'error',
+        duration: 3000,
+      });
+    }
+  };
+
+  const handleDownloadChatFile = async (msg) => {
+    if (!msg.file_id) return;
+    try {
+      const blob = await downloadChatFile(msg.file_id);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = msg.file_name || 'file';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: 'Error downloading file', status: 'error', duration: 3000 });
+    }
   };
 
   const handleChatKeyDown = (e) => {
@@ -429,12 +629,12 @@ const VideoMeeting = () => {
     }
   };
 
-  // Compute grid layout
+  // Compute grid layout (remote peers only; local video is a small overlay)
   const totalParticipants = peers.length + 1; // +1 for self
-  const gridCols = totalParticipants <= 1 ? 1 : totalParticipants <= 4 ? 2 : totalParticipants <= 9 ? 3 : 4;
+  const gridCols = peers.length === 0 ? 1 : peers.length === 1 ? 1 : peers.length <= 3 ? 2 : peers.length <= 8 ? 3 : 4;
 
   return (
-    <Box bg={bgColor} minH="100vh" color="white" position="fixed" top={0} left={0} right={0} bottom={0} zIndex={1500}>
+    <Box bg={bgColor} minH="100vh" color="white" position="fixed" top={0} left={0} right={0} bottom={0} zIndex={1000}>
       {/* Header bar */}
       <Flex
         bg="blackAlpha.600"
@@ -462,7 +662,7 @@ const VideoMeeting = () => {
       </Flex>
 
       {/* Video grid */}
-      <Box p={4} h="calc(100vh - 140px)" overflow="auto">
+      <Box p={4} h="calc(100vh - 140px)" overflow="auto" position="relative">
         <Grid
           templateColumns={`repeat(${gridCols}, 1fr)`}
           gap={3}
@@ -470,91 +670,113 @@ const VideoMeeting = () => {
           maxW="1400px"
           mx="auto"
         >
-          {/* Local video */}
-          <GridItem>
-            <Box
-              position="relative"
-              bg="gray.800"
-              borderRadius="xl"
-              overflow="hidden"
-              h="full"
-              minH="200px"
-              border="2px solid"
-              borderColor="blue.500"
-            >
-              <video
-                ref={localVideoRef}
-                autoPlay
-                muted
-                playsInline
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  transform: 'scaleX(-1)',
-                  display: isVideoEnabled ? 'block' : 'none',
-                }}
-              />
-              {!isVideoEnabled && (
-                <Flex align="center" justify="center" h="full">
-                  <Avatar size="2xl" name={user?.username || 'You'} bg="blue.500" />
-                </Flex>
-              )}
-              <Box
-                position="absolute"
-                bottom={2}
-                left={2}
-                bg="blackAlpha.700"
-                px={3}
-                py={1}
-                borderRadius="md"
-              >
-                <HStack spacing={2}>
-                  <Text fontSize="sm" fontWeight="500">{user?.username || 'You'} (You)</Text>
-                  {!isAudioEnabled && <FiMicOff size={14} color="#FC8181" />}
-                </HStack>
-              </Box>
-            </Box>
-          </GridItem>
-
-          {/* Remote peers */}
-          {peers.map((peer) => (
-            <GridItem key={peer.peerId}>
-              <Box
-                position="relative"
+          {/* Remote peers (big) */}
+          {peers.length === 0 ? (
+            <GridItem colSpan={gridCols}>
+              <Flex
+                align="center"
+                justify="center"
+                direction="column"
+                h="full"
+                minH="300px"
                 bg="gray.800"
                 borderRadius="xl"
-                overflow="hidden"
-                h="full"
-                minH="200px"
-                border="2px solid"
-                borderColor="whiteAlpha.200"
+                borderWidth="1px"
+                borderStyle="dashed"
+                borderColor="whiteAlpha.300"
               >
-                {peer.stream && peer.isVideoEnabled ? (
-                  <PeerVideo stream={peer.stream} />
-                ) : (
-                  <Flex align="center" justify="center" h="full">
-                    <Avatar size="2xl" name={peer.username} bg="purple.500" />
-                  </Flex>
-                )}
-                <Box
-                  position="absolute"
-                  bottom={2}
-                  left={2}
-                  bg="blackAlpha.700"
-                  px={3}
-                  py={1}
-                  borderRadius="md"
-                >
-                  <HStack spacing={2}>
-                    <Text fontSize="sm" fontWeight="500">{peer.username}</Text>
-                    {!peer.isAudioEnabled && <FiMicOff size={14} color="#FC8181" />}
-                  </HStack>
-                </Box>
-              </Box>
+                <Avatar size="2xl" name={user?.username || 'You'} bg="blue.500" mb={4} />
+                <Text color="gray.400">Waiting for others to join...</Text>
+              </Flex>
             </GridItem>
-          ))}
+          ) : (
+            peers.map((peer) => (
+              <GridItem key={peer.peerId}>
+                <Box
+                  position="relative"
+                  bg="gray.800"
+                  borderRadius="xl"
+                  overflow="hidden"
+                  h="full"
+                  minH="200px"
+                  border="2px solid"
+                  borderColor="whiteAlpha.200"
+                >
+                  {peer.stream && peer.isVideoEnabled ? (
+                    <PeerVideo stream={peer.stream} />
+                  ) : (
+                    <Flex align="center" justify="center" h="full">
+                      <Avatar size="2xl" name={peer.username} bg="purple.500" />
+                    </Flex>
+                  )}
+                  <Box
+                    position="absolute"
+                    bottom={2}
+                    left={2}
+                    bg="blackAlpha.700"
+                    px={3}
+                    py={1}
+                    borderRadius="md"
+                  >
+                    <HStack spacing={2}>
+                      <Text fontSize="sm" fontWeight="500">{peer.username}</Text>
+                      {!peer.isAudioEnabled && <FiMicOff size={14} color="#FC8181" />}
+                    </HStack>
+                  </Box>
+                </Box>
+              </GridItem>
+            ))
+          )}
         </Grid>
+
+        {/* Local video (small, picture-in-picture overlay) */}
+        <Box
+          position="fixed"
+          bottom="90px"
+          right={4}
+          w="220px"
+          h="150px"
+          bg="gray.800"
+          borderRadius="xl"
+          overflow="hidden"
+          border="2px solid"
+          borderColor="blue.500"
+          shadow="2xl"
+          zIndex={5}
+        >
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transform: 'scaleX(-1)',
+              display: isVideoEnabled ? 'block' : 'none',
+            }}
+          />
+          {!isVideoEnabled && (
+            <Flex align="center" justify="center" h="full">
+              <Avatar size="md" name={user?.username || 'You'} bg="blue.500" />
+            </Flex>
+          )}
+          <Box
+            position="absolute"
+            bottom={1}
+            left={1}
+            bg="blackAlpha.700"
+            px={2}
+            py={0.5}
+            borderRadius="md"
+          >
+            <HStack spacing={1}>
+              <Text fontSize="xs" fontWeight="500">{user?.username || 'You'} (You)</Text>
+              {!isAudioEnabled && <FiMicOff size={12} color="#FC8181" />}
+            </HStack>
+          </Box>
+        </Box>
       </Box>
 
       {/* Control bar */}
@@ -675,7 +897,7 @@ const VideoMeeting = () => {
               )}
               {chatMessages.map((msg, i) => (
                 <Box
-                  key={i}
+                  key={msg.clientId || msg.id || i}
                   alignSelf={msg.isMine ? 'flex-end' : 'flex-start'}
                   maxW="80%"
                 >
@@ -690,7 +912,36 @@ const VideoMeeting = () => {
                     py={2}
                     borderRadius="lg"
                   >
-                    <Text fontSize="sm">{msg.message}</Text>
+                    <VStack spacing={2} align="stretch">
+                      {msg.message && <Text fontSize="sm">{msg.message}</Text>}
+                      {msg.status === 'uploading' && (
+                        <HStack spacing={2} color="whiteAlpha.900">
+                          <Spinner size="sm" />
+                          <Text fontSize="xs">Uploading {msg.file_name}...</Text>
+                        </HStack>
+                      )}
+                      {msg.file_id && (
+                        <Box
+                          display="flex"
+                          alignItems="center"
+                          gap={2}
+                          bg={msg.isMine ? 'blackAlpha.300' : 'whiteAlpha.200'}
+                          borderRadius="md"
+                          px={2}
+                          py={1.5}
+                          cursor="pointer"
+                          onClick={() => handleDownloadChatFile(msg)}
+                          _hover={{ bg: msg.isMine ? 'blackAlpha.400' : 'whiteAlpha.300' }}
+                        >
+                          <FiFile size={16} />
+                          <Box flex={1} minW={0}>
+                            <Text fontSize="xs" fontWeight="600" isTruncated>{msg.file_name}</Text>
+                            <Text fontSize="10px" opacity={0.8}>{formatFileSize(msg.file_size)}</Text>
+                          </Box>
+                          <FiDownload size={14} />
+                        </Box>
+                      )}
+                    </VStack>
                   </Box>
                   <Text fontSize="xs" color="gray.500" mt={1}>
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -700,6 +951,17 @@ const VideoMeeting = () => {
               <div ref={chatEndRef} />
             </VStack>
             <HStack p={4} borderTop="1px solid" borderColor="whiteAlpha.200">
+              <input ref={fileInputRef} type="file" hidden onChange={handleChatFileSelect} />
+              <Tooltip label="Attach a file">
+                <IconButton
+                  icon={<FiPaperclip />}
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="Attach a file"
+                  variant="ghost"
+                  color="gray.300"
+                  _hover={{ bg: 'whiteAlpha.200' }}
+                />
+              </Tooltip>
               <Input
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}

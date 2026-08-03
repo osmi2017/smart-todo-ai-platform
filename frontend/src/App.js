@@ -16,6 +16,7 @@ import TaskDetail from './pages/TaskDetail';
 import TaskForm from './pages/TaskForm';  // ← IMPORT AJOUTÉ
 import Kanban from './pages/Kanban';
 import Milestones from './pages/Milestones';  // ← IMPORT AJOUTÉ
+import MilestoneDetail from './pages/MilestoneDetail';  // ← IMPORT AJOUTÉ
 import Profile from './pages/Profile';
 import Analytics from './pages/Analytics';
 import Meetings from './pages/Meetings';
@@ -175,6 +176,7 @@ function App() {
                   <Route path="tasks/:id/edit" element={<TaskForm />} />  {/* ← Route pour édition */}
                   <Route path="kanban" element={<Kanban />} />
                   <Route path="milestones" element={<Milestones />} />
+                 <Route path="milestones/:id" element={<MilestoneDetail />} />
                   <Route path="meetings" element={<Meetings />} />
                   <Route path="meetings/create" element={<MeetingForm />} />
                   <Route path="meetings/:id" element={<MeetingDetail />} />

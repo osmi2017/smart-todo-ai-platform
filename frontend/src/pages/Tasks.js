@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -34,14 +34,17 @@ import {
   FiAlertCircle,
   FiClock,
   FiCheckCircle,
+  FiCheckSquare,
   FiMoreVertical,
   FiEye,
   FiEdit2,
   FiTrash2,
+  FiX,
 } from 'react-icons/fi';
 import { useQuery } from 'react-query';
 import { useTaskService } from '../services/taskService';
-import { Link as RouterLink, useNavigate } from 'react-router-dom';
+import { useMilestoneService } from '../services/milestoneService';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { fr as frLocale, enUS } from 'date-fns/locale';
 import {
@@ -53,19 +56,58 @@ import {
 } from '../utils/constants';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
+import PageGuide from '../components/PageGuide';
+
+const TASKS_STEPS = [
+  { key: 'overview', icon: FiCheckSquare },
+  { key: 'create', icon: FiPlus },
+  { key: 'priorities', icon: FiAlertCircle },
+];
 
 const Tasks = () => {
   const { t, i18n } = useTranslation();
   const dateLocale = i18n.language === 'fr' ? frLocale : enUS;
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState({
-    status: '',
-    priority: '',
-    search: '',
+    status: searchParams.get('status') || '',
+    priority: searchParams.get('priority') || '',
+    search: searchParams.get('search') || '',
+    milestone: searchParams.get('milestone') || '',
   });
+
+  // Synchroniser les filtres avec l'URL (drill-down depuis le dashboard)
+  useEffect(() => {
+    const urlStatus = searchParams.get('status') || '';
+    const urlPriority = searchParams.get('priority') || '';
+    const urlSearch = searchParams.get('search') || '';
+    const urlMilestone = searchParams.get('milestone') || '';
+    if (urlStatus !== filters.status || urlPriority !== filters.priority || urlSearch !== filters.search || urlMilestone !== filters.milestone) {
+      setFilters({ status: urlStatus, priority: urlPriority, search: urlSearch, milestone: urlMilestone });
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (filters.status) params.set('status', filters.status);
+    if (filters.priority) params.set('priority', filters.priority);
+    if (filters.search) params.set('search', filters.search);
+    if (filters.milestone) params.set('milestone', filters.milestone);
+    const qs = params.toString();
+    if (qs !== searchParams.toString()) {
+      setSearchParams(params, { replace: true });
+    }
+  }, [filters, setSearchParams, searchParams]);
 
   const toast = useToast();
   const navigate = useNavigate();
   const taskService = useTaskService();
+  const milestoneService = useMilestoneService();
+
+  const { data: milestoneFilter } = useQuery(
+    ['milestone', filters.milestone],
+    () => milestoneService.getMilestone(filters.milestone),
+    { enabled: !!filters.milestone }
+  );
 
   const { data: tasks, isLoading } = useQuery(
     ['tasks', filters],
@@ -143,6 +185,20 @@ const Tasks = () => {
                   <option value="4">{t('common.critical')}</option>
                 </Select>
               </HStack>
+              {filters.milestone && (
+                <HStack spacing={2}>
+                  <Tag colorScheme="purple" variant="subtle" size="md">
+                    <TagLabel>{milestoneFilter?.name || `#${filters.milestone}`}</TagLabel>
+                  </Tag>
+                  <IconButton
+                    size="xs"
+                    variant="ghost"
+                    icon={<FiX />}
+                    aria-label={t('common.clear')}
+                    onClick={() => setFilters({ ...filters, milestone: '' })}
+                  />
+                </HStack>
+              )}
             </VStack>
           </CardBody>
         </Card>
@@ -294,12 +350,19 @@ const Tasks = () => {
           </SimpleGrid>
         ) : (
           <EmptyState
+            icon={FiCheckSquare}
             message={t('tasks.notFound')}
+            description={t('tasks.emptyDescription')}
             actionLabel={t('tasks.createFirst')}
             actionTo="/tasks/create"
           />
         )}
       </VStack>
+      <PageGuide
+        guideId="tasks"
+        i18nPrefix="pageGuides.tasks"
+        steps={TASKS_STEPS}
+      />
     </Box>
   );
 };

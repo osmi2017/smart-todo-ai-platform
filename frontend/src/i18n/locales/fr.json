@@ -7,7 +7,7 @@
     "delete": "Supprimer",
     "add": "Ajouter",
     "close": "Fermer",
-    "search": "Rechercher...",
+    "search": "Rechercher",
     "loading": "Chargement...",
     "retry": "Réessayer",
     "error": "Erreur",
@@ -80,7 +80,10 @@
     "createSuccess": "Créé avec succès",
     "updateError": "Erreur lors de la mise à jour",
     "createError": "Erreur lors de la création",
-    "unknownError": "Erreur inconnue"
+    "unknownError": "Erreur inconnue",
+    "refresh": "Rafraîchir",
+    "lastUpdate": "Dernière mise à jour",
+    "clear": "Effacer"
   },
   "sidebar": {
     "dashboard": "Tableau de bord",
@@ -96,6 +99,87 @@
     "groups": "Groupes",
     "companies": "Entreprises",
     "projectManagement": "Gestion de projets"
+  },
+  "quickCreate": {
+    "title": "Créer rapidement",
+    "project": "Nouveau projet",
+    "task": "Nouvelle tâche",
+    "meeting": "Nouvelle réunion",
+    "mission": "Nouvelle mission"
+  },
+  "onboarding": {
+    "skip": "Passer",
+    "next": "Suivant",
+    "previous": "Précédent",
+    "done": "Commencer",
+    "steps": {
+      "welcome": {
+        "title": "Bienvenue sur SmartTodoAI",
+        "description": "Cet outil vous aide à gérer vos projets, tâches, jalons, réunions, fichiers et missions au sein de votre entreprise. Ce guide rapide vous montre l'essentiel pour démarrer."
+      },
+      "sidebar": {
+        "title": "Naviguez dans vos modules",
+        "description": "Utilisez le menu de gauche pour accéder à vos Projets, Tâches, Kanban, Jalons, Réunions, Fichiers, Missions et Analytics."
+      },
+      "quickcreate": {
+        "title": "Créez en un clic",
+        "description": "Le bouton « + » en haut à droite vous permet de créer rapidement un projet, une tâche, une réunion ou une mission depuis n'importe quelle page."
+      },
+      "help": {
+        "title": "Besoin d'aide ?",
+        "description": "Cliquez sur l'icône d'aide à tout moment pour ouvrir le centre d'aide, redécouvrir ce guide et en savoir plus sur chaque module."
+      },
+      "done": {
+        "title": "Vous êtes prêt !",
+        "description": "Commencez par créer votre premier projet, puis ajoutez des tâches. Bonne gestion !"
+      }
+    }
+  },
+  "help": {
+    "title": "Centre d'aide",
+    "intro": "Un guide rapide pour chaque module. Cliquez sur « Ouvrir » pour y accéder directement.",
+    "open": "Ouvrir",
+    "relaunchTour": "Revoir le guide de bienvenue",
+    "contactSupport": "Besoin d'aide supplémentaire ?",
+    "contactSupportDesc": "Contactez votre administrateur ou l'équipe support pour toute question.",
+    "modules": {
+      "dashboard": {
+        "title": "Tableau de bord",
+        "description": "Vue d'ensemble de votre activité : statistiques, échéances à venir, réunions et recommandations IA."
+      },
+      "projects": {
+        "title": "Projets",
+        "description": "Organisez vos projets, suivez leur avancement et gérez les membres et les groupes."
+      },
+      "tasks": {
+        "title": "Tâches",
+        "description": "Créez et assignez des tâches, suivez leur statut et priorité, et détectez les retards."
+      },
+      "kanban": {
+        "title": "Kanban",
+        "description": "Visualisez et déplacez vos tâches par statut pour un suivi visuel du travail en cours."
+      },
+      "milestones": {
+        "title": "Jalons",
+        "description": "Définissez des étapes clés avec échéances, progression et analyse de risque IA."
+      },
+      "meetings": {
+        "title": "Réunions",
+        "description": "Planifiez des réunions audio/textuelles, rejoignez la visioconférence et traitez le contenu par IA."
+      },
+      "files": {
+        "title": "Fichiers",
+        "description": "Déposez, partagez et prévisualisez vos documents avec suivi du stockage."
+      },
+      "missions": {
+        "title": "Missions",
+        "description": "Planifiez des missions terrain avec destination, budget, équipe et rapport détaillé."
+      },
+      "analytics": {
+        "title": "Analytics",
+        "description": "Analysez la productivité, les risques et les tendances de votre équipe."
+      }
+    }
   },
   "header": {
     "search": "Rechercher...",
@@ -193,7 +277,24 @@
     "noMeetings": "Aucune réunion",
     "createFirstMeeting": "Créez votre première réunion",
     "participants": "participants",
-    "meetingInProgress": "En cours"
+    "meetingInProgress": "En cours",
+    "getStarted": {
+      "title": "Bienvenue ! Commençons",
+      "description": "Suivez ces étapes simples pour configurer votre espace de travail.",
+      "project": "Créez votre premier projet",
+      "projectDesc": "Regroupez vos travaux et suivez leur avancement.",
+      "task": "Ajoutez votre première tâche",
+      "taskDesc": "Planifiez le travail à accomplir.",
+      "meeting": "Planifiez une réunion",
+      "meetingDesc": "Échangez avec votre équipe.",
+      "mission": "Créez une mission",
+      "missionDesc": "Planifiez une sortie terrain.",
+      "files": "Déposez un fichier",
+      "filesDesc": "Partagez vos documents avec l'équipe.",
+      "start": "Commencer",
+      "done": "Terminé",
+      "dismiss": "Masquer ce guide"
+    }
   },
   "projects": {
     "title": "Projets",
@@ -219,6 +320,7 @@
     "confirmDeleteDesc": "Cette action est irréversible.",
     "notFound": "Aucun projet trouvé",
     "createFirst": "Créer votre premier projet",
+    "emptyDescription": "Les projets vous permettent de regrouper les tâches, jalons, réunions et fichiers de votre équipe.",
     "column": {
       "name": "Nom",
       "status": "Statut",
@@ -249,7 +351,8 @@
     "byPriority": "Par priorité",
     "byStatus": "Par statut",
     "blockedCount": "Bloquées",
-    "completedCount": "Terminées"
+    "completedCount": "Terminées",
+    "searchPlaceholder": "Rechercher un projet..."
   },
   "tasks": {
     "title": "Tâches",
@@ -281,6 +384,7 @@
     "confirmDeleteDesc": "Êtes-vous sûr de vouloir supprimer cette tâche ? Cette action est irréversible.",
     "notFound": "Aucune tâche trouvée",
     "createFirst": "Créer votre première tâche",
+    "emptyDescription": "Créez votre première tâche, assignez-la à un membre et suivez son avancement.",
     "searchPlaceholder": "Rechercher une tâche...",
     "riskWarning": "Risque de retard:",
     "risk": "Risque",
@@ -310,7 +414,10 @@
     "taskMoved": "Tâche déplacée avec succès",
     "taskMoveError": "Impossible de déplacer la tâche",
     "noTasks": "Aucune tâche",
-    "addToColumn": "Ajouter"
+    "addToColumn": "Ajouter",
+    "totalEstimate": "Temps estimé total",
+    "dropHere": "Déposer ici",
+    "clearFilters": "Réinitialiser les filtres"
   },
   "milestones": {
     "title": "Jalons",
@@ -332,6 +439,7 @@
     "confirmDeleteDesc": "Cette action est irréversible.",
     "notFound": "Aucun jalon trouvé",
     "createFirst": "Créer un jalon",
+    "emptyDescription": "Les jalons découpent vos projets en étapes claires avec des échéances et une analyse de risque.",
     "highRisk": "Risque élevé",
     "risk": "Risque:",
     "overdueMilestone": "Jalon en retard",
@@ -343,7 +451,15 @@
     "gridView": "Grille",
     "calendarView": "Calendrier",
     "statusTooltip": "Vous pouvez modifier manuellement le statut",
-    "weekdays": ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"]
+    "weekdays": [
+      "Dim",
+      "Lun",
+      "Mar",
+      "Mer",
+      "Jeu",
+      "Ven",
+      "Sam"
+    ]
   },
   "meetings": {
     "title": "Meetings",
@@ -353,6 +469,7 @@
     "allStatuses": "Tous les statuts",
     "notFound": "Aucune réunion trouvée",
     "createFirst": "Créez votre première réunion",
+    "emptyDescription": "Planifiez une réunion audio ou textuelle, puis traitez son contenu avec l'IA.",
     "scheduled": "Planifié",
     "inProgress": "En cours",
     "completed": "Terminé",
@@ -417,6 +534,7 @@
     "searchPlaceholder": "Rechercher un fichier...",
     "allTypes": "Tous les types",
     "uploadFile": "Uploader un fichier",
+    "emptyDescription": "Déposez vos documents pour les partager avec votre équipe et suivez votre espace de stockage.",
     "storage": "Stockage:",
     "fileName": "Nom du fichier",
     "fileDescription": "Description optionnelle",
@@ -494,6 +612,7 @@
     "allStatuses": "Tous les statuts",
     "notFound": "Aucune mission trouvée",
     "createFirst": "Créez votre première mission pour commencer",
+    "emptyDescription": "Planifiez une mission terrain avec destination, budget, équipe et rapport détaillé.",
     "createMission": "Créer une mission",
     "planned": "Planifiée",
     "inProgress": "En cours",
@@ -512,6 +631,7 @@
     "chief": "Chef de mission",
     "reportsUpdated": "Rapports mis à jour",
     "costsUpdated": "Coûts mis à jour",
+    "justificationUploadError": "Erreur lors de l'envoi du fichier",
     "costsUpdateError": "Erreur lors de la mise à jour des coûts",
     "backToMissions": "Retour aux missions",
     "startMission": "Démarrer la mission",
@@ -556,36 +676,37 @@
     "loadDataError": "Impossible de charger les données",
     "loadErrorTitle": "Erreur lors du chargement",
     "form": {
-      "titleRequired": "Le titre est requis",
-      "destinationRequired": "La destination est requise",
-      "startDateRequired": "La date de début est requise",
-      "atLeastOneMember": "Ajoutez au moins un membre à l'équipe.",
-      "chiefRequired": "Un chef de mission est obligatoire.",
-      "backToMission": "Retour à la mission",
-      "backToMissions": "Retour aux missions",
-      "generalInfo": "Informations générales",
-      "title": "Titre de la mission",
+      "allowance": "Indemnité",
+      "housing": "Hébergement",
+      "transport": "Transport",
+      "otherExpenses": "Autres frais",
+      "save": "Enregistrer",
+      "missionReport": "Rapport de mission",
+      "reportPlaceholder": "Rapport d'activité...",
+      "title": "Titre",
+      "titlePlaceholder": "Titre de la mission",
       "description": "Description",
+      "descriptionPlaceholder": "Décrivez brièvement la mission...",
       "status": "Statut",
-      "titlePlaceholder": "Titre de la mission...",
-      "descriptionPlaceholder": "Description de la mission...",
+      "generalInfo": "Informations générales",
       "projectAndLinks": "Projet & Liens",
       "associatedProject": "Projet associé",
-      "associatedTasks": "Tâches associées",
-      "associatedMilestones": "Jalons associés",
       "noProject": "Aucun projet",
+      "associatedTasks": "Tâches associées",
       "noTasksInProject": "Aucune tâche dans ce projet",
-      "noMilestonesInProject": "Aucun jalon dans ce projet",
+      "associatedMilestones": "Étapes associées",
+      "noMilestonesInProject": "Aucune étape dans ce projet",
       "destination": "Destination",
       "destinationName": "Nom de la destination",
-      "destinationPlaceholder": "Rechercher une ville, un pays...",
+      "destinationPlaceholder": "Rechercher une destination...",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "dates": "Dates",
       "startDate": "Date de début",
       "endDate": "Date de fin",
+      "dateRangeInvalid": "La date de fin doit être postérieure à la date de début.",
       "team": "Équipe",
-      "chiefLabel": "Chef de mission (obligatoire)",
+      "chiefLabel": "Chef de mission",
       "selectChief": "Sélectionner le chef de mission",
       "addMembers": "Ajouter des membres",
       "selectMember": "Sélectionner un membre",
@@ -593,20 +714,24 @@
       "detailedCosts": "Coûts détaillés",
       "currency": "Devise",
       "loadingCurrencies": "Chargement des devises...",
-      "allowance": "Indemnité",
-      "housing": "Hébergement",
-      "transport": "Transport",
-      "otherExpenses": "Autres frais",
+      "perDay": "par jour",
+      "total": "Coût total estimé",
       "reports": "Rapports",
-      "missionReport": "Rapport de mission",
-      "reportPlaceholder": "Rapport d'activité de la mission...",
       "saving": "Enregistrement...",
       "creating": "Création...",
-      "save": "Enregistrer",
       "createMission": "Créer la mission",
+      "backToMission": "Retour à la mission",
+      "backToMissions": "Retour aux missions",
+      "titleRequired": "Un titre est requis.",
+      "destinationRequired": "Une destination est requise.",
+      "startDateRequired": "Une date de début est requise.",
+      "atLeastOneMember": "Ajoutez au moins un membre.",
+      "chiefRequired": "Un chef de mission est requis.",
       "distanceLabel": "Distance :",
-      "distanceFromPosition": "(depuis votre position)",
-      "searchForMap": "Recherchez une destination pour\nafficher la carte"
+      "distanceFromPosition": "depuis votre position",
+      "searchForMap": "Recherchez une destination pour afficher la carte.",
+      "selectCurrency": "Rechercher ou sélectionner une devise",
+      "noResults": "Aucun résultat trouvé"
     },
     "actions": {
       "viewDetails": "Voir détails",
@@ -620,15 +745,6 @@
       "team": "Équipe",
       "responsible": "Responsable",
       "actions": "Actions"
-    },
-    "form": {
-      "allowance": "Indemnité",
-      "housing": "Hébergement",
-      "transport": "Transport",
-      "otherExpenses": "Autres frais",
-      "save": "Enregistrer",
-      "missionReport": "Rapport de mission",
-      "reportPlaceholder": "Rapport d'activité..."
     }
   },
   "missionDetail": {
@@ -690,6 +806,7 @@
     "transportLabel": "Transport",
     "otherExpensesLabel": "Autres frais",
     "missionReportTitle": "Rapport de mission",
+    "reportNarrative": "Rapport narratif",
     "reportPlaceholder": "Rapport d'activité...",
     "noReport": "Aucun rapport de mission renseigné",
     "associatedProject": "Projet associé",
@@ -703,6 +820,9 @@
     "noMilestones": "Aucun jalon associé",
     "geoUnavailable": "Géolocalisation non disponible",
     "geoDescription": "Ajoutez les coordonnées GPS de la destination pour afficher la carte.",
+    "justifications": "Pièces justificatives",
+    "addJustification": "Ajouter un fichier",
+    "noJustification": "Aucun fichier ajouté",
     "deleteConfirm": "Êtes-vous sûr ? Cette action est irréversible."
   },
   "expenseReport": {
@@ -731,6 +851,31 @@
     "totalExpenses": "TOTAL FRAIS DE MISSION",
     "print": "Imprimer",
     "downloadPdf": "Télécharger PDF"
+  },
+  "missionReport": {
+    "launchedBy": "Lancée par :",
+    "manager": "Chef de mission :",
+    "startDate": "Date début :",
+    "endDate": "Date fin :",
+    "duration": "Durée :",
+    "currency": "Devise :",
+    "status": "Statut :",
+    "destination": "Destination",
+    "destinationName": "Destination :",
+    "coordinates": "Coordonnées GPS :",
+    "distance": "Distance :",
+    "description": "Description",
+    "team": "Équipe",
+    "member": "Membre",
+    "email": "Email",
+    "role": "Rôle",
+    "expenses": "Frais de mission",
+    "expenseNarrative": "Note de frais (récit)",
+    "task": "Tâche",
+    "milestone": "Jalon",
+    "assigned": "Assignée à",
+    "progress": "Progression",
+    "dueDate": "Échéance"
   },
   "analytics": {
     "title": "Analytics",
@@ -893,5 +1038,167 @@
   },
   "emptyStates": {
     "noItems": "Aucun élément trouvé"
+  },
+  "pageGuide": {
+    "guide": "Guide",
+    "next": "Suivant",
+    "previous": "Précédent",
+    "gotIt": "C'est compris",
+    "skip": "Fermer"
+  },
+  "pageGuides": {
+    "dashboard": {
+      "title": "Tableau de bord",
+      "steps": {
+        "overview": {
+          "title": "Vue d'ensemble",
+          "description": "Retrouvez vos indicateurs, l'avancement de vos projets et vos tâches prioritaires en un coup d'œil."
+        },
+        "checklist": {
+          "title": "Premiers pas",
+          "description": "Un checklist vous guide pour démarrer : créer un projet, une tâche, une réunion, une mission ou déposer un fichier."
+        },
+        "quickAccess": {
+          "title": "Accès rapide",
+          "description": "Utilisez le bouton « + » de l'en-tête pour créer rapidement un projet, une tâche, une réunion ou une mission."
+        }
+      }
+    },
+    "projects": {
+      "title": "Projets",
+      "steps": {
+        "overview": {
+          "title": "Organisez votre travail",
+          "description": "Regroupez vos tâches par projet et suivez l'avancement de chacun avec des statistiques claires."
+        },
+        "create": {
+          "title": "Créez un projet",
+          "description": "Cliquez sur « Nouveau projet » pour créer votre premier projet en quelques secondes."
+        },
+        "detail": {
+          "title": "Explorez vos projets",
+          "description": "Cliquez sur un projet pour voir ses tâches, ses jalons et ses membres."
+        }
+      }
+    },
+    "tasks": {
+      "title": "Tâches",
+      "steps": {
+        "overview": {
+          "title": "Gérez vos tâches",
+          "description": "Consultez, filtrez et suivez vos tâches avec leur statut, leur priorité et leur échéance."
+        },
+        "create": {
+          "title": "Créez une tâche",
+          "description": "Le bouton « Nouvelle tâche » vous permet d'ajouter une tâche et de l'assigner rapidement."
+        },
+        "priorities": {
+          "title": "Priorités colorées",
+          "description": "Les priorités (basse, moyenne, haute, critique) sont colorées pour être lisibles d'un coup d'œil."
+        }
+      }
+    },
+    "kanban": {
+      "title": "Kanban",
+      "steps": {
+        "overview": {
+          "title": "Visualisez vos tâches",
+          "description": "Le tableau Kanban organise vos tâches en colonnes par statut : à faire, en cours, revue, bloqué, terminé."
+        },
+        "drag": {
+          "title": "Glissez-déposez",
+          "description": "Faites glisser les cartes entre les colonnes pour mettre à jour leur statut en un instant."
+        },
+        "filter": {
+          "title": "Filtrez la vue",
+          "description": "Filtrez par projet ou par membre pour vous concentrer sur ce qui compte."
+        }
+      }
+    },
+    "milestones": {
+      "title": "Jalons",
+      "steps": {
+        "overview": {
+          "title": "Suivez les grandes étapes",
+          "description": "Découpez vos projets en jalons pour suivre les grandes étapes de votre planning."
+        },
+        "create": {
+          "title": "Créez un jalon",
+          "description": "Créez un jalon lié à un projet et définissez sa date d'échéance."
+        },
+        "track": {
+          "title": "Suivez l'avancement",
+          "description": "Ajustez le taux de progression de chaque jalon et repérez les retards."
+        }
+      }
+    },
+    "meetings": {
+      "title": "Réunions",
+      "steps": {
+        "overview": {
+          "title": "Organisez vos réunions",
+          "description": "Planifiez, organisez et suivez vos réunions en ligne ou sur site."
+        },
+        "create": {
+          "title": "Programmez une réunion",
+          "description": "Créez une réunion avec vos participants et choisissez le type de saisie (audio, texte, les deux)."
+        },
+        "join": {
+          "title": "Rejoignez en un clic",
+          "description": "Lancez la visioconférence directement depuis la réunion pour échanger avec votre équipe."
+        }
+      }
+    },
+    "files": {
+      "title": "Fichiers",
+      "steps": {
+        "overview": {
+          "title": "Centralisez vos documents",
+          "description": "Partagez et retrouvez tous vos documents d'équipe au même endroit."
+        },
+        "upload": {
+          "title": "Déposez un fichier",
+          "description": "Le bouton « Téléverser » vous permet de partager un document avec votre équipe."
+        },
+        "organize": {
+          "title": "Organisez vos fichiers",
+          "description": "Classez vos documents par catégorie et par mission pour les retrouver facilement."
+        }
+      }
+    },
+    "missions": {
+      "title": "Missions",
+      "steps": {
+        "overview": {
+          "title": "Planifiez vos missions",
+          "description": "Gérez vos missions terrain avec distance, kilométrage et participants."
+        },
+        "create": {
+          "title": "Créez une mission",
+          "description": "Créez une mission et renseignez sa distance et son kilométrage estimé."
+        },
+        "report": {
+          "title": "Générez un rapport",
+          "description": "Générez un rapport de mission à partager avec votre équipe."
+        }
+      }
+    },
+    "analytics": {
+      "title": "Analytics",
+      "steps": {
+        "overview": {
+          "title": "Pilotez la performance",
+          "description": "Suivez le taux de complétion, les retards et la précision ML de vos prévisions."
+        },
+        "trends": {
+          "title": "Graphiques d'activité",
+          "description": "Les graphiques d'activité et de priorités vous donnent une vue d'ensemble de la période."
+        },
+        "performance": {
+          "title": "Performance par utilisateur",
+          "description": "Le tableau de performance identifie les tendances par membre de l'équipe."
+        }
+      }
+    }
   }
 }

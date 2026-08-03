@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Heading,
@@ -7,42 +7,24 @@ import {
   VStack,
   Text,
   Badge,
-  Avatar,
-  AvatarGroup,
   IconButton,
   Button,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
   Select,
   Input,
   InputGroup,
   InputLeftElement,
-  Tag,
-  TagLabel,
-  TagLeftIcon,
   Tooltip,
   Card,
   CardBody,
   useToast,
-  Spinner,
-  Divider,
-  Portal,
 } from '@chakra-ui/react';
 import {
   FiPlus,
-  FiMoreVertical,
-  FiClock,
-  FiMessageSquare,
-  FiFlag,
-  FiUser,
-  FiCalendar,
-  FiFilter,
   FiSearch,
   FiCpu,
-  FiAlertCircle,
-  FiCheckCircle,
+  FiClock,
+  FiX,
+  FiUser,
 } from 'react-icons/fi';
 import {
   DndContext,
@@ -52,33 +34,32 @@ import {
   useSensor,
   useSensors,
   DragOverlay,
-  defaultDropAnimation,
+  useDroppable,
 } from '@dnd-kit/core';
 import {
-  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import {
-  restrictToVerticalAxis,
-  restrictToParentElement,
-} from '@dnd-kit/modifiers';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useKanbanService } from '../services/kanbanService';
 import { useProjectService } from '../services/projectService';
-import { useAuth } from '../context/AuthContext';
-import { Link as RouterLink } from 'react-router-dom';
-import { format, isAfter, isBefore } from 'date-fns';
-import { fr as frLocale, enUS } from 'date-fns/locale';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import SortableTaskCard from '../components/SortableTaskCard';
 import { getPriorityColor, getPriorityLabel } from '../utils/constants';
 import LoadingState from '../components/LoadingState';
+import PageGuide from '../components/PageGuide';
+import { FiColumns, FiMove, FiFilter } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 
+const KANBAN_STEPS = [
+  { key: 'overview', icon: FiColumns },
+  { key: 'drag', icon: FiMove },
+  { key: 'filter', icon: FiFilter },
+];
+
 const Kanban = () => {
-  const { t, i18n } = useTranslation();
-  const dateLocale = i18n.language === 'fr' ? frLocale : enUS;
+  const { t } = useTranslation();
 
   const [columns, setColumns] = useState({
     todo: { id: 'todo', title: t('common.todo'), tasks: [], color: 'gray' },
@@ -89,16 +70,17 @@ const Kanban = () => {
   });
 
   const [activeId, setActiveId] = useState(null);
+  const [overColumnId, setOverColumnId] = useState(null);
   const [filterProject, setFilterProject] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [projects, setProjects] = useState([]);
 
   const toast = useToast();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const kanbanService = useKanbanService();
   const projectService = useProjectService();
-  const { user } = useAuth();
 
   // Configuration des capteurs pour le drag & drop
   const sensors = useSensors(
@@ -115,79 +97,98 @@ const Kanban = () => {
   // Charger les tâches
   const { data: tasks, isLoading } = useQuery(
     ['kanbanTasks', filterProject],
-    () => kanbanService.getKanbanTasks(filterProject || null),
-    {
-      onSuccess: (data) => {
-        organizeTasksByStatus(data);
-      },
-    }
+    () => kanbanService.getKanbanTasks(filterProject || null)
   );
 
   // Charger les projets pour le filtre
   const { data: projectsData } = useQuery(
     'projects',
-    () => projectService.getAll(),
-    {
-      onError: () => {
-        // Données mockées
-        setProjects([
-          { id: 1, name: 'Frontend' },
-          { id: 2, name: 'Backend' },
-          { id: 3, name: 'ML Service' },
-        ]);
-      }
-    }
+    () => projectService.getAll()
   );
 
   useEffect(() => {
-    if (projectsData) {
-      setProjects(projectsData);
-    }
+    const list = Array.isArray(projectsData) ? projectsData : (projectsData?.results || []);
+    if (list.length) setProjects(list);
   }, [projectsData]);
 
-  // Mutation pour mettre à jour le statut
-  const updateStatusMutation = useMutation(
-    ({ taskId, newStatus, newOrder }) => 
-      kanbanService.updateTaskStatus(taskId, newStatus, newOrder),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries('kanbanTasks');
-      },
-    }
-  );
+  // Organiser les tâches par colonne selon les filtres actifs
+  const organizeTasksByStatus = useCallback((tasksList, priority, search) => {
+    if (!Array.isArray(tasksList)) return;
 
-  // Organiser les tâches par colonne
-  const organizeTasksByStatus = (tasksList) => {
-    const filteredTasks = tasksList.filter(task => {
-      // Filtre par priorité
-      if (filterPriority && task.priority.toString() !== filterPriority) {
-        return false;
-      }
-      // Filtre par recherche
-      if (searchTerm && !task.title.toLowerCase().includes(searchTerm.toLowerCase()) &&
-          !task.description?.toLowerCase().includes(searchTerm.toLowerCase())) {
-        return false;
+    const filtered = tasksList.filter(task => {
+      if (priority && String(task.priority) !== String(priority)) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const title = task.title || '';
+        const description = task.description || '';
+        if (!title.toLowerCase().includes(q) && !description.toLowerCase().includes(q)) return false;
       }
       return true;
     });
 
-    const newColumns = { ...columns };
-    Object.keys(newColumns).forEach(key => {
-      newColumns[key].tasks = [];
+    setColumns(prev => {
+      const next = {};
+      Object.keys(prev).forEach(key => {
+        next[key] = { ...prev[key], tasks: [] };
+      });
+      filtered.forEach(task => {
+        if (next[task.status]) {
+          next[task.status].tasks.push(task);
+        }
+      });
+      Object.keys(next).forEach(key => {
+        next[key].tasks.sort((a, b) => (a.order || 0) - (b.order || 0));
+      });
+      return next;
     });
+  }, []);
 
-    filteredTasks.forEach(task => {
-      if (newColumns[task.status]) {
-        newColumns[task.status].tasks.push(task);
-      }
-    });
+  // Réorganiser dès que les tâches ou les filtres changent
+  useEffect(() => {
+    const list = Array.isArray(tasks) ? tasks : (tasks?.results || []);
+    organizeTasksByStatus(list, filterPriority, searchTerm);
+  }, [tasks, filterPriority, searchTerm, organizeTasksByStatus]);
 
-    // Trier par ordre
-    Object.keys(newColumns).forEach(key => {
-      newColumns[key].tasks.sort((a, b) => (a.order || 0) - (b.order || 0));
-    });
+  // Mutation pour mettre à jour le statut / l'ordre
+  const updateStatusMutation = useMutation(
+    ({ taskId, newStatus, newOrder }) =>
+      kanbanService.updateTaskStatus(taskId, newStatus, newOrder),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('kanbanTasks');
+        toast({ title: t('kanban.taskMoved'), status: 'success', duration: 2000 });
+      },
+      onError: () => {
+        queryClient.invalidateQueries('kanbanTasks');
+        toast({ title: t('kanban.taskMoveError'), status: 'error', duration: 3000 });
+      },
+    }
+  );
 
-    setColumns(newColumns);
+  // Mutation pour supprimer une tâche
+  const deleteTaskMutation = useMutation(
+    (taskId) => kanbanService.removeTask(taskId),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('kanbanTasks');
+        queryClient.invalidateQueries('sidebar-task-count');
+        toast({ title: t('common.deleteSuccess'), status: 'success', duration: 2000 });
+      },
+      onError: () => {
+        toast({ title: t('common.deleteError'), status: 'error', duration: 3000 });
+      },
+    }
+  );
+
+  // Trouver la colonne contenant une tâche
+  const findColumnOfTask = (taskId, cols) =>
+    Object.keys(cols).find(key => cols[key].tasks.some(task => task.id === taskId));
+
+  const handleAddToColumn = (columnId) => {
+    const params = new URLSearchParams();
+    params.set('status', columnId);
+    if (filterProject) params.set('project', filterProject);
+    navigate(`/tasks/create?${params.toString()}`);
   };
 
   // Gestionnaires d'événements pour le drag & drop
@@ -196,108 +197,84 @@ const Kanban = () => {
   };
 
   const handleDragOver = (event) => {
-    const { active, over } = event;
+    const { over } = event;
     if (!over) return;
-
-    const activeId = active.id;
-    const overId = over.id;
-
-    // Vérifier si on survole une colonne
-    if (overId in columns) {
-      // Changement de colonne
-      const activeColumn = Object.keys(columns).find(key =>
-        columns[key].tasks.some(task => task.id === activeId)
-      );
-      
-      if (activeColumn && activeColumn !== overId) {
-        setColumns(prev => {
-          const activeTasks = [...prev[activeColumn].tasks];
-          const overTasks = [...prev[overId].tasks];
-          
-          const activeIndex = activeTasks.findIndex(t => t.id === activeId);
-          const [movedTask] = activeTasks.splice(activeIndex, 1);
-          
-          movedTask.status = overId;
-          overTasks.splice(0, 0, movedTask);
-          
-          return {
-            ...prev,
-            [activeColumn]: { ...prev[activeColumn], tasks: activeTasks },
-            [overId]: { ...prev[overId], tasks: overTasks },
-          };
-        });
-      }
-    }
+    const colId = over.id in columns ? over.id : findColumnOfTask(over.id, columns);
+    setOverColumnId(colId || null);
   };
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
     setActiveId(null);
+    setOverColumnId(null);
 
     if (!over) return;
 
-    const activeId = active.id;
+    const activeTaskId = active.id;
     const overId = over.id;
 
-    // Déplacement dans la même colonne
-    if (overId in columns) {
-      const columnId = overId;
-      const columnTasks = [...columns[columnId].tasks];
-      const oldIndex = columnTasks.findIndex(t => t.id === activeId);
-      const newIndex = columnTasks.findIndex(t => t.id === overId);
+    const sourceColumnId = findColumnOfTask(activeTaskId, columns);
+    if (!sourceColumnId) return;
 
-      if (oldIndex !== newIndex) {
-        const newTasks = arrayMove(columnTasks, oldIndex, newIndex);
-        setColumns(prev => ({
-          ...prev,
-          [columnId]: { ...prev[columnId], tasks: newTasks },
-        }));
+    const targetColumnId = overId in columns ? overId : findColumnOfTask(overId, columns);
+    if (!targetColumnId) return;
 
-        // Mettre à jour l'ordre dans le backend
-        const movedTask = newTasks[newIndex];
-        updateStatusMutation.mutate({
-          taskId: movedTask.id,
-          newStatus: columnId,
-          newOrder: newIndex,
-        });
-      }
-    } 
-    // Déplacement vers une colonne
-    else if (overId && overId in columns) {
-      const overColumnId = overId;
-      const activeColumnId = Object.keys(columns).find(key =>
-        columns[key].tasks.some(task => task.id === activeId)
-      );
+    const sourceTasks = columns[sourceColumnId].tasks;
+    const targetTasks = columns[targetColumnId].tasks;
+    const sourceIndex = sourceTasks.findIndex(task => task.id === activeTaskId);
+    if (sourceIndex === -1) return;
 
-      if (activeColumnId && activeColumnId !== overColumnId) {
-        setColumns(prev => {
-          const activeTasks = [...prev[activeColumnId].tasks];
-          const overTasks = [...prev[overColumnId].tasks];
-          
-          const activeIndex = activeTasks.findIndex(t => t.id === activeId);
-          const [movedTask] = activeTasks.splice(activeIndex, 1);
-          
-          movedTask.status = overColumnId;
-          overTasks.splice(0, 0, movedTask);
-          
-          return {
-            ...prev,
-            [activeColumnId]: { ...prev[activeColumnId], tasks: activeTasks },
-            [overColumnId]: { ...prev[overColumnId], tasks: overTasks },
-          };
-        });
-
-        // Mettre à jour dans le backend
-        updateStatusMutation.mutate({
-          taskId: activeId,
-          newStatus: overColumnId,
-          newOrder: 0,
-        });
-      }
+    let targetIndex;
+    if (targetColumnId === sourceColumnId) {
+      const overIndex = targetTasks.findIndex(task => task.id === overId);
+      if (overIndex === -1) return;
+      if (sourceIndex === overIndex) return;
+      targetIndex = overIndex;
+    } else {
+      targetIndex = overId in columns
+        ? targetTasks.length
+        : targetTasks.findIndex(task => task.id === overId);
+      if (targetIndex === -1) targetIndex = targetTasks.length;
     }
+
+    setColumns(prev => {
+      const src = [...prev[sourceColumnId].tasks];
+      const [movedTask] = src.splice(sourceIndex, 1);
+      movedTask.status = targetColumnId;
+
+      const dst = targetColumnId === sourceColumnId
+        ? src
+        : [...prev[targetColumnId].tasks];
+
+      dst.splice(targetIndex, 0, movedTask);
+
+      return {
+        ...prev,
+        [sourceColumnId]: { ...prev[sourceColumnId], tasks: src },
+        [targetColumnId]: { ...prev[targetColumnId], tasks: dst },
+      };
+    });
+
+    updateStatusMutation.mutate({
+      taskId: activeTaskId,
+      newStatus: targetColumnId,
+      newOrder: targetIndex,
+    });
   };
 
+  const handleDeleteTask = (task) => {
+    if (!window.confirm(t('common.confirmDelete'))) return;
+    deleteTaskMutation.mutate(task.id);
+  };
 
+  const handleClearFilters = () => {
+    setFilterProject('');
+    setFilterPriority('');
+    setSearchTerm('');
+  };
+
+  const hasActiveFilters = Boolean(filterProject || filterPriority || searchTerm);
+  const totalTaskCount = Object.values(columns).reduce((sum, col) => sum + col.tasks.length, 0);
 
   if (isLoading) {
     return <LoadingState message={t('kanban.title')} />;
@@ -307,23 +284,26 @@ const Kanban = () => {
     <Box height="calc(100vh - 120px)" overflow="hidden">
       <VStack spacing={4} align="stretch" height="100%">
         {/* En-tête */}
-        <Flex justify="space-between" align="center">
-          <Heading size="lg">{t('kanban.title')}</Heading>
+        <Flex justify="space-between" align="center" wrap="wrap" gap={3}>
           <HStack spacing={3}>
-            <Button
-              leftIcon={<FiPlus />}
-              colorScheme="blue"
-              size="sm"
-              as={RouterLink}
-              to="/tasks/new"
-            >
-              {t('kanban.newTask')}
-            </Button>
+            <Heading size="lg">{t('kanban.title')}</Heading>
+            <Badge colorScheme="gray" variant="outline" fontSize="sm" px={3} py={1} borderRadius="full">
+              {totalTaskCount} {t('common.tasks')}
+            </Badge>
           </HStack>
+          <Button
+            leftIcon={<FiPlus />}
+            colorScheme="blue"
+            size="sm"
+            as={RouterLink}
+            to="/tasks/create"
+          >
+            {t('kanban.newTask')}
+          </Button>
         </Flex>
 
         {/* Filtres */}
-        <HStack spacing={4} wrap="wrap">
+        <HStack spacing={3} wrap="wrap">
           <InputGroup maxW="300px">
             <InputLeftElement pointerEvents="none">
               <FiSearch color="gray.300" />
@@ -331,10 +311,7 @@ const Kanban = () => {
             <Input
               placeholder={t('kanban.searchPlaceholder')}
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                if (tasks) organizeTasksByStatus(tasks);
-              }}
+              onChange={(e) => setSearchTerm(e.target.value)}
               size="sm"
               borderRadius="md"
             />
@@ -355,20 +332,27 @@ const Kanban = () => {
           <Select
             placeholder={t('common.allPriorities')}
             value={filterPriority}
-            onChange={(e) => {
-              setFilterPriority(e.target.value);
-              if (tasks) organizeTasksByStatus(tasks);
-            }}
+            onChange={(e) => setFilterPriority(e.target.value)}
             size="sm"
             width="200px"
           >
-            <option value="1">{t('common.low')}</option>
-            <option value="2">{t('common.medium')}</option>
-            <option value="3">{t('common.high')}</option>
-            <option value="4">{t('common.critical')}</option>
+            {[1, 2, 3, 4].map(p => (
+              <option key={p} value={p}>{getPriorityLabel(p)}</option>
+            ))}
           </Select>
 
-          <Badge colorScheme="purple" px={3} py={1} borderRadius="full">
+          {hasActiveFilters && (
+            <Button
+              leftIcon={<FiX />}
+              variant="ghost"
+              size="sm"
+              onClick={handleClearFilters}
+            >
+              {t('kanban.clearFilters')}
+            </Button>
+          )}
+
+          <Badge colorScheme="purple" px={3} py={1} borderRadius="full" ml="auto">
             <HStack spacing={1}>
               <FiCpu />
               <Text>{t('kanban.predictiveMode')}</Text>
@@ -383,7 +367,10 @@ const Kanban = () => {
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
-          modifiers={[restrictToVerticalAxis]}
+          onDragCancel={() => {
+            setActiveId(null);
+            setOverColumnId(null);
+          }}
         >
           <Flex
             gap={4}
@@ -405,44 +392,14 @@ const Kanban = () => {
             }}
           >
             {Object.values(columns).map((column) => (
-              <Box
+              <KanbanColumn
                 key={column.id}
-                flex="1"
-                minWidth="280px"
-                maxWidth="320px"
-                bg="gray.50"
-                borderRadius="lg"
-                p={3}
-                height="100%"
-                display="flex"
-                flexDirection="column"
+                column={column}
+                overColumnId={overColumnId}
+                onAdd={handleAddToColumn}
               >
-                {/* En-tête de colonne */}
-                <Flex justify="space-between" align="center" mb={3}>
-                  <HStack>
-                    <Badge
-                      colorScheme={column.color}
-                      px={2}
-                      py={1}
-                      borderRadius="full"
-                    >
-                      <HStack spacing={1}>
-                        <Text fontWeight="bold">{column.title}</Text>
-                        <Text>({column.tasks.length})</Text>
-                      </HStack>
-                    </Badge>
-                  </HStack>
-                  <IconButton
-                    icon={<FiPlus />}
-                    size="xs"
-                    variant="ghost"
-                    aria-label={t('kanban.addToColumn')}
-                  />
-                </Flex>
-
-                {/* Liste des tâches */}
                 <SortableContext
-                  items={column.tasks.map(t => t.id)}
+                  items={column.tasks.map(task => task.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   <VStack
@@ -470,6 +427,7 @@ const Kanban = () => {
                         key={task.id}
                         task={task}
                         columnId={column.id}
+                        onDelete={handleDeleteTask}
                       />
                     ))}
 
@@ -477,18 +435,20 @@ const Kanban = () => {
                       <Box
                         p={4}
                         border="2px dashed"
-                        borderColor="gray.200"
+                        borderColor={overColumnId === column.id ? 'brand.300' : 'gray.200'}
                         borderRadius="lg"
                         textAlign="center"
+                        bg={overColumnId === column.id ? 'brand.50' : 'transparent'}
+                        transition="all 0.15s ease"
                       >
-                        <Text color="gray.400" fontSize="sm">
-                          {t('kanban.noTasks')}
+                        <Text color={overColumnId === column.id ? 'brand.500' : 'gray.400'} fontSize="sm">
+                          {overColumnId === column.id ? t('kanban.dropHere') : t('kanban.noTasks')}
                         </Text>
                       </Box>
                     )}
                   </VStack>
                 </SortableContext>
-              </Box>
+              </KanbanColumn>
             ))}
           </Flex>
 
@@ -497,12 +457,86 @@ const Kanban = () => {
               <TaskCardOverlay
                 task={Object.values(columns)
                   .flatMap(col => col.tasks)
-                  .find(t => t.id === activeId)}
+                  .find(task => task.id === activeId)}
               />
             ) : null}
           </DragOverlay>
         </DndContext>
       </VStack>
+      <PageGuide
+        guideId="kanban"
+        i18nPrefix="pageGuides.kanban"
+        steps={KANBAN_STEPS}
+      />
+    </Box>
+  );
+};
+
+// Colonne du tableau : zone de dépôt (droppable) pour les tâches
+const KanbanColumn = ({ column, overColumnId, onAdd, children }) => {
+  const { t } = useTranslation();
+  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const effectiveIsOver = isOver || overColumnId === column.id;
+  const totalEstimate = (column.tasks || []).reduce(
+    (sum, task) => sum + (Number(task.estimated_time) || 0),
+    0
+  );
+
+  return (
+    <Box
+      ref={setNodeRef}
+      flex="1"
+      minWidth="280px"
+      maxWidth="320px"
+      bg="gray.50"
+      borderRadius="lg"
+      borderWidth="2px"
+      borderColor={effectiveIsOver ? 'brand.400' : 'transparent'}
+      borderTopWidth="3px"
+      borderTopColor={`${column.color}.400`}
+      boxShadow={effectiveIsOver ? '0 0 0 3px rgba(59, 91, 219, 0.15)' : 'none'}
+      p={3}
+      height="100%"
+      display="flex"
+      flexDirection="column"
+      transition="box-shadow 0.15s ease"
+    >
+      {/* En-tête de colonne */}
+      <Flex justify="space-between" align="center" mb={3}>
+        <HStack spacing={2}>
+          <Badge
+            colorScheme={column.color}
+            px={2}
+            py={1}
+            borderRadius="full"
+            fontSize="xs"
+          >
+            <HStack spacing={1}>
+              <Text fontWeight="bold">{column.title}</Text>
+              <Text>({column.tasks.length})</Text>
+            </HStack>
+          </Badge>
+          {totalEstimate > 0 && (
+            <Tooltip label={t('kanban.totalEstimate')}>
+              <HStack spacing={1} color="gray.500" fontSize="xs">
+                <FiClock size={12} />
+                <Text>{totalEstimate}h</Text>
+              </HStack>
+            </Tooltip>
+          )}
+        </HStack>
+        <Tooltip label={t('kanban.addToColumn')}>
+          <IconButton
+            icon={<FiPlus />}
+            size="xs"
+            variant="ghost"
+            aria-label={t('kanban.addToColumn')}
+            onClick={() => onAdd(column.id)}
+          />
+        </Tooltip>
+      </Flex>
+
+      {children}
     </Box>
   );
 };
@@ -526,15 +560,14 @@ const TaskCardOverlay = ({ task }) => {
             {task.title}
           </Text>
           <HStack justify="space-between">
-            <Badge colorScheme={
-              task.priority === 4 ? 'red' :
-              task.priority === 3 ? 'orange' :
-              task.priority === 2 ? 'blue' : 'gray'
-            }>
-              {t('common.priority')} {task.priority}
+            <Badge colorScheme={getPriorityColor(task.priority)}>
+              {getPriorityLabel(task.priority)}
             </Badge>
             {task.assigned_to_name && (
-              <Avatar size="xs" name={task.assigned_to_name} />
+              <HStack spacing={1} fontSize="xs" color="gray.500">
+                <FiUser />
+                <Text>{task.assigned_to_name}</Text>
+              </HStack>
             )}
           </HStack>
         </VStack>

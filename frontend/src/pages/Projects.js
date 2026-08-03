@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Box,
@@ -47,34 +47,52 @@ import {
   Stat,
   StatLabel,
   StatNumber,
-  StatHelpText,
-  StatArrow,
   Tag,
   TagLabel,
   TagCloseButton,
   Wrap,
   WrapItem,
+  InputGroup,
+  InputLeftElement,
+  Tooltip,
 } from '@chakra-ui/react';
 import {
   FiPlus,
-  FiMoreVertical,
   FiEdit2,
   FiTrash2,
   FiEye,
-  FiCalendar,
+  FiSearch,
+  FiArrowUp,
+  FiArrowDown,
+  FiChevronsDown,
+  FiList,
   FiUsers,
+  FiAlertCircle,
 } from 'react-icons/fi';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useProjectService } from '../services/projectService';
 import { useCrudService } from '../utils/createCrudService';
 import { useAuth } from '../context/AuthContext';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { PROJECT_STATUS_COLORS, getProjectStatusLabel } from '../utils/constants';
 import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import PageGuide from '../components/PageGuide';
+import { FiFolder } from 'react-icons/fi';
+
+const PROJECTS_STEPS = [
+  { key: 'overview', icon: FiFolder },
+  { key: 'create', icon: FiPlus },
+  { key: 'detail', icon: FiEye },
+];
+
+const STATUS_KEYS = ['not_started', 'in_progress', 'paused', 'completed', 'archived'];
 
 const Projects = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProject, setSelectedProject] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -89,15 +107,30 @@ const Projects = () => {
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [selectedManagerId, setSelectedManagerId] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState('');
-  
+
+  // Filtres & tri
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [sortKey, setSortKey] = useState('deadline');
+  const [sortDir, setSortDir] = useState('asc');
+  const [statusUpdatingId, setStatusUpdatingId] = useState(null);
+
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { 
-    isOpen: isDeleteOpen, 
-    onOpen: onDeleteOpen, 
-    onClose: onDeleteClose 
+  const {
+    isOpen: isDeleteOpen,
+    onOpen: onDeleteOpen,
+    onClose: onDeleteClose,
   } = useDisclosure();
   const cancelRef = React.useRef();
-  
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      handleOpenModal();
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const toast = useToast();
   const queryClient = useQueryClient();
   const projectService = useProjectService();
@@ -106,9 +139,9 @@ const Projects = () => {
   const userService = useCrudService('/users', { resourceName: t('sidebar.users') });
 
   const { data: allGroups = [] } = useQuery('groups', () => groupService.getAll());
- const availableGroups = Array.isArray(allGroups) 
-  ? allGroups 
-  : (allGroups?.results || []);
+  const availableGroups = Array.isArray(allGroups)
+    ? allGroups
+    : (allGroups?.results || []);
 
   const { data: allUsers = [] } = useQuery('managed-users', () => userService.getAll());
   const availableUsers = Array.isArray(allUsers) ? allUsers : allUsers.results || [];
@@ -128,6 +161,8 @@ const Projects = () => {
       },
     }
   );
+
+  const projectList = Array.isArray(projects) ? projects : (projects?.results || []);
 
   // Mutation pour créer un projet
   const createMutation = useMutation(
@@ -172,6 +207,32 @@ const Projects = () => {
         toast({
           title: t('common.error'),
           description: error.response?.data?.message || t('projects.updateError'),
+          status: 'error',
+          duration: 3000,
+        });
+      },
+    }
+  );
+
+  // Mutation pour changer le statut rapidement (inline)
+  const updateStatusMutation = useMutation(
+    ({ id, status }) => projectService.updateProjectStatus(id, { status }),
+    {
+      onSuccess: () => {
+        setStatusUpdatingId(null);
+        queryClient.invalidateQueries('projects');
+        toast({
+          title: t('common.success'),
+          description: t('projects.updatedSuccess'),
+          status: 'success',
+          duration: 2000,
+        });
+      },
+      onError: () => {
+        setStatusUpdatingId(null);
+        toast({
+          title: t('common.error'),
+          description: t('projects.updateError'),
           status: 'error',
           duration: 3000,
         });
@@ -258,7 +319,6 @@ const Projects = () => {
     } else {
       createMutation.mutate(formData);
     }
-    
   };
 
   const addToList = (field, selectedId, setSelectedId) => {
@@ -286,6 +346,96 @@ const Projects = () => {
   };
 
   const getStatusColor = (status) => PROJECT_STATUS_COLORS[status] || 'gray';
+
+  const toggleSort = (key) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const isProjectOverdue = (project) =>
+    project.deadline && new Date(project.deadline) < new Date() && project.status !== 'completed';
+
+  const filteredProjects = useMemo(() => {
+    let list = projectList;
+    if (statusFilter) list = list.filter((p) => p.status === statusFilter);
+    if (overdueOnly) list = list.filter(isProjectOverdue);
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      list = list.filter(
+        (p) =>
+          (p.name || '').toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q)
+      );
+    }
+    const sorted = [...list].sort((a, b) => {
+      let av;
+      let bv;
+      if (sortKey === 'deadline') {
+        av = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+        bv = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+      } else if (sortKey === 'progress') {
+        av = Number(a.progress) || 0;
+        bv = Number(b.progress) || 0;
+      } else {
+        av = String(a[sortKey] || '').toLowerCase();
+        bv = String(b[sortKey] || '').toLowerCase();
+      }
+      const cmp = av > bv ? 1 : av < bv ? -1 : 0;
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return sorted;
+  }, [projectList, statusFilter, overdueOnly, searchTerm, sortKey, sortDir]);
+
+  const overdueCount = projectList.filter(isProjectOverdue).length;
+
+  const statCards = [
+    {
+      key: 'all',
+      label: t('projects.title'),
+      value: projectList.length,
+      active: !statusFilter && !overdueOnly,
+      onClick: () => {
+        setStatusFilter('');
+        setOverdueOnly(false);
+      },
+    },
+    {
+      key: 'in_progress',
+      label: t('common.inProgress'),
+      value: projectList.filter((p) => p.status === 'in_progress').length,
+      active: statusFilter === 'in_progress',
+      onClick: () => {
+        setStatusFilter('in_progress');
+        setOverdueOnly(false);
+      },
+    },
+    {
+      key: 'completed',
+      label: t('common.completed'),
+      value: projectList.filter((p) => p.status === 'completed').length,
+      active: statusFilter === 'completed',
+      onClick: () => {
+        setStatusFilter('completed');
+        setOverdueOnly(false);
+      },
+    },
+    {
+      key: 'overdue',
+      label: t('projects.overdueTasks'),
+      value: overdueCount,
+      active: overdueOnly,
+      onClick: () => {
+        setStatusFilter('');
+        setOverdueOnly(true);
+      },
+    },
+  ];
+
+  const hasActiveFilters = Boolean(searchTerm || statusFilter || overdueOnly);
 
   if (isLoading) {
     return <LoadingState message={t('common.loading')} />;
@@ -315,181 +465,239 @@ const Projects = () => {
         </Button>
       </HStack>
 
-      {/* Statistiques rapides */}
-      {projects && projects.length > 0 && (
-        <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4} mb={6}>
-          <Card>
-            <CardBody>
+      {/* Statistiques rapides (cliquables = filtres) */}
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={6}>
+        {statCards.map((card) => (
+          <Card
+            key={card.key}
+            cursor="pointer"
+            onClick={card.onClick}
+            borderWidth="2px"
+            borderColor={card.active ? 'brand.400' : 'transparent'}
+            boxShadow={card.active ? '0 0 0 3px rgba(59, 91, 219, 0.15)' : 'sm'}
+            _hover={{ shadow: 'md', transform: 'translateY(-1px)' }}
+            transition="all 0.15s"
+            role="group"
+          >
+            <CardBody py={4}>
               <Stat>
-                <StatLabel>{t('projects.title')}</StatLabel>
-                <StatNumber>{projects.length}</StatNumber>
+                <StatLabel color={card.active ? 'brand.600' : 'inherit'}>
+                  {card.label}
+                </StatLabel>
+                <StatNumber fontSize="2xl">{card.value}</StatNumber>
               </Stat>
             </CardBody>
           </Card>
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>{t('common.inProgress')}</StatLabel>
-                <StatNumber>
-                  {projects.filter(p => p.status === 'in_progress').length}
-                </StatNumber>
-              </Stat>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>{t('common.completed')}</StatLabel>
-                <StatNumber>
-                  {projects.filter(p => p.status === 'completed').length}
-                </StatNumber>
-              </Stat>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardBody>
-              <Stat>
-                <StatLabel>{t('projects.progressAvg')}</StatLabel>
-                <StatNumber>
-                  {Math.round(projects.reduce((acc, p) => acc + p.progress, 0) / projects.length)}%
-                </StatNumber>
-              </Stat>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
-      )}
+        ))}
+      </SimpleGrid>
+
+      {/* Barre de filtres */}
+      <HStack spacing={4} mb={6} wrap="wrap">
+        <InputGroup maxW="320px">
+          <InputLeftElement pointerEvents="none">
+            <FiSearch color="gray.300" />
+          </InputLeftElement>
+          <Input
+            placeholder={t('projects.searchPlaceholder')}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="sm"
+            borderRadius="md"
+          />
+        </InputGroup>
+
+        <Select
+          placeholder={t('common.allStatuses')}
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value);
+            setOverdueOnly(false);
+          }}
+          size="sm"
+          width="200px"
+        >
+          {STATUS_KEYS.map((s) => (
+            <option key={s} value={s}>{getProjectStatusLabel(s)}</option>
+          ))}
+        </Select>
+
+        {hasActiveFilters && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('');
+              setOverdueOnly(false);
+            }}
+          >
+            {t('kanban.clearFilters')}
+          </Button>
+        )}
+
+        <Text fontSize="sm" color="gray.500" ml="auto">
+          {filteredProjects.length} / {projectList.length}
+        </Text>
+      </HStack>
 
       {/* Tableau des projets */}
-      <Box bg="white" borderRadius="lg" boxShadow="sm" overflow="hidden">
-        <Table variant="simple">
+      <Box bg="white" borderRadius="lg" boxShadow="sm" overflowX="auto">
+        <Table variant="simple" size="sm">
           <Thead bg="gray.50">
             <Tr>
-              <Th>{t('projects.column.name')}</Th>
-              <Th>{t('common.status')}</Th>
-              <Th>{t('common.progress')}</Th>
-              <Th>{t('projects.column.groups')}</Th>
-              <Th>{t('projects.column.managers')}</Th>
-              <Th>{t('projects.column.deadline')}</Th>
+              <SortableTh label={t('projects.column.name')} column="name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+              <SortableTh label={t('common.status')} column="status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+              <SortableTh label={t('common.progress')} column="progress" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+              <Th>{t('common.tasks')}</Th>
+              <Th>{t('common.members')}</Th>
+              <SortableTh label={t('projects.column.deadline')} column="deadline" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
               <Th>{t('common.actions')}</Th>
             </Tr>
           </Thead>
           <Tbody>
-            {projects && projects.length > 0 ? (
-              projects.map((project) => (
-                <Tr key={project.id}>
-                  <Td>
-                    <Text fontWeight="500">{project.name}</Text>
-                    <Text fontSize="sm" color="gray.500" noOfLines={1}>
-                      {project.description}
-                    </Text>
-                  </Td>
-                  <Td>
-                    <Badge colorScheme={getStatusColor(project.status)}>
-                      {getProjectStatusLabel(project.status)}
-                    </Badge>
-                  </Td>
-                  <Td>
-                    <HStack spacing={3}>
-                      <Progress
-                        value={project.progress}
-                        size="sm"
-                        colorScheme={project.progress === 100 ? 'green' : 'blue'}
-                        width="100px"
-                        borderRadius="full"
-                      />
-                      <Text fontSize="sm">{Math.round(project.progress)}%</Text>
-                    </HStack>
-                  </Td>
-                  <Td>
-                    {project.groups_detail && project.groups_detail.length > 0 ? (
-                      <Wrap>
-                        {project.groups_detail.map((g) => (
-                          <WrapItem key={g.id}>
-                            <Badge colorScheme="purple" fontSize="xs">{g.name}</Badge>
-                          </WrapItem>
-                        ))}
-                      </Wrap>
-                    ) : (
-                      <Text fontSize="sm" color="gray.400">-</Text>
-                    )}
-                  </Td>
-                  <Td>
-                    {project.managers_detail && project.managers_detail.length > 0 ? (
-                      <Wrap>
-                        {project.managers_detail.map((m) => (
-                          <WrapItem key={m.id}>
-                            <Badge colorScheme="orange" fontSize="xs">{m.username}</Badge>
-                          </WrapItem>
-                        ))}
-                      </Wrap>
-                    ) : (
-                      <Text fontSize="sm" color="gray.400">-</Text>
-                    )}
-                  </Td>
-                  <Td>
-                    {project.deadline ? (
-                      <Text
-                        fontSize="sm"
-                        color={
-                          new Date(project.deadline) < new Date() &&
-                          project.status !== 'completed'
-                            ? 'red.500'
-                            : 'inherit'
-                        }
-                        fontWeight={
-                          new Date(project.deadline) < new Date() &&
-                          project.status !== 'completed'
-                            ? 'bold'
-                            : 'normal'
-                        }
-                      >
-                        {format(new Date(project.deadline), 'dd/MM/yyyy')}
-                      </Text>
-                    ) : (
-                      <Text fontSize="sm" color="gray.400">-</Text>
-                    )}
-                  </Td>
-                  <Td>
-                    <HStack spacing={2}>
-                      <IconButton
-                        as={RouterLink}
-                        to={`/projects/${project.id}`}
-                        icon={<FiEye />}
-                        size="sm"
-                        variant="ghost"
-                        aria-label={t('common.view')}
-                      />
-                      <IconButton
-                        icon={<FiEdit2 />}
-                        size="sm"
-                        variant="ghost"
-                        aria-label={t('common.edit')}
-                        onClick={() => handleOpenModal(project)}
-                      />
-                      <IconButton
-                        icon={<FiTrash2 />}
-                        size="sm"
-                        variant="ghost"
-                        colorScheme="red"
-                        aria-label={t('common.delete')}
-                        onClick={() => handleDelete(project)}
-                      />
-                    </HStack>
-                  </Td>
-                </Tr>
-              ))
+            {filteredProjects.length > 0 ? (
+              filteredProjects.map((project) => {
+                const progress = Math.round(project.progress || 0);
+                const progressColor = progress >= 100 ? 'green' : progress >= 50 ? 'blue' : progress >= 25 ? 'orange' : 'red';
+                const overdue = isProjectOverdue(project);
+                return (
+                  <Tr
+                    key={project.id}
+                    onClick={() => navigate(`/projects/${project.id}`)}
+                    cursor="pointer"
+                    _hover={{ bg: 'gray.50' }}
+                    transition="background 0.15s"
+                  >
+                    <Td>
+                      <HStack spacing={2}>
+                        {overdue && (
+                          <Tooltip label={t('common.overdue')}>
+                            <FiAlertCircle color="red.500" />
+                          </Tooltip>
+                        )}
+                        <Box>
+                          <Text fontWeight="500">{project.name}</Text>
+                          <Text fontSize="sm" color="gray.500" noOfLines={1}>
+                            {project.description}
+                          </Text>
+                        </Box>
+                      </HStack>
+                    </Td>
+                    <Td onClick={(e) => e.stopPropagation()}>
+                      {statusUpdatingId === project.id ? (
+                        <Spinner size="sm" color="blue.500" />
+                      ) : (
+                        <Select
+                          size="xs"
+                          width="140px"
+                          value={project.status}
+                          onChange={(e) => {
+                            setStatusUpdatingId(project.id);
+                            updateStatusMutation.mutate({ id: project.id, status: e.target.value });
+                          }}
+                          borderColor={`${getStatusColor(project.status)}.300`}
+                        >
+                          {STATUS_KEYS.map((s) => (
+                            <option key={s} value={s}>{getProjectStatusLabel(s)}</option>
+                          ))}
+                        </Select>
+                      )}
+                    </Td>
+                    <Td>
+                      <HStack spacing={3}>
+                        <Progress
+                          value={progress}
+                          size="sm"
+                          colorScheme={progressColor}
+                          width="100px"
+                          borderRadius="full"
+                        />
+                        <Text fontSize="sm">{progress}%</Text>
+                      </HStack>
+                    </Td>
+                    <Td>
+                      <HStack spacing={1}>
+                        <FiList size={12} color="gray.400" />
+                        <Text fontSize="sm">{project.task_count ?? '-'}</Text>
+                      </HStack>
+                    </Td>
+                    <Td>
+                      <HStack spacing={1}>
+                        <FiUsers size={12} color="gray.400" />
+                        <Text fontSize="sm">{project.members_count ?? '-'}</Text>
+                      </HStack>
+                    </Td>
+                    <Td>
+                      {project.deadline ? (
+                        <Text
+                          fontSize="sm"
+                          color={overdue ? 'red.500' : 'inherit'}
+                          fontWeight={overdue ? 'bold' : 'normal'}
+                        >
+                          {format(new Date(project.deadline), 'dd/MM/yyyy')}
+                        </Text>
+                      ) : (
+                        <Text fontSize="sm" color="gray.400">-</Text>
+                      )}
+                    </Td>
+                    <Td onClick={(e) => e.stopPropagation()}>
+                      <HStack spacing={2}>
+                        <IconButton
+                          as={RouterLink}
+                          to={`/projects/${project.id}`}
+                          icon={<FiEye />}
+                          size="sm"
+                          variant="ghost"
+                          aria-label={t('common.view')}
+                        />
+                        <IconButton
+                          icon={<FiEdit2 />}
+                          size="sm"
+                          variant="ghost"
+                          aria-label={t('common.edit')}
+                          onClick={() => handleOpenModal(project)}
+                        />
+                        <IconButton
+                          icon={<FiTrash2 />}
+                          size="sm"
+                          variant="ghost"
+                          colorScheme="red"
+                          aria-label={t('common.delete')}
+                          onClick={() => handleDelete(project)}
+                        />
+                      </HStack>
+                    </Td>
+                  </Tr>
+                );
+              })
             ) : (
               <Tr>
-                <Td colSpan={7} textAlign="center" py={8}>
-                  <Text color="gray.500">{t('projects.notFound')}</Text>
-                  <Button
-                    mt={4}
-                    size="sm"
-                    leftIcon={<FiPlus />}
-                    onClick={() => handleOpenModal()}
-                  >
-                    {t('projects.createFirst')}
-                  </Button>
+                <Td colSpan={7} py={8}>
+                  {projectList.length === 0 ? (
+                    <EmptyState
+                      icon={FiFolder}
+                      message={t('projects.notFound')}
+                      description={t('projects.emptyDescription')}
+                      actionLabel={t('projects.createFirst')}
+                      onAction={() => handleOpenModal()}
+                    />
+                  ) : (
+                    <VStack spacing={4} py={6}>
+                      <Text color="gray.500">{t('common.noResults')}</Text>
+                      <Button
+                        mt={2}
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setStatusFilter('');
+                          setOverdueOnly(false);
+                        }}
+                      >
+                        {t('kanban.clearFilters')}
+                      </Button>
+                    </VStack>
+                  )}
                 </Td>
               </Tr>
             )}
@@ -537,6 +745,7 @@ const Projects = () => {
                     <option value="in_progress">{t('common.inProgress')}</option>
                     <option value="paused">{t('common.paused')}</option>
                     <option value="completed">{t('common.completed')}</option>
+                    <option value="archived">{t('common.archived')}</option>
                   </Select>
                 </FormControl>
 
@@ -717,8 +926,27 @@ const Projects = () => {
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
+      <PageGuide
+        guideId="projects"
+        i18nPrefix="pageGuides.projects"
+        steps={PROJECTS_STEPS}
+      />
     </Box>
   );
 };
+
+// En-tête de colonne triable
+const SortableTh = ({ label, column, sortKey, sortDir, onSort }) => (
+  <Th cursor="pointer" userSelect="none" onClick={() => onSort(column)}>
+    <HStack spacing={1}>
+      <Text>{label}</Text>
+      {sortKey === column ? (
+        sortDir === 'asc' ? <FiArrowUp size={12} /> : <FiArrowDown size={12} />
+      ) : (
+        <FiChevronsDown size={12} color="gray.300" />
+      )}
+    </HStack>
+  </Th>
+);
 
 export default Projects;

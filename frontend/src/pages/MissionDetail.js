@@ -17,10 +17,11 @@ import {
 import {
   FiArrowLeft, FiEdit2, FiTrash2, FiCalendar, FiMapPin,
   FiUsers, FiDollarSign, FiClock, FiCheck, FiXCircle, FiPlay,
-  FiFileText, FiSave, FiPrinter, FiDownload, FiLink,
+  FiFileText, FiSave, FiPrinter, FiDownload, FiLink, FiUpload, FiX,
 } from 'react-icons/fi';
 import { useMissionService } from '../services/missionService';
 import { useAuth } from '../context/AuthContext';
+import MissionReport from '../components/MissionReport';
 
 const statusConfig = {
   planned: { color: 'blue', labelKey: 'missions.planned', icon: FiClock },
@@ -124,6 +125,105 @@ const MissionDetail = () => {
     } catch (error) {
       toast({ title: t('common.error'), status: 'error', duration: 3000 });
     }
+  };
+
+  const costCategories = [
+    { key: 'accommodation', label: t('missions.form.housing') },
+    { key: 'transport', label: t('missions.form.transport') },
+    { key: 'other', label: t('missions.form.otherExpenses') },
+  ];
+
+  const [justifications, setJustifications] = useState({ accommodation: [], transport: [], other: [] });
+  const [uploadingCat, setUploadingCat] = useState(null);
+  const justificationInputRef = useRef(null);
+
+  const loadJustifications = async () => {
+    if (!mission) return;
+    try {
+      const res = await axiosInstance.get('/files/', { params: { mission: mission.id } });
+      const files = Array.isArray(res.data) ? res.data : res.data.results || [];
+      const grouped = { accommodation: [], transport: [], other: [] };
+      files.forEach((f) => {
+        const cat = grouped[f.category] ? f.category : 'other';
+        grouped[cat].push(f);
+      });
+      setJustifications(grouped);
+    } catch {
+      // silent
+    }
+  };
+
+  useEffect(() => {
+    if (mission) loadJustifications();
+  }, [mission?.id]);
+
+  const handleAddJustification = (category) => {
+    setUploadingCat(category);
+    justificationInputRef.current?.click();
+  };
+
+  const handleJustificationFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    const category = uploadingCat;
+    if (!file || !category) {
+      e.target.value = '';
+      return;
+    }
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('name', file.name);
+    formData.append('mission', mission.id);
+    formData.append('category', category);
+    try {
+      await axiosInstance.post('/files/', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast({ title: t('files.uploadedSuccess'), status: 'success', duration: 2000 });
+      await loadJustifications();
+    } catch (err) {
+      toast({
+        title: t('missions.justificationUploadError'),
+        description: err.response?.data?.error || t('common.unknownError'),
+        status: 'error', duration: 3000,
+      });
+    } finally {
+      setUploadingCat(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleJustificationDownload = async (file) => {
+    try {
+      const res = await axiosInstance.get(`/files/${file.id}/download/`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', file.name);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: t('files.downloadError'), status: 'error', duration: 3000 });
+    }
+  };
+
+  const handleJustificationDelete = async (file) => {
+    try {
+      await axiosInstance.delete(`/files/${file.id}/`);
+      toast({ title: t('files.deletedSuccess'), status: 'info', duration: 2000 });
+      await loadJustifications();
+    } catch {
+      toast({ title: t('common.error'), status: 'error', duration: 3000 });
+    }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   const formatDate = (dateStr) => {
@@ -469,6 +569,96 @@ const MissionDetail = () => {
                     </Flex>
                   </VStack>
                 )}
+
+                <Divider />
+
+                <Box>
+                  <Flex justify="space-between" align="center" mb={3}>
+                    <Heading size="sm">{t('missionDetail.justifications')}</Heading>
+                  </Flex>
+                  <input
+                    ref={justificationInputRef}
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={handleJustificationFileSelect}
+                  />
+                  {costCategories.map((cat) => {
+                    const files = justifications[cat.key] || [];
+                    return (
+                      <Box key={cat.key} p={3} bg={codeBg} borderRadius="lg" mb={3}>
+                        <Flex justify="space-between" align="center" mb={2}>
+                          <Text fontWeight="600">{cat.label}</Text>
+                          <HStack>
+                            {uploadingCat === cat.key && <Spinner size="sm" />}
+                            <Button
+                              size="xs"
+                              leftIcon={<FiUpload />}
+                              colorScheme="blue"
+                              variant="outline"
+                              onClick={() => handleAddJustification(cat.key)}
+                              isLoading={uploadingCat === cat.key}
+                            >
+                              {t('missionDetail.addJustification')}
+                            </Button>
+                          </HStack>
+                        </Flex>
+                        {files.length === 0 ? (
+                          <Text fontSize="sm" color="gray.400" fontStyle="italic">
+                            {t('missionDetail.noJustification')}
+                          </Text>
+                        ) : (
+                          <VStack spacing={1} align="stretch">
+                            {files.map((f) => (
+                              <Flex
+                                key={f.id}
+                                align="center"
+                                justify="space-between"
+                                p={2}
+                                bg={bgColor}
+                                borderRadius="md"
+                                borderWidth="1px"
+                                borderColor={borderColor}
+                              >
+                                <HStack minW={0}>
+                                  <Icon as={FiFileText} color="blue.400" flexShrink={0} />
+                                  <Box minW={0}>
+                                    <Text fontSize="sm" fontWeight="500" isTruncated>{f.name}</Text>
+                                    <Text fontSize="xs" color="gray.400">
+                                      {formatFileSize(f.size_bytes)} · {f.uploaded_by_name}
+                                    </Text>
+                                  </Box>
+                                </HStack>
+                                <HStack spacing={1} flexShrink={0}>
+                                  <Tooltip label={t('files.downloadButton')}>
+                                    <IconButton
+                                      size="xs"
+                                      icon={<FiDownload />}
+                                      variant="ghost"
+                                      onClick={() => handleJustificationDownload(f)}
+                                      aria-label={t('files.downloadButton')}
+                                    />
+                                  </Tooltip>
+                                  {(f.uploaded_by === user?.id || user?.role === 'admin' || user?.role === 'superadmin') && (
+                                    <Tooltip label={t('files.deleteButton')}>
+                                      <IconButton
+                                        size="xs"
+                                        icon={<FiX />}
+                                        variant="ghost"
+                                        colorScheme="red"
+                                        onClick={() => handleJustificationDelete(f)}
+                                        aria-label={t('files.deleteButton')}
+                                      />
+                                    </Tooltip>
+                                  )}
+                                </HStack>
+                              </Flex>
+                            ))}
+                          </VStack>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
               </VStack>
             </TabPanel>
 
@@ -479,9 +669,15 @@ const MissionDetail = () => {
 
             {/* Mission Report Tab */}
             <TabPanel>
+              <MissionReport
+                mission={mission}
+                formatCost={formatCost}
+                getCostBreakdown={getCostBreakdown}
+              />
+              <Divider my={6} />
               <VStack spacing={4} align="stretch">
                 <Flex justify="space-between" align="center">
-                  <Heading size="sm">{t('missionDetail.tabs.report')}</Heading>
+                  <Heading size="sm">{t('missionDetail.reportNarrative')}</Heading>
                   {(isLeader || user?.role === 'admin' || user?.role === 'superadmin') && (
                     editingReports ? (
                       <HStack>

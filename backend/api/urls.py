@@ -2,7 +2,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 from .views_comment import CommentViewSet
-from .views_meeting import MeetingViewSet, MeetingActionItemViewSet
+from .views_meeting import MeetingViewSet, MeetingActionItemViewSet, MeetingChatMessageViewSet
 from .views_file import FileViewSet, StorageNotificationViewSet
 from .views_mission import MissionViewSet
 from .views_currency import CurrencyListView
@@ -23,6 +23,7 @@ router.register(r'tasks', views.TaskViewSet)
 router.register(r'comments', CommentViewSet)
 router.register(r'meetings', MeetingViewSet)
 router.register(r'meeting-action-items', MeetingActionItemViewSet)
+router.register(r'meeting-chat-messages', MeetingChatMessageViewSet)
 router.register(r'files', FileViewSet)
 router.register(r'storage-notifications', StorageNotificationViewSet)
 router.register(r'missions', MissionViewSet)

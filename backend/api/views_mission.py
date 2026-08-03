@@ -68,7 +68,7 @@ class MissionViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         pk = kwargs.get('pk')
         redis_client = _get_redis()
-        cache_key = f'mission_detail:{pk}'
+        cache_key = f'mission_detail:{request.user.id}:{pk}'
 
         if redis_client:
             cached = redis_client.get(cache_key)
@@ -105,7 +105,8 @@ class MissionViewSet(viewsets.ModelViewSet):
     def _invalidate_detail_cache(self, mission_id):
         redis_client = _get_redis()
         if redis_client:
-            redis_client.delete(f'mission_detail:{mission_id}')
+            for key in redis_client.scan_iter(f'mission_detail:*:{mission_id}'):
+                redis_client.delete(key)
 
     @action(detail=True, methods=['post'])
     def end_mission(self, request, pk=None):

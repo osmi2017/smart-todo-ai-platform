@@ -31,13 +31,20 @@ import {
   FiHelpCircle,
   FiMenu,
   FiGlobe,
+  FiPlus,
+  FiFolder,
+  FiCheckSquare,
+  FiMic,
+  FiMap,
 } from 'react-icons/fi';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { setUserLanguage } from '../i18n';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
 import Sidebar from './Sidebar';
 import GlobalSearch from './GlobalSearch';
+import HelpDrawer from './HelpDrawer';
 
 const Header = ({ onMobileMenuToggle, isMobile }) => {
   const navigate = useNavigate();
@@ -46,6 +53,11 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
   const bgColor = useColorModeValue('white', 'gray.900');
   const borderColor = useColorModeValue('gray.100', 'gray.800');
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const {
+    isOpen: isHelpOpen,
+    onOpen: onHelpOpen,
+    onClose: onHelpClose,
+  } = useDisclosure();
 
   const currentLang = i18n.language;
 
@@ -93,6 +105,37 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
               />
             )}
 
+            <Box data-onboard="quickcreate">
+              <Menu>
+                <MenuButton
+                  as={IconButton}
+                  icon={<FiPlus />}
+                  variant="solid"
+                  colorScheme="blue"
+                  size="sm"
+                  borderRadius="xl"
+                  aria-label={t('quickCreate.title')}
+                />
+                <MenuList minW="220px" p={2}>
+                  <Box px={3} py={1} fontSize="xs" fontWeight="600" color="gray.400" textTransform="uppercase" letterSpacing="wide">
+                    {t('quickCreate.title')}
+                  </Box>
+                  <MenuItem as={RouterLink} to="/projects?new=1" icon={<FiFolder />} borderRadius="lg">
+                    {t('quickCreate.project')}
+                  </MenuItem>
+                  <MenuItem as={RouterLink} to="/tasks/create" icon={<FiCheckSquare />} borderRadius="lg">
+                    {t('quickCreate.task')}
+                  </MenuItem>
+                  <MenuItem as={RouterLink} to="/meetings/create" icon={<FiMic />} borderRadius="lg">
+                    {t('quickCreate.meeting')}
+                  </MenuItem>
+                  <MenuItem as={RouterLink} to="/missions/create" icon={<FiMap />} borderRadius="lg">
+                    {t('quickCreate.mission')}
+                  </MenuItem>
+                </MenuList>
+              </Menu>
+            </Box>
+
             <Menu>
               <MenuButton
                 as={IconButton}
@@ -104,7 +147,7 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
               <MenuList minW="120px" p={1}>
                 <MenuItem
                   borderRadius="lg"
-                  onClick={() => i18n.changeLanguage('fr')}
+                  onClick={() => setUserLanguage('fr')}
                   bg={currentLang === 'fr' ? 'blue.50' : undefined}
                   fontWeight={currentLang === 'fr' ? '600' : '400'}
                 >
@@ -112,7 +155,7 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
                 </MenuItem>
                 <MenuItem
                   borderRadius="lg"
-                  onClick={() => i18n.changeLanguage('en')}
+                  onClick={() => setUserLanguage('en')}
                   bg={currentLang === 'en' ? 'blue.50' : undefined}
                   fontWeight={currentLang === 'en' ? '600' : '400'}
                 >
@@ -122,6 +165,16 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
             </Menu>
 
             <NotificationBell />
+
+            <Box data-onboard="help">
+              <IconButton
+                icon={<FiHelpCircle />}
+                variant="ghost"
+                size="sm"
+                aria-label={t('header.help')}
+                onClick={onHelpOpen}
+              />
+            </Box>
 
             <Menu>
               <MenuButton>
@@ -157,13 +210,6 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
                 >
                   {t('header.settings')}
                 </MenuItem>
-                <MenuItem
-                  icon={<FiHelpCircle />}
-                  borderRadius="lg"
-                  onClick={() => window.open('/docs', '_blank')}
-                >
-                  {t('header.help')}
-                </MenuItem>
                 <MenuDivider />
                 <MenuItem
                   icon={<FiLogOut />}
@@ -190,6 +236,8 @@ const Header = ({ onMobileMenuToggle, isMobile }) => {
           </DrawerContent>
         </Drawer>
       )}
+
+      <HelpDrawer isOpen={isHelpOpen} onClose={onHelpClose} />
     </>
   );
 };

@@ -11,6 +11,7 @@ export const useMissionService = () => {
         destination_name: data.destination_name || '',
         destination_lat: data.destination_lat || null,
         destination_lng: data.destination_lng || null,
+        distance_km: data.distance_km || null,
         start_date: data.start_date || null,
         end_date: data.end_date || null,
         cost_per_diem: data.cost_per_diem || 0,
@@ -20,6 +21,9 @@ export const useMissionService = () => {
         currency: data.currency || 'xof',
         expense_report: data.expense_report || '',
         mission_report: data.mission_report || '',
+        project: data.project || null,
+        tasks: data.tasks || [],
+        milestones: data.milestones || [],
       };
       if (data.member_ids !== undefined) formatted.member_ids = data.member_ids;
       if (data.leader_id !== undefined) formatted.leader_id = data.leader_id;

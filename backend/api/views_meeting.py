@@ -1,4 +1,4 @@
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -6,14 +6,16 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import (
-    Meeting, MeetingParticipant, MeetingActionItem,
+    Meeting, MeetingParticipant, MeetingActionItem, MeetingChatMessage,
     ActivityLog, Project,
 )
 from .serializers_meeting import (
     MeetingSerializer, MeetingDetailSerializer,
     MeetingParticipantSerializer, MeetingActionItemSerializer,
+    MeetingChatMessageSerializer,
 )
 from .events import EventTypes, emit_event, event_actor
 from .services.integrations import GoogleCalendarService, SlackService
@@ -24,6 +26,10 @@ class MeetingViewSet(viewsets.ModelViewSet):
     serializer_class = MeetingSerializer
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['status', 'project', 'organizer']
+    search_fields = ['title', 'description']
+    ordering_fields = ['scheduled_at', 'created_at', 'title']
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -286,3 +292,32 @@ class MeetingActionItemViewSet(viewsets.ModelViewSet):
             ).distinct()
 
         return qs
+
+
+class MeetingChatMessageViewSet(viewsets.ModelViewSet):
+    """Chat persisté d'une réunion vidéo."""
+    queryset = MeetingChatMessage.objects.all()
+    serializer_class = MeetingChatMessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        qs = MeetingChatMessage.objects.all()
+
+        meeting_id = self.request.query_params.get('meeting')
+        if meeting_id:
+            qs = qs.filter(meeting_id=meeting_id)
+
+        if user.role == 'superadmin':
+            return qs
+        if user.role == 'admin' and user.company:
+            return qs.filter(
+                Q(meeting__organizer__company=user.company)
+                | Q(meeting__project__company=user.company)
+            ).distinct()
+        return qs.filter(
+            Q(meeting__organizer=user) | Q(meeting__participants__user=user)
+        ).distinct()
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)

@@ -1,7 +1,46 @@
 from rest_framework import serializers
 from .models import (
-    Meeting, MeetingParticipant, MeetingSummary, MeetingActionItem, User,
+    Meeting, MeetingParticipant, MeetingSummary, MeetingActionItem,
+    MeetingChatMessage, File, User,
 )
+
+
+class MeetingChatMessageSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    file = serializers.PrimaryKeyRelatedField(
+        queryset=File.objects.all(), required=False, allow_null=True,
+    )
+    file_name = serializers.CharField(source='file.name', read_only=True, allow_null=True)
+    file_size = serializers.IntegerField(source='file.size_bytes', read_only=True, allow_null=True)
+    file_mime_type = serializers.CharField(source='file.mime_type', read_only=True, allow_null=True)
+
+    class Meta:
+        model = MeetingChatMessage
+        fields = [
+            'id', 'meeting', 'user', 'username', 'message',
+            'file', 'file_name', 'file_size', 'file_mime_type', 'created_at',
+        ]
+        read_only_fields = ['id', 'user', 'created_at']
+
+    def validate(self, attrs):
+        message = attrs.get('message', '')
+        file = attrs.get('file')
+        meeting = attrs.get('meeting')
+        if not message and not file:
+            raise serializers.ValidationError(
+                'Provide a message or attach a file.'
+            )
+        if file:
+            user = self.context.get('request').user
+            if file.company_id != user.company_id:
+                raise serializers.ValidationError(
+                    'Cannot attach a file from another company.'
+                )
+            if not file.meeting_id or file.meeting_id != meeting.id:
+                raise serializers.ValidationError(
+                    'File is not associated with this meeting.'
+                )
+        return attrs
 
 
 class MeetingParticipantSerializer(serializers.ModelSerializer):
@@ -45,6 +84,7 @@ class MeetingActionItemSerializer(serializers.ModelSerializer):
 
 class MeetingSerializer(serializers.ModelSerializer):
     organizer_name = serializers.CharField(source='organizer.username', read_only=True)
+    project_name = serializers.CharField(source='project.name', read_only=True, allow_null=True)
     participants_count = serializers.SerializerMethodField()
     action_items_count = serializers.SerializerMethodField()
     has_summary = serializers.SerializerMethodField()
@@ -55,7 +95,7 @@ class MeetingSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'status', 'input_type',
             'scheduled_at', 'started_at', 'ended_at', 'duration_minutes',
             'audio_file', 'raw_notes', 'transcript',
-            'organizer', 'organizer_name', 'project',
+            'organizer', 'organizer_name', 'project', 'project_name',
             'ai_processed', 'ai_processing_error',
             'google_calendar_event_id', 'slack_channel_id',
             'participants_count', 'action_items_count', 'has_summary',

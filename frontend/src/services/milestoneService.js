@@ -70,6 +70,16 @@ export const useMilestoneService = () => {
     }
   };
 
+  const patchMilestone = async (id, data) => {
+    try {
+      const response = await axiosInstance.patch(`/milestones/${id}/`, data);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur mise à jour milestone:', error.response?.data);
+      throw error;
+    }
+  };
+
   const deleteMilestone = async (id) => {
     try {
       await axiosInstance.delete(`/milestones/${id}/`);
@@ -95,6 +105,7 @@ export const useMilestoneService = () => {
     getMilestone,
     createMilestone,
     updateMilestone,
+    patchMilestone,
     deleteMilestone,
     predictRisk,
   };

@@ -45,6 +45,14 @@ import {
 } from 'recharts';
 import { useQuery } from 'react-query';
 import { useStatsService } from '../services/statsService';
+import PageGuide from '../components/PageGuide';
+import { FiBarChart2, FiTrendingUp, FiUsers } from 'react-icons/fi';
+
+const ANALYTICS_STEPS = [
+  { key: 'overview', icon: FiBarChart2 },
+  { key: 'trends', icon: FiTrendingUp },
+  { key: 'performance', icon: FiUsers },
+];
 
 const Analytics = () => {
   const [timeRange, setTimeRange] = useState('week');
@@ -300,6 +308,11 @@ const Analytics = () => {
           </Card>
         </SimpleGrid>
       </VStack>
+      <PageGuide
+        guideId="analytics"
+        i18nPrefix="pageGuides.analytics"
+        steps={ANALYTICS_STEPS}
+      />
     </Box>
   );
 };

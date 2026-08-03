@@ -68,6 +68,7 @@ export const useProjectService = () => {
     getProject: service.getOne,
     createProject: service.create,
     updateProject: service.update,
+    updateProjectStatus: service.patch,
     deleteProject: service.remove,
     getProjectStats: service.getProjectStats,
   };

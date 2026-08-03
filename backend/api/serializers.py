@@ -334,6 +334,7 @@ class FileSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'file', 'mime_type', 'size_bytes', 'company',
                   'uploaded_by', 'uploaded_by_name', 'uploaded_by_email',
                   'description', 'is_previewable', 'shares_count', 'user_permissions',
+                  'meeting', 'mission', 'category',
                   'created_at', 'updated_at')
         read_only_fields = ('id', 'mime_type', 'size_bytes', 'company', 'uploaded_by',
                             'created_at', 'updated_at')

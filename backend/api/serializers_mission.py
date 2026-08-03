@@ -55,7 +55,7 @@ class MissionSerializer(serializers.ModelSerializer):
         model = Mission
         fields = [
             'id', 'title', 'description', 'status',
-            'destination_name', 'destination_lat', 'destination_lng',
+            'destination_name', 'destination_lat', 'destination_lng', 'distance_km',
             'start_date', 'end_date',
             'cost_per_diem', 'cost_accommodation', 'cost_transport', 'cost_other',
             'currency', 'total_cost', 'frais_de_mission', 'created_by', 'created_by_name',

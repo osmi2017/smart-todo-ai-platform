@@ -36,7 +36,7 @@ import { format, isAfter, isBefore } from 'date-fns';
 import { fr as frLocale, enUS } from 'date-fns/locale';
 import { useTranslation } from 'react-i18next';
 
-const SortableTaskCard = ({ task, columnId }) => {
+const SortableTaskCard = ({ task, columnId, onDelete }) => {
   const { t, i18n } = useTranslation();
   const dateLocale = i18n.language === 'fr' ? frLocale : enUS;
   const {
@@ -153,8 +153,15 @@ const SortableTaskCard = ({ task, columnId }) => {
                   <MenuItem as={RouterLink} to={`/tasks/${task.id}`}>
                     {t('sortableTask.viewDetails')}
                   </MenuItem>
-                  <MenuItem>{t('common.edit')}</MenuItem>
-                  <MenuItem color="red.500">{t('common.delete')}</MenuItem>
+                  <MenuItem as={RouterLink} to={`/tasks/${task.id}/edit`}>
+                    {t('common.edit')}
+                  </MenuItem>
+                  <MenuItem
+                    color="red.500"
+                    onClick={() => onDelete && onDelete(task)}
+                  >
+                    {t('common.delete')}
+                  </MenuItem>
                 </MenuList>
               </Menu>
             </HStack>

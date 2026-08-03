@@ -648,6 +648,7 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             proj_completed = proj.tasks.filter(status='completed').count()
             progress = round((proj_completed / proj_tasks * 100) if proj_tasks > 0 else 0)
             project_progress.append({
+                'id': proj.id,
                 'name': proj.name,
                 'progress': progress,
                 'color': proj.color or '#4299E1',

@@ -17,7 +17,16 @@ import {
 } from 'react-icons/fi';
 import { useMissionService } from '../services/missionService';
 import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import PageGuide from '../components/PageGuide';
+import { FiFileText } from 'react-icons/fi';
 import i18n from '../i18n';
+
+const MISSIONS_STEPS = [
+  { key: 'overview', icon: FiMapPin },
+  { key: 'create', icon: FiPlus },
+  { key: 'report', icon: FiFileText },
+];
 
 const Missions = () => {
   const { t } = useTranslation();
@@ -142,14 +151,15 @@ const Missions = () => {
       </HStack>
 
       {filtered.length === 0 ? (
-        <Box textAlign="center" py={16} bg={bgColor} borderRadius="xl" shadow="sm" borderWidth="1px" borderColor={borderColor}>
-          <Icon as={FiMapPin} boxSize={16} color="gray.300" mb={4} />
-          <Heading size="md" color="gray.500" mb={2}>{t('missions.notFound')}</Heading>
-          <Text color="gray.400" mb={6}>{t('missions.createFirst')}</Text>
-          <Button as={RouterLink} to="/missions/create" colorScheme="blue" leftIcon={<FiPlus />}>
-            {t('missions.createMission')}
-          </Button>
-        </Box>
+        <EmptyState
+          icon={FiMapPin}
+          iconBg="brand.50"
+          iconColor="brand.300"
+          message={t('missions.notFound')}
+          description={t('missions.emptyDescription')}
+          actionLabel={t('missions.createMission')}
+          actionTo="/missions/create"
+        />
       ) : (
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
           {filtered.map(mission => {
@@ -278,6 +288,11 @@ const Missions = () => {
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
+      <PageGuide
+        guideId="missions"
+        i18nPrefix="pageGuides.missions"
+        steps={MISSIONS_STEPS}
+      />
     </Box>
   );
 };

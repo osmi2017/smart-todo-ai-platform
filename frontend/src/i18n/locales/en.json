@@ -7,7 +7,7 @@
     "delete": "Delete",
     "add": "Add",
     "close": "Close",
-    "search": "Search...",
+    "search": "Search",
     "loading": "Loading...",
     "retry": "Retry",
     "error": "Error",
@@ -80,7 +80,10 @@
     "createSuccess": "Created successfully",
     "updateError": "Error during update",
     "createError": "Error during creation",
-    "unknownError": "Unknown error"
+    "unknownError": "Unknown error",
+    "refresh": "Refresh",
+    "lastUpdate": "Last updated",
+    "clear": "Clear"
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -96,6 +99,87 @@
     "groups": "Groups",
     "companies": "Companies",
     "projectManagement": "Project Management"
+  },
+  "quickCreate": {
+    "title": "Quick create",
+    "project": "New project",
+    "task": "New task",
+    "meeting": "New meeting",
+    "mission": "New mission"
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "next": "Next",
+    "previous": "Previous",
+    "done": "Get started",
+    "steps": {
+      "welcome": {
+        "title": "Welcome to SmartTodoAI",
+        "description": "This tool helps you manage your projects, tasks, milestones, meetings, files and missions within your company. This quick guide shows you the essentials to get started."
+      },
+      "sidebar": {
+        "title": "Browse your modules",
+        "description": "Use the menu on the left to access your Projects, Tasks, Kanban, Milestones, Meetings, Files, Missions and Analytics."
+      },
+      "quickcreate": {
+        "title": "Create in one click",
+        "description": "The « + » button on the top right lets you quickly create a project, task, meeting or mission from any page."
+      },
+      "help": {
+        "title": "Need help?",
+        "description": "Click the help icon at any time to open the help center, revisit this guide and learn more about each module."
+      },
+      "done": {
+        "title": "You are ready!",
+        "description": "Start by creating your first project, then add tasks. Happy organizing!"
+      }
+    }
+  },
+  "help": {
+    "title": "Help Center",
+    "intro": "A quick guide for every module. Click \"Open\" to jump straight there.",
+    "open": "Open",
+    "relaunchTour": "Replay the welcome guide",
+    "contactSupport": "Need more help?",
+    "contactSupportDesc": "Contact your administrator or the support team with any question.",
+    "modules": {
+      "dashboard": {
+        "title": "Dashboard",
+        "description": "Overview of your activity: statistics, upcoming deadlines, meetings and AI recommendations."
+      },
+      "projects": {
+        "title": "Projects",
+        "description": "Organize your projects, track progress and manage members and groups."
+      },
+      "tasks": {
+        "title": "Tasks",
+        "description": "Create and assign tasks, track status and priority, and detect delays."
+      },
+      "kanban": {
+        "title": "Kanban",
+        "description": "Visualize and drag your tasks by status for a visual view of work in progress."
+      },
+      "milestones": {
+        "title": "Milestones",
+        "description": "Define key steps with deadlines, progress and AI risk analysis."
+      },
+      "meetings": {
+        "title": "Meetings",
+        "description": "Schedule audio/text meetings, join the video call and process the content with AI."
+      },
+      "files": {
+        "title": "Files",
+        "description": "Upload, share and preview your documents while tracking storage usage."
+      },
+      "missions": {
+        "title": "Missions",
+        "description": "Plan field missions with destination, budget, team and a detailed report."
+      },
+      "analytics": {
+        "title": "Analytics",
+        "description": "Analyze productivity, risks and team trends."
+      }
+    }
   },
   "header": {
     "search": "Search...",
@@ -193,7 +277,24 @@
     "noMeetings": "No meetings yet",
     "createFirstMeeting": "Create your first meeting",
     "participants": "participants",
-    "meetingInProgress": "In Progress"
+    "meetingInProgress": "In Progress",
+    "getStarted": {
+      "title": "Welcome! Let's get started",
+      "description": "Follow these simple steps to set up your workspace.",
+      "project": "Create your first project",
+      "projectDesc": "Group your work and track its progress.",
+      "task": "Add your first task",
+      "taskDesc": "Plan the work to be done.",
+      "meeting": "Schedule a meeting",
+      "meetingDesc": "Connect with your team.",
+      "mission": "Create a mission",
+      "missionDesc": "Plan a field trip.",
+      "files": "Upload a file",
+      "filesDesc": "Share your documents with the team.",
+      "start": "Start",
+      "done": "Done",
+      "dismiss": "Hide this guide"
+    }
   },
   "projects": {
     "title": "Projects",
@@ -219,6 +320,7 @@
     "confirmDeleteDesc": "This action is irreversible.",
     "notFound": "No projects found",
     "createFirst": "Create your first project",
+    "emptyDescription": "Projects let you group your team's tasks, milestones, meetings and files together.",
     "column": {
       "name": "Name",
       "status": "Status",
@@ -249,7 +351,8 @@
     "byPriority": "By Priority",
     "byStatus": "By Status",
     "blockedCount": "Blocked",
-    "completedCount": "Completed"
+    "completedCount": "Completed",
+    "searchPlaceholder": "Search projects..."
   },
   "tasks": {
     "title": "Tasks",
@@ -281,6 +384,7 @@
     "confirmDeleteDesc": "Are you sure you want to delete this task? This action is irreversible.",
     "notFound": "No tasks found",
     "createFirst": "Create your first task",
+    "emptyDescription": "Create your first task, assign it to a member and track its progress.",
     "searchPlaceholder": "Search for a task...",
     "riskWarning": "Risk of delay:",
     "risk": "Risk",
@@ -310,7 +414,10 @@
     "taskMoved": "Task moved successfully",
     "taskMoveError": "Unable to move task",
     "noTasks": "No tasks",
-    "addToColumn": "Add"
+    "addToColumn": "Add",
+    "totalEstimate": "Total estimated time",
+    "dropHere": "Drop here",
+    "clearFilters": "Clear filters"
   },
   "milestones": {
     "title": "Milestones",
@@ -332,6 +439,7 @@
     "confirmDeleteDesc": "This action is irreversible.",
     "notFound": "No milestones found",
     "createFirst": "Create a milestone",
+    "emptyDescription": "Milestones break your projects into clear steps with deadlines and risk analysis.",
     "highRisk": "High risk",
     "risk": "Risk:",
     "overdueMilestone": "Overdue milestone",
@@ -343,7 +451,15 @@
     "gridView": "Grid",
     "calendarView": "Calendar",
     "statusTooltip": "You can manually change the status",
-    "weekdays": ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    "weekdays": [
+      "Sun",
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat"
+    ]
   },
   "meetings": {
     "title": "Meetings",
@@ -353,6 +469,7 @@
     "allStatuses": "All statuses",
     "notFound": "No meetings found",
     "createFirst": "Create your first meeting",
+    "emptyDescription": "Schedule an audio or text meeting, then process its content with AI.",
     "scheduled": "Scheduled",
     "inProgress": "In Progress",
     "completed": "Completed",
@@ -417,6 +534,7 @@
     "searchPlaceholder": "Search for a file...",
     "allTypes": "All types",
     "uploadFile": "Upload a file",
+    "emptyDescription": "Drop your documents to share them with your team and track your storage space.",
     "storage": "Storage:",
     "fileName": "File Name",
     "fileDescription": "Optional description",
@@ -494,6 +612,7 @@
     "allStatuses": "All statuses",
     "notFound": "No missions found",
     "createFirst": "Create your first mission to get started",
+    "emptyDescription": "Plan a field mission with destination, budget, team and a detailed report.",
     "createMission": "Create Mission",
     "planned": "Planned",
     "inProgress": "In Progress",
@@ -513,6 +632,7 @@
     "reportsUpdated": "Reports updated",
     "costsUpdated": "Costs updated",
     "costsUpdateError": "Error updating costs",
+    "justificationUploadError": "Error uploading the file",
     "backToMissions": "Back to missions",
     "startMission": "Start mission",
     "completeMission": "Complete mission",
@@ -556,36 +676,37 @@
     "loadDataError": "Unable to load data",
     "loadErrorTitle": "Loading error",
     "form": {
-      "titleRequired": "Title is required",
-      "destinationRequired": "Destination is required",
-      "startDateRequired": "Start date is required",
-      "atLeastOneMember": "Add at least one team member.",
-      "chiefRequired": "A mission chief is required.",
-      "backToMission": "Back to mission",
-      "backToMissions": "Back to missions",
-      "generalInfo": "General Information",
-      "title": "Mission Title",
+      "allowance": "Per Diem",
+      "housing": "Accommodation",
+      "transport": "Transport",
+      "otherExpenses": "Other Expenses",
+      "save": "Save",
+      "missionReport": "Mission Report",
+      "reportPlaceholder": "Activity report...",
+      "title": "Title",
+      "titlePlaceholder": "Mission title",
       "description": "Description",
+      "descriptionPlaceholder": "Briefly describe the mission...",
       "status": "Status",
-      "titlePlaceholder": "Mission title...",
-      "descriptionPlaceholder": "Mission description...",
+      "generalInfo": "General Information",
       "projectAndLinks": "Project & Links",
-      "associatedProject": "Associated Project",
-      "associatedTasks": "Associated Tasks",
-      "associatedMilestones": "Associated Milestones",
+      "associatedProject": "Associated project",
       "noProject": "No project",
+      "associatedTasks": "Associated tasks",
       "noTasksInProject": "No tasks in this project",
+      "associatedMilestones": "Associated milestones",
       "noMilestonesInProject": "No milestones in this project",
       "destination": "Destination",
       "destinationName": "Destination name",
-      "destinationPlaceholder": "Search for a city, a country...",
+      "destinationPlaceholder": "Search for a destination...",
       "latitude": "Latitude",
       "longitude": "Longitude",
       "dates": "Dates",
-      "startDate": "Start Date",
-      "endDate": "End Date",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "dateRangeInvalid": "The end date must be after the start date.",
       "team": "Team",
-      "chiefLabel": "Mission Chief (required)",
+      "chiefLabel": "Mission chief",
       "selectChief": "Select mission chief",
       "addMembers": "Add members",
       "selectMember": "Select a member",
@@ -593,20 +714,24 @@
       "detailedCosts": "Detailed Costs",
       "currency": "Currency",
       "loadingCurrencies": "Loading currencies...",
-      "allowance": "Per Diem",
-      "housing": "Accommodation",
-      "transport": "Transport",
-      "otherExpenses": "Other Expenses",
+      "perDay": "per day",
+      "total": "Total estimated cost",
       "reports": "Reports",
-      "missionReport": "Mission Report",
-      "reportPlaceholder": "Mission activity report...",
       "saving": "Saving...",
       "creating": "Creating...",
-      "save": "Save",
       "createMission": "Create Mission",
+      "backToMission": "Back to mission",
+      "backToMissions": "Back to missions",
+      "titleRequired": "A title is required.",
+      "destinationRequired": "A destination is required.",
+      "startDateRequired": "A start date is required.",
+      "atLeastOneMember": "Add at least one member.",
+      "chiefRequired": "A mission chief is required.",
       "distanceLabel": "Distance:",
-      "distanceFromPosition": "(from your position)",
-      "searchForMap": "Search for a destination to\ndisplay the map"
+      "distanceFromPosition": "from your position",
+      "searchForMap": "Search for a destination to display the map.",
+      "selectCurrency": "Search or select a currency",
+      "noResults": "No results found"
     },
     "actions": {
       "viewDetails": "View Details",
@@ -620,15 +745,6 @@
       "team": "Team",
       "responsible": "Responsible",
       "actions": "Actions"
-    },
-    "form": {
-      "allowance": "Per Diem",
-      "housing": "Accommodation",
-      "transport": "Transport",
-      "otherExpenses": "Other Expenses",
-      "save": "Save",
-      "missionReport": "Mission Report",
-      "reportPlaceholder": "Activity report..."
     }
   },
   "missionDetail": {
@@ -690,6 +806,7 @@
     "transportLabel": "Transport",
     "otherExpensesLabel": "Other Expenses",
     "missionReportTitle": "Mission Report",
+    "reportNarrative": "Narrative Report",
     "reportPlaceholder": "Activity report...",
     "noReport": "No mission report entered",
     "associatedProject": "Associated Project",
@@ -703,6 +820,9 @@
     "noMilestones": "No associated milestones",
     "geoUnavailable": "Geolocation unavailable",
     "geoDescription": "Add the GPS coordinates of the destination to display the map.",
+    "justifications": "Justifying documents",
+    "addJustification": "Add file",
+    "noJustification": "No file added",
     "deleteConfirm": "Are you sure? This action is irreversible."
   },
   "expenseReport": {
@@ -731,6 +851,31 @@
     "totalExpenses": "TOTAL MISSION EXPENSES",
     "print": "Print",
     "downloadPdf": "Download PDF"
+  },
+  "missionReport": {
+    "launchedBy": "Launched by:",
+    "manager": "Mission Chief:",
+    "startDate": "Start Date:",
+    "endDate": "End Date:",
+    "duration": "Duration:",
+    "currency": "Currency:",
+    "status": "Status:",
+    "destination": "Destination",
+    "destinationName": "Destination:",
+    "coordinates": "GPS Coordinates:",
+    "distance": "Distance:",
+    "description": "Description",
+    "team": "Team",
+    "member": "Member",
+    "email": "Email",
+    "role": "Role",
+    "expenses": "Mission Expenses",
+    "expenseNarrative": "Expense Report (narrative)",
+    "task": "Task",
+    "milestone": "Milestone",
+    "assigned": "Assigned to",
+    "progress": "Progress",
+    "dueDate": "Due Date"
   },
   "analytics": {
     "title": "Analytics",
@@ -893,5 +1038,167 @@
   },
   "emptyStates": {
     "noItems": "No items found"
+  },
+  "pageGuide": {
+    "guide": "Guide",
+    "next": "Next",
+    "previous": "Previous",
+    "gotIt": "Got it",
+    "skip": "Close"
+  },
+  "pageGuides": {
+    "dashboard": {
+      "title": "Dashboard",
+      "steps": {
+        "overview": {
+          "title": "Overview at a glance",
+          "description": "Find your key indicators, project progress and priority tasks in one place."
+        },
+        "checklist": {
+          "title": "First steps",
+          "description": "A checklist guides you to get started: create a project, a task, a meeting, a mission or upload a file."
+        },
+        "quickAccess": {
+          "title": "Quick access",
+          "description": "Use the “+” button in the header to quickly create a project, task, meeting or mission."
+        }
+      }
+    },
+    "projects": {
+      "title": "Projects",
+      "steps": {
+        "overview": {
+          "title": "Organize your work",
+          "description": "Group your tasks by project and track each one's progress with clear statistics."
+        },
+        "create": {
+          "title": "Create a project",
+          "description": "Click “New project” to create your first project in seconds."
+        },
+        "detail": {
+          "title": "Explore your projects",
+          "description": "Click on a project to see its tasks, milestones and members."
+        }
+      }
+    },
+    "tasks": {
+      "title": "Tasks",
+      "steps": {
+        "overview": {
+          "title": "Manage your tasks",
+          "description": "View, filter and track your tasks with their status, priority and due date."
+        },
+        "create": {
+          "title": "Create a task",
+          "description": "The “New task” button lets you add a task and assign it quickly."
+        },
+        "priorities": {
+          "title": "Color-coded priorities",
+          "description": "Priorities (low, medium, high, critical) are color-coded to be readable at a glance."
+        }
+      }
+    },
+    "kanban": {
+      "title": "Kanban",
+      "steps": {
+        "overview": {
+          "title": "Visualize your tasks",
+          "description": "The Kanban board organizes your tasks into status columns: to do, in progress, review, blocked, done."
+        },
+        "drag": {
+          "title": "Drag and drop",
+          "description": "Drag cards between columns to update their status instantly."
+        },
+        "filter": {
+          "title": "Filter the view",
+          "description": "Filter by project or member to focus on what matters."
+        }
+      }
+    },
+    "milestones": {
+      "title": "Milestones",
+      "steps": {
+        "overview": {
+          "title": "Track the big steps",
+          "description": "Break your projects down into milestones to follow the key steps of your schedule."
+        },
+        "create": {
+          "title": "Create a milestone",
+          "description": "Create a milestone linked to a project and set its due date."
+        },
+        "track": {
+          "title": "Track progress",
+          "description": "Adjust the progress of each milestone and spot delays."
+        }
+      }
+    },
+    "meetings": {
+      "title": "Meetings",
+      "steps": {
+        "overview": {
+          "title": "Organize your meetings",
+          "description": "Plan, organize and follow your meetings online or on site."
+        },
+        "create": {
+          "title": "Schedule a meeting",
+          "description": "Create a meeting with your attendees and choose the input type (audio, text, both)."
+        },
+        "join": {
+          "title": "Join in one click",
+          "description": "Start the video conference right from the meeting to talk with your team."
+        }
+      }
+    },
+    "files": {
+      "title": "Files",
+      "steps": {
+        "overview": {
+          "title": "Centralize your documents",
+          "description": "Share and find all your team documents in one place."
+        },
+        "upload": {
+          "title": "Upload a file",
+          "description": "The “Upload” button lets you share a document with your team."
+        },
+        "organize": {
+          "title": "Organize your files",
+          "description": "Sort your documents by category and mission to find them easily."
+        }
+      }
+    },
+    "missions": {
+      "title": "Missions",
+      "steps": {
+        "overview": {
+          "title": "Plan your missions",
+          "description": "Manage your field missions with distance, mileage and attendees."
+        },
+        "create": {
+          "title": "Create a mission",
+          "description": "Create a mission and fill in its distance and estimated mileage."
+        },
+        "report": {
+          "title": "Generate a report",
+          "description": "Generate a mission report to share with your team."
+        }
+      }
+    },
+    "analytics": {
+      "title": "Analytics",
+      "steps": {
+        "overview": {
+          "title": "Drive performance",
+          "description": "Track completion rate, delays and the ML accuracy of your forecasts."
+        },
+        "trends": {
+          "title": "Activity charts",
+          "description": "Activity and priority charts give you an overview of the period."
+        },
+        "performance": {
+          "title": "Per-user performance",
+          "description": "The performance table highlights trends for each team member."
+        }
+      }
+    }
   }
 }

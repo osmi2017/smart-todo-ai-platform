@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { Box, Flex, useBreakpointValue } from '@chakra-ui/react';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import OnboardingTour from './OnboardingTour';
 
 const Layout = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -58,6 +59,8 @@ const Layout = () => {
           </Box>
         </Box>
       </Flex>
+
+      <OnboardingTour />
     </Flex>
   );
 };
