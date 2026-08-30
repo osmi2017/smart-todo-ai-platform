@@ -95,6 +95,7 @@ services:
       DB_NAME: ${DB_NAME:-todo_ai}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD}
+      CORS_ALLOWED_ORIGINS: http://${APP_HOST:-localhost}:3000,http://127.0.0.1:3000
       REDIS_URL: redis://redis:6379/0
       KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -402,7 +403,7 @@ services:
       - "4000:4000"
     environment:
       PORT: 4000
-      FRONTEND_URL: http://10.0.0.5:3000
+      FRONTEND_URL: http://${APP_HOST:-localhost}:3000
       KAFKA_ENABLED: "True"
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_TOPIC: ${KAFKA_EVENTS_TOPIC:-smart-todo.events}
@@ -422,10 +423,10 @@ services:
       dockerfile: Dockerfile
     container_name: todo_ai_frontend
     environment:
-      REACT_APP_API_URL: http://10.0.0.5:8000/api
-      REACT_APP_WS_URL: ws://10.0.0.5:8000
-      REACT_APP_ML_URL: http://10.0.0.5:5001
-      REACT_APP_MEETING_SERVICE_URL: http://10.0.0.5:4000
+      REACT_APP_API_URL: http://${APP_HOST:-localhost}:8000/api
+      REACT_APP_WS_URL: ws://${APP_HOST:-localhost}:8000
+      REACT_APP_ML_URL: http://${APP_HOST:-localhost}:5001
+      REACT_APP_MEETING_SERVICE_URL: http://${APP_HOST:-localhost}:4000
     ports:
       - "3000:3000"
     depends_on:

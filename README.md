@@ -58,6 +58,7 @@ Une plateforme intelligente de gestion de tâches, projets et réunions, avec pr
 - **Kafka** : bus d'événements centralisé (`smart-todo.events` + DLQ `smart-todo.events.dlq`, six partitions) capturant réunion démarrée, tâche complétée, utilisateur connecté, etc.
 - **Redis** : broker et backend de résultats pour Celery.
 - **PostgreSQL** : base de données principale.
+- **mobile** (React Native/Expo) : application mobile connectée aux mêmes API, WebSocket et services que le frontend web (dashboard, tâches, projets, kanban, réunions, jalons, administration).
 
 ## 🔧 Variables d'environnement
 
@@ -74,6 +75,7 @@ cp .env.example .env
 
 | Variable | Description | Défaut (dev) |
 |---|---|---|
+| `APP_HOST` | Adresse de la machine (`localhost` ou son IP réseau). Toutes les URLs publiques (frontend, API, WS, ML, meetings) sont construites à partir d'elle — **aucune IP n'est codée en dur**. | `localhost` |
 | `DJANGO_SECRET_KEY` | Clé secrète Django | *(à définir)* |
 | `DEBUG` | Mode debug Django | `False` |
 | `ALLOWED_HOSTS` | Hôtes autorisés à servir l'API | `localhost,127.0.0.1` |
@@ -192,6 +194,21 @@ cd meeting-service
 npm install
 npm start
 ```
+
+### Mobile (React Native / Expo)
+
+L'application mobile utilise **les mêmes endpoints que le frontend** (API, WebSocket,
+ML et meeting-service), lues depuis son propre `.env` :
+
+```bash
+cd mobile
+cp .env.example .env   # remplace HOST_IP par l'IP LAN de la machine (hostname -I)
+npm install
+npx expo start         # scanne le QR code avec Expo Go, ou appuie sur "a"/"w"
+```
+
+> ⚠️ Un téléphone ne peut pas joindre `localhost` : `EXPO_PUBLIC_API_URL` (et les autres
+> `EXPO_PUBLIC_*`) doivent pointer vers l'IP de la machine qui exécute docker-compose.
 
 Ou lance `./scripts/setup.sh` pour automatiser l'installation des environnements virtuels, dépendances et migrations initiales.
 
