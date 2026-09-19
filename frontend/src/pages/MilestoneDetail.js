@@ -67,6 +67,7 @@ import {
   FiFlag,
 } from 'react-icons/fi';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useMilestoneService } from '../services/milestoneService';
 import { useTaskService } from '../services/taskService';
@@ -86,6 +87,7 @@ import LoadingState from '../components/LoadingState';
 const MilestoneDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const toast = useToast();
   const queryClient = useQueryClient();
   const milestoneService = useMilestoneService();
@@ -108,20 +110,23 @@ const MilestoneDetail = () => {
     progress: 0,
   });
 
+  const [progressValue, setProgressValue] = useState(0);
+
   const { data: milestone, isLoading } = useQuery(
     ['milestone', id],
     () => milestoneService.getMilestone(id),
     {
       onError: () => {
         toast({
-          title: 'Erreur',
-          description: 'Impossible de charger le jalon',
+          title: t('common.error'),
+          description: t('milestones.loadErrorDesc'),
           status: 'error',
           duration: 3000,
         });
       },
       onSuccess: (data) => {
         if (data) {
+          setProgressValue(Math.round(data.progress || 0));
           setFormData({
             name: data.name,
             description: data.description || '',
@@ -153,8 +158,8 @@ const MilestoneDetail = () => {
       onSuccess: () => {
         queryClient.invalidateQueries(['milestone', id]);
         toast({
-          title: 'Succès',
-          description: 'Jalon mis à jour',
+          title: t('common.success'),
+          description: t('milestones.updatedSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -162,8 +167,8 @@ const MilestoneDetail = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: error.response?.data?.message || 'Erreur lors de la mise à jour',
+          title: t('common.error'),
+          description: error.response?.data?.message || t('common.updateError'),
           status: 'error',
           duration: 3000,
         });
@@ -179,8 +184,8 @@ const MilestoneDetail = () => {
       },
       onError: () => {
         toast({
-          title: 'Erreur',
-          description: 'Impossible de mettre à jour le statut',
+          title: t('common.error'),
+          description: t('milestones.updateStatusError'),
           status: 'error',
           duration: 3000,
         });
@@ -196,8 +201,8 @@ const MilestoneDetail = () => {
       },
       onError: () => {
         toast({
-          title: 'Erreur',
-          description: 'Impossible de mettre à jour la progression',
+          title: t('common.error'),
+          description: t('milestones.updateProgressError'),
           status: 'error',
           duration: 3000,
         });
@@ -211,8 +216,8 @@ const MilestoneDetail = () => {
       onSuccess: () => {
         queryClient.invalidateQueries('milestones');
         toast({
-          title: 'Succès',
-          description: 'Jalon supprimé',
+          title: t('common.success'),
+          description: t('milestones.deletedSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -220,8 +225,8 @@ const MilestoneDetail = () => {
       },
       onError: () => {
         toast({
-          title: 'Erreur',
-          description: 'Impossible de supprimer le jalon',
+          title: t('common.error'),
+          description: t('milestones.deleteErrorDesc'),
           status: 'error',
           duration: 3000,
         });
@@ -235,16 +240,16 @@ const MilestoneDetail = () => {
       onSuccess: (data) => {
         queryClient.invalidateQueries(['milestone', id]);
         toast({
-          title: 'Analyse IA',
-          description: `Risque calculé: ${data.risk_score}%`,
+          title: t('milestones.aiAnalysis'),
+          description: t('milestones.riskCalculated', { risk: data.risk_score }),
           status: 'info',
           duration: 3000,
         });
       },
       onError: () => {
         toast({
-          title: 'Erreur',
-          description: 'Impossible de lancer l\'analyse IA',
+          title: t('common.error'),
+          description: t('milestones.aiAnalysisError'),
           status: 'error',
           duration: 3000,
         });
@@ -256,8 +261,8 @@ const MilestoneDetail = () => {
     e.preventDefault();
     if (!formData.project_id) {
       toast({
-        title: 'Erreur',
-        description: 'Veuillez sélectionner un projet',
+        title: t('common.error'),
+        description: t('milestones.selectProjectError'),
         status: 'error',
         duration: 3000,
       });
@@ -277,15 +282,15 @@ const MilestoneDetail = () => {
   };
 
   if (isLoading) {
-    return <LoadingState message="Chargement du jalon..." />;
+    return <LoadingState message={t('milestones.loadingDetail')} />;
   }
 
   if (!milestone) {
     return (
       <Box textAlign="center" py={16}>
-        <Text color="gray.500">Jalon introuvable</Text>
+        <Text color="gray.500">{t('milestones.notFound')}</Text>
         <Button mt={4} leftIcon={<FiArrowLeft />} onClick={() => navigate('/milestones')}>
-          Retour aux jalons
+          {t('milestones.backToMilestones')}
         </Button>
       </Box>
     );
@@ -317,7 +322,7 @@ const MilestoneDetail = () => {
             <IconButton
               icon={<FiArrowLeft />}
               variant="ghost"
-              aria-label="Retour"
+              aria-label={t('common.back')}
               onClick={() => navigate('/milestones')}
             />
             <Box>
@@ -331,14 +336,14 @@ const MilestoneDetail = () => {
                   colorScheme={MILESTONE_STATUS_COLORS[milestone.status] || 'gray'}
                   onChange={(e) => statusMutation.mutate({ mid: milestone.id, status: e.target.value })}
                 >
-                  <option value="not_started">Non démarré</option>
-                  <option value="in_progress">En cours</option>
-                  <option value="completed">Terminé</option>
-                  <option value="delayed">En retard</option>
-                  <option value="cancelled">Annulé</option>
+                  <option value="not_started">{t('common.notStarted')}</option>
+                  <option value="in_progress">{t('common.inProgress')}</option>
+                  <option value="completed">{t('common.completed')}</option>
+                  <option value="delayed">{t('common.delayed')}</option>
+                  <option value="cancelled">{t('common.cancelled')}</option>
                 </Select>
                 <Badge colorScheme="purple">
-                  {milestone.project_name || 'Sans projet'}
+                  {milestone.project_name || t('milestones.noProject')}
                 </Badge>
               </HStack>
             </Box>
@@ -351,7 +356,7 @@ const MilestoneDetail = () => {
               onClick={() => predictMutation.mutate(milestone.id)}
               isLoading={predictMutation.isLoading}
             >
-              Analyser risque
+              {t('milestones.analyzeRisk')}
             </Button>
             <Button
               size="sm"
@@ -359,7 +364,7 @@ const MilestoneDetail = () => {
               colorScheme="blue"
               onClick={onOpen}
             >
-              Modifier
+              {t('common.edit')}
             </Button>
             <Button
               size="sm"
@@ -368,7 +373,7 @@ const MilestoneDetail = () => {
               variant="outline"
               onClick={onDeleteOpen}
             >
-              Supprimer
+              {t('common.delete')}
             </Button>
           </HStack>
         </Flex>
@@ -378,7 +383,7 @@ const MilestoneDetail = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Progression</StatLabel>
+                <StatLabel>{t('common.progress')}</StatLabel>
                 <StatNumber color="blue.500">{milestone.progress}%</StatNumber>
               </Stat>
             </CardBody>
@@ -386,7 +391,7 @@ const MilestoneDetail = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Tâches</StatLabel>
+                <StatLabel>{t('milestones.tasksCount')}</StatLabel>
                 <StatNumber color="green.500">
                   {milestone.completed_task_count}/{milestone.task_count}
                 </StatNumber>
@@ -396,7 +401,7 @@ const MilestoneDetail = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Échéance</StatLabel>
+                <StatLabel>{t('milestones.dueDate')}</StatLabel>
                 <StatNumber fontSize="md" color={overdue ? 'red.500' : undefined}>
                   {milestone.due_date ? format(new Date(milestone.due_date), 'dd/MM/yyyy') : '—'}
                 </StatNumber>
@@ -406,7 +411,7 @@ const MilestoneDetail = () => {
           <Card>
             <CardBody>
               <Stat>
-                <StatLabel>Risque</StatLabel>
+                <StatLabel>{t('milestones.riskStat')}</StatLabel>
                 <StatNumber color={getRiskColor(milestone.risk_score) + '.500'}>
                   {milestone.risk_score > 0 ? `${milestone.risk_score}%` : '—'}
                 </StatNumber>
@@ -418,14 +423,14 @@ const MilestoneDetail = () => {
         {overdue && (
           <Alert status="error" borderRadius="md">
             <AlertIcon />
-            <Text>Ce jalon est en retard.</Text>
+            <Text>{t('milestones.overdueDesc')}</Text>
           </Alert>
         )}
 
         {/* Progression ajustable */}
         <Card>
           <CardHeader>
-            <Heading size="sm">Ajuster la progression</Heading>
+            <Heading size="sm">{t('projects.adjustProgress')}</Heading>
           </CardHeader>
           <CardBody>
             <Slider
@@ -433,12 +438,13 @@ const MilestoneDetail = () => {
               min={0}
               max={100}
               step={1}
-              value={milestone.progress}
+              value={progressValue}
+              onChange={setProgressValue}
               onChangeEnd={(v) => progressMutation.mutate({ mid: milestone.id, progress: v })}
               mb={6}
             >
               <SliderMark
-                value={milestone.progress}
+                value={progressValue}
                 textAlign="center"
                 bg="blue.500"
                 color="white"
@@ -448,7 +454,7 @@ const MilestoneDetail = () => {
                 borderRadius="full"
                 fontSize="sm"
               >
-                {Math.round(milestone.progress)}%
+                {progressValue}%
               </SliderMark>
               <SliderTrack bg="gray.200">
                 <SliderFilledTrack bg="blue.500" />
@@ -470,7 +476,7 @@ const MilestoneDetail = () => {
         <Card>
           <CardHeader>
             <Flex justify="space-between" align="center">
-              <Heading size="sm">Tâches ({tasks?.length || 0})</Heading>
+              <Heading size="sm">{`${t('common.tasks')} (${tasks?.length || 0})`}</Heading>
               <Button
                 size="sm"
                 leftIcon={<FiPlus />}
@@ -478,7 +484,7 @@ const MilestoneDetail = () => {
                 as={RouterLink}
                 to={`/tasks/create?milestone=${milestone.id}&project=${milestone.project}`}
               >
-                Nouvelle tâche
+                {t('tasks.newTask')}
               </Button>
             </Flex>
           </CardHeader>
@@ -517,7 +523,7 @@ const MilestoneDetail = () => {
                           </HStack>
                           <Text fontWeight="600">{task.title}</Text>
                           {task.delay_probability > 0.5 && (
-                            <Tooltip label={`Probabilité de retard ${Math.round(task.delay_probability * 100)}%`}>
+                            <Tooltip label={`${t('tasks.delayProbability')} ${Math.round(task.delay_probability * 100)}%`}>
                               <Tag
                                 size="sm"
                                 mt={1}
@@ -525,7 +531,7 @@ const MilestoneDetail = () => {
                                 variant="subtle"
                               >
                                 <TagLeftIcon as={FiAlertCircle} />
-                                <TagLabel>Risque {Math.round(task.delay_probability * 100)}%</TagLabel>
+                                <TagLabel>{`${t('tasks.risk')} ${Math.round(task.delay_probability * 100)}%`}</TagLabel>
                               </Tag>
                             </Tooltip>
                           )}
@@ -548,7 +554,7 @@ const MilestoneDetail = () => {
               </VStack>
             ) : (
               <Text color="gray.500" textAlign="center" py={6}>
-                Aucune tâche associée à ce jalon
+                {t('milestones.noTasks')}
               </Text>
             )}
           </CardBody>
@@ -560,31 +566,31 @@ const MilestoneDetail = () => {
         <ModalOverlay />
         <ModalContent>
           <form onSubmit={handleSubmit}>
-            <ModalHeader>Modifier le jalon</ModalHeader>
+            <ModalHeader>{t('milestones.editMilestone')}</ModalHeader>
             <ModalCloseButton />
             <ModalBody maxH="70vh" overflowY="auto">
               <VStack spacing={4}>
                 <FormControl isRequired>
-                  <FormLabel>Nom du jalon</FormLabel>
+                  <FormLabel>{t('milestones.milestoneName')}</FormLabel>
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Ex: Phase 1 - MVP"
+                    placeholder={t('milestones.milestoneNamePlaceholder')}
                   />
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>{t('common.description')}</FormLabel>
                   <Textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Description du jalon..."
+                    placeholder={t('milestones.descriptionPlaceholder')}
                     rows={3}
                   />
                 </FormControl>
 
                 <FormControl isRequired>
-                  <FormLabel>Date d'échéance</FormLabel>
+                  <FormLabel>{t('milestones.deadline')}</FormLabel>
                   <Input
                     type="date"
                     value={formData.due_date}
@@ -593,11 +599,11 @@ const MilestoneDetail = () => {
                 </FormControl>
 
                 <FormControl isRequired>
-                  <FormLabel>Projet associé</FormLabel>
+                  <FormLabel>{t('milestones.project')}</FormLabel>
                   <Select
                     value={formData.project_id}
                     onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
-                    placeholder="Sélectionner un projet"
+                    placeholder={t('milestones.selectProject')}
                   >
                     {projects?.map(project => (
                       <option key={project.id} value={project.id}>
@@ -608,21 +614,21 @@ const MilestoneDetail = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Statut</FormLabel>
+                  <FormLabel>{t('common.status')}</FormLabel>
                   <Select
                     value={formData.status}
                     onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   >
-                    <option value="not_started">Non démarré</option>
-                    <option value="in_progress">En cours</option>
-                    <option value="completed">Terminé</option>
-                    <option value="delayed">En retard</option>
-                    <option value="cancelled">Annulé</option>
+                    <option value="not_started">{t('common.notStarted')}</option>
+                    <option value="in_progress">{t('common.inProgress')}</option>
+                    <option value="completed">{t('common.completed')}</option>
+                    <option value="delayed">{t('common.delayed')}</option>
+                    <option value="cancelled">{t('common.cancelled')}</option>
                   </Select>
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Progression (%)</FormLabel>
+                  <FormLabel>{t('milestones.progressPercent')}</FormLabel>
                   <Slider
                     aria-label="progression-slider"
                     min={0}
@@ -658,14 +664,14 @@ const MilestoneDetail = () => {
 
             <ModalFooter>
               <Button variant="ghost" mr={3} onClick={onClose}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 colorScheme="blue"
                 isLoading={updateMutation.isLoading}
               >
-                Mettre à jour
+                {t('common.update')}
               </Button>
             </ModalFooter>
           </form>
@@ -677,21 +683,20 @@ const MilestoneDetail = () => {
         <AlertDialogOverlay>
           <AlertDialogContent>
             <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Supprimer le jalon
+              {t('milestones.deleteTitle')}
             </AlertDialogHeader>
             <AlertDialogBody>
-              Êtes-vous sûr de vouloir supprimer "{milestone.name}" ?
-              Cette action est irréversible.
+              {t('common.confirmDelete')} "{milestone.name}" ? {t('common.irreversible')}
             </AlertDialogBody>
             <AlertDialogFooter>
-              <Button onClick={onDeleteClose}>Annuler</Button>
+              <Button onClick={onDeleteClose}>{t('common.cancel')}</Button>
               <Button
                 colorScheme="red"
                 onClick={() => deleteMutation.mutate(milestone.id)}
                 ml={3}
                 isLoading={deleteMutation.isLoading}
               >
-                Supprimer
+                {t('common.delete')}
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

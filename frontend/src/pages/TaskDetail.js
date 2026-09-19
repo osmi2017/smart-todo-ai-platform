@@ -106,17 +106,7 @@ const TaskDetail = () => {
     {
       onSuccess: (data) => {
         if (data) {
-          setEditForm({
-            title: data.title || '',
-            description: data.description || '',
-            priority: data.priority || 2,
-            status: data.status || 'todo',
-            deadline: data.deadline || '',
-            estimated_time: data.estimated_time || '',
-            project: data.project || '',
-            milestone: data.milestone || '',
-            assigned_to: data.assigned_to || '',
-          });
+          setEditForm(toEditForm(data));
         }
       },
       onError: (error) => {
@@ -130,6 +120,25 @@ const TaskDetail = () => {
       },
     }
   );
+
+  const toEditForm = (data) => ({
+    title: data.title || '',
+    description: data.description || '',
+    priority: data.priority || 2,
+    status: data.status || 'todo',
+    deadline: data.deadline || '',
+    estimated_time: data.estimated_time || '',
+    project: data.project || '',
+    milestone: data.milestone || '',
+    assigned_to: data.assigned_to || '',
+  });
+
+  const openEditModal = () => {
+    if (task) {
+      setEditForm(toEditForm(task));
+    }
+    setIsEditing(true);
+  };
 
   // Charger les projets pour le formulaire d'édition
   const { data: projects } = useQuery(
@@ -323,7 +332,7 @@ const TaskDetail = () => {
             <Menu>
               <MenuButton as={IconButton} icon={<FiMoreVertical />} variant="ghost" />
               <MenuList>
-                <MenuItem icon={<FiEdit2 />} onClick={() => setIsEditing(true)}>
+                <MenuItem icon={<FiEdit2 />} onClick={openEditModal}>
                   {t('common.edit')}
                 </MenuItem>
                 <MenuItem icon={<FiTrash2 />} color="red.500" onClick={onDeleteOpen}>

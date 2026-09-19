@@ -15,8 +15,7 @@ import {
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 import { useMeetingService } from '../services/meetingService';
-
-const MEETING_SERVICE_URL = process.env.REACT_APP_MEETING_SERVICE_URL || 'http://localhost:4000';
+import { MEETING_SERVICE_URL } from '../utils/apiConfig';
 
 const ICE_SERVERS = {
   iceServers: [

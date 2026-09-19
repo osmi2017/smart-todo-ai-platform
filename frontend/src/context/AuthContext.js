@@ -1,6 +1,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
 import { useToast } from '@chakra-ui/react';
+import { API_URL } from '../utils/apiConfig';
 
 const AuthContext = createContext();
 
@@ -18,8 +19,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem('token'));
   const toast = useToast();
-
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
   // Configuration d'Axios avec le token
   const axiosInstance = axios.create({

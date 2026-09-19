@@ -145,6 +145,8 @@ def train_models():
 def extract_task_features(data):
     """Extrait les features pour les modèles de tâche"""
     
+    days_until_deadline = calculate_days_remaining(data.get('deadline'))
+    
     # Features pour prédiction de temps
     time_features = [
         len(data.get('title', '')),  # longueur titre
@@ -152,22 +154,21 @@ def extract_task_features(data):
         data.get('priority', 2),  # priorité
         data.get('estimated_time', 0) or 0,  # temps estimé
         1 if data.get('milestone_id') else 0,  # a un milestone?
-        data.get('assigned_to_id', 0) or 0,  # assigné?
+        1 if data.get('assigned_to_id') else 0,  # assigné?
     ]
     
     # Features pour prédiction de délai
     delay_features = [
         data.get('priority', 2),
         data.get('estimated_time', 0) or 0,
-        1 if data.get('deadline') else 0,  # a une deadline?
-        # Plus de features à ajouter avec données historiques
+        days_until_deadline,
     ]
     
     # Features pour priorisation
     priority_features = [
         len(data.get('title', '')),
         data.get('estimated_time', 0) or 0,
-        1 if data.get('deadline') else 0,
+        days_until_deadline,
     ]
     
     return {

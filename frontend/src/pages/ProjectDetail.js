@@ -54,6 +54,11 @@ import {
   Input,
   Textarea,
   Select,
+  Slider,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
+  SliderMark,
 } from '@chakra-ui/react';
 import {
   FiCalendar,
@@ -73,6 +78,11 @@ import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useProjectService } from '../services/projectService';
 import { useTaskService } from '../services/taskService';
+import { useMilestoneService } from '../services/milestoneService';
+import {
+  MILESTONE_STATUS_COLORS,
+  getMilestoneStatusLabel,
+} from '../utils/constants';
 import { format } from 'date-fns';
 import { fr as frLocale, enUS } from 'date-fns/locale';
 
@@ -96,6 +106,8 @@ const ProjectDetail = () => {
     deadline: '',
   });
 
+  const [progressValue, setProgressValue] = useState(0);
+
   // Charger les détails du projet
   const { data: project, isLoading: projectLoading } = useQuery(
     ['project', id],
@@ -110,6 +122,7 @@ const ProjectDetail = () => {
           start_date: data.start_date || '',
           deadline: data.deadline || '',
         });
+        setProgressValue(Math.round(data.progress || 0));
       },
       onError: (error) => {
         toast({
@@ -141,6 +154,17 @@ const ProjectDetail = () => {
     }
   );
 
+  const milestoneService = useMilestoneService();
+
+  // Charger les jalons du projet
+  const { data: milestones, isLoading: milestonesLoading } = useQuery(
+    ['projectMilestones', id],
+    () => milestoneService.getMilestones({ project: id }),
+    {
+      enabled: !!project,
+    }
+  );
+
   // Mutation pour mettre à jour le projet
   const updateProjectMutation = useMutation(
     (data) => projectService.updateProject(id, data),
@@ -155,6 +179,26 @@ const ProjectDetail = () => {
           duration: 3000,
         });
         onEditClose();
+      },
+      onError: (error) => {
+        toast({
+          title: t('common.error'),
+          description: error.response?.data?.message || t('projects.updateError'),
+          status: 'error',
+          duration: 3000,
+        });
+      },
+    }
+  );
+
+  // Mutation pour ajuster la progression
+  const progressMutation = useMutation(
+    (progress) => projectService.updateProjectProgress(id, progress),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['project', id]);
+        queryClient.invalidateQueries(['projectStats', id]);
+        queryClient.invalidateQueries('projects');
       },
       onError: (error) => {
         toast({
@@ -363,6 +407,51 @@ const ProjectDetail = () => {
           </Card>
         </SimpleGrid>
 
+        {/* Progression ajustable */}
+        <Card>
+          <CardHeader>
+            <Heading size="sm">{t('projects.adjustProgress')}</Heading>
+          </CardHeader>
+          <CardBody>
+            <Slider
+              aria-label="project-progress-slider"
+              min={0}
+              max={100}
+              step={1}
+              value={progressValue}
+              onChange={setProgressValue}
+              onChangeEnd={(v) => progressMutation.mutate(v)}
+              mb={6}
+            >
+              <SliderMark
+                value={progressValue}
+                textAlign="center"
+                bg="blue.500"
+                color="white"
+                mt="3"
+                ml="-5"
+                w="10"
+                borderRadius="full"
+                fontSize="sm"
+              >
+                {progressValue}%
+              </SliderMark>
+              <SliderTrack bg="gray.200">
+                <SliderFilledTrack bg="blue.500" />
+              </SliderTrack>
+              <SliderThumb boxSize={5}>
+                <Box color="blue.500" />
+              </SliderThumb>
+            </Slider>
+            <Progress
+              value={project.progress}
+              colorScheme={project.progress === 100 ? 'green' : 'blue'}
+              size="sm"
+              borderRadius="full"
+            />
+          </CardBody>
+        </Card>
+
         {/* Alertes IA */}
         {project.risk_score > 50 && (
           <Alert status="warning" variant="left-accent" borderRadius="md">
@@ -498,19 +587,82 @@ const ProjectDetail = () => {
             </TabPanel>
 
             <TabPanel>
-              <Box textAlign="center" py={8}>
-                <Text color="gray.500">{t('projects.comingSoon')}</Text>
-                <Button
-                  mt={4}
-                  leftIcon={<FiPlus />}
-                  size="sm"
-                  colorScheme="purple"
-                  as={RouterLink}
-                  to={`/milestones/create?project=${id}`}
-                >
-                  {t('projects.createMilestone')}
-                </Button>
-              </Box>
+              <VStack align="stretch" spacing={4}>
+                {milestones && milestones.length > 0 ? (
+                  milestones.map((milestone) => (
+                    <Card
+                      key={milestone.id}
+                      as={RouterLink}
+                      to={`/milestones/${milestone.id}`}
+                      _hover={{ shadow: 'md', transform: 'translateY(-2px)' }}
+                      transition="all 0.2s"
+                      cursor="pointer"
+                    >
+                      <CardBody>
+                        <Flex justify="space-between" align="center">
+                          <HStack spacing={4}>
+                            <Box>
+                              <HStack mb={2}>
+                                <Badge colorScheme={MILESTONE_STATUS_COLORS[milestone.status] || 'gray'}>
+                                  {getMilestoneStatusLabel(milestone.status)}
+                                </Badge>
+                                {milestone.risk_score >= 75 && (
+                                  <Icon as={FiAlertCircle} color="red.500" />
+                                )}
+                              </HStack>
+                              <Text fontWeight="500">{milestone.name}</Text>
+                              {milestone.description && (
+                                <Text fontSize="sm" color="gray.500" noOfLines={1}>
+                                  {milestone.description}
+                                </Text>
+                              )}
+                            </Box>
+                          </HStack>
+                          <VStack align="end" spacing={1}>
+                            <HStack spacing={1} color="gray.500" fontSize="sm">
+                              <Icon as={FiCalendar} boxSize={3.5} />
+                              <Text>
+                                {milestone.due_date
+                                  ? format(new Date(milestone.due_date), 'dd MMM yyyy', { locale: dateLocale })
+                                  : t('common.notDefined')}
+                              </Text>
+                            </HStack>
+                            <HStack spacing={2}>
+                              <Progress
+                                value={Math.round(milestone.progress || 0)}
+                                size="xs"
+                                width="80px"
+                                colorScheme={
+                                  milestone.status === 'delayed' ? 'red' :
+                                  milestone.progress === 100 ? 'green' : 'blue'
+                                }
+                                borderRadius="full"
+                              />
+                              <Text fontSize="sm" fontWeight="600">
+                                {Math.round(milestone.progress || 0)}%
+                              </Text>
+                            </HStack>
+                          </VStack>
+                        </Flex>
+                      </CardBody>
+                    </Card>
+                  ))
+                ) : (
+                  <Box textAlign="center" py={8}>
+                    <Text color="gray.500">{t('projects.noMilestones')}</Text>
+                    <Button
+                      mt={4}
+                      leftIcon={<FiPlus />}
+                      size="sm"
+                      colorScheme="purple"
+                      as={RouterLink}
+                      to={`/milestones/create?project=${id}`}
+                    >
+                      {t('projects.createMilestone')}
+                    </Button>
+                  </Box>
+                )}
+              </VStack>
             </TabPanel>
 
             <TabPanel>

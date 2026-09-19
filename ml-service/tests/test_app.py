@@ -59,7 +59,7 @@ class TestExtractTaskFeatures:
         assert tf[2] == 3
         assert tf[3] == 5.0
         assert tf[4] == 1  # has milestone
-        assert tf[5] == 42
+        assert tf[5] == 1  # is assigned
 
     def test_missing_fields_use_defaults(self):
         features = extract_task_features({})
@@ -77,11 +77,11 @@ class TestExtractTaskFeatures:
 
     def test_delay_features_with_deadline(self):
         features = extract_task_features({'deadline': '2026-12-31'})
-        assert features['delay_features'][2] == 1
+        assert features['delay_features'][2] == calculate_days_remaining('2026-12-31')
 
     def test_delay_features_without_deadline(self):
         features = extract_task_features({})
-        assert features['delay_features'][2] == 0
+        assert features['delay_features'][2] == 30  # default days remaining
 
 
 class TestExtractRiskFeatures:

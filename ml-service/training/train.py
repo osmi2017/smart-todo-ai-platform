@@ -23,7 +23,7 @@ def generate_synthetic_data(n_samples=1000):
         'days_until_deadline': np.random.randint(-10, 30, n_samples),
         'user_avg_completion': np.random.uniform(1, 10, n_samples),
         'user_delay_rate': np.random.uniform(0, 0.5, n_samples),
-        'project_complexity': np.random.uniform(1, 5, n_samples),
+        'assigned': np.random.randint(0, 2, n_samples),
     }
     
     df = pd.DataFrame(data)
@@ -60,7 +60,7 @@ def train_time_model(df, models_dir):
     print("🔄 Entraînement du modèle de prédiction de temps...")
     
     features = ['title_length', 'description_length', 'priority', 
-                'estimated_time', 'has_milestone', 'project_complexity']
+                'estimated_time', 'has_milestone', 'assigned']
     X = df[features]
     y = df['actual_time']
     
@@ -103,8 +103,7 @@ def train_delay_model(df, models_dir):
     """Entraîne le modèle de prédiction de retard"""
     print("🔄 Entraînement du modèle de prédiction de retard...")
     
-    features = ['priority', 'estimated_time', 'days_until_deadline', 
-                'user_avg_completion', 'user_delay_rate']
+    features = ['priority', 'estimated_time', 'days_until_deadline']
     X = df[features]
     y = df['is_delayed']
     
@@ -132,8 +131,7 @@ def train_priority_model(df, models_dir):
     """Entraîne le modèle de priorisation"""
     print("🔄 Entraînement du modèle de priorisation...")
     
-    features = ['title_length', 'estimated_time', 'days_until_deadline', 
-                'priority', 'project_complexity']
+    features = ['title_length', 'estimated_time', 'days_until_deadline']
     X = df[features]
     y = df['optimal_priority']
     

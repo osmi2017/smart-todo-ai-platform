@@ -69,6 +69,7 @@ export const useProjectService = () => {
     createProject: service.create,
     updateProject: service.update,
     updateProjectStatus: service.patch,
+    updateProjectProgress: (id, progress) => service.patch(id, { progress }),
     deleteProject: service.remove,
     getProjectStats: service.getProjectStats,
   };

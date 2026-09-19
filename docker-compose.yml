@@ -422,11 +422,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: todo_ai_frontend
-    environment:
-      REACT_APP_API_URL: http://${APP_HOST:-localhost}:8000/api
-      REACT_APP_WS_URL: ws://${APP_HOST:-localhost}:8000
-      REACT_APP_ML_URL: http://${APP_HOST:-localhost}:5001
-      REACT_APP_MEETING_SERVICE_URL: http://${APP_HOST:-localhost}:4000
     ports:
       - "3000:3000"
     depends_on:

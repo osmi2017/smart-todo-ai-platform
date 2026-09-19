@@ -38,8 +38,7 @@ import { io } from 'socket.io-client';
 import { useCommentService } from '../services/commentService';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
-
-const MEETING_SERVICE_URL = process.env.REACT_APP_MEETING_SERVICE_URL || 'http://localhost:4000';
+import { MEETING_SERVICE_URL } from '../utils/apiConfig';
 
 const TaskComments = ({ taskId }) => {
   const [newComment, setNewComment] = useState('');

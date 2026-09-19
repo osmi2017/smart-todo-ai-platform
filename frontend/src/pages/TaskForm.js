@@ -29,6 +29,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { FiAlertCircle, FiRefreshCw } from 'react-icons/fi';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useTaskService } from '../services/taskService';
 import { useProjectService } from '../services/projectService';
@@ -89,11 +90,20 @@ const TaskForm = () => {
   );
 
   // Charger la tâche si on est en mode édition
-  const { data: task, isLoading: taskLoading } = useQuery(
+  const { data: task, isLoading: taskLoading, isError: taskError } = useQuery(
     ['task', id],
     () => taskService.getTask(id),
     { 
       enabled: !!id,
+      retry: 2,
+      onError: () => {
+        toast({
+          title: t('common.error'),
+          description: t('tasks.loadErrorDesc'),
+          status: 'error',
+          duration: 5000,
+        });
+      },
       onSuccess: (data) => {
         if (data) {
           setFormData({
@@ -309,6 +319,23 @@ const TaskForm = () => {
     );
   }
 
+  if (id && taskError) {
+    return (
+      <Box textAlign="center" py={10}>
+        <FiAlertCircle size={40} color="red.500" />
+        <Text mt={4} color="red.500">{t('tasks.loadErrorDesc')}</Text>
+        <Button
+          mt={4}
+          leftIcon={<FiRefreshCw />}
+          colorScheme="blue"
+          onClick={() => queryClient.invalidateQueries(['task', id])}
+        >
+          {t('common.retry')}
+        </Button>
+      </Box>
+    );
+  }
+
   return (
     <Box>
       <Heading size="lg" mb={6}>
@@ -436,7 +463,7 @@ const TaskForm = () => {
 
               {/* Champ "Assigné à" mis à jour avec les membres du projet */}
               <FormControl>
-                <FormLabel>{t('tasks.assignedTo')}</FormLabel>
+                <FormLabel>{t('tasks.assignTo')}</FormLabel>
                 <Select
                   value={formData.assigned_to}
                   onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}

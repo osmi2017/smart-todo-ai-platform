@@ -1,8 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { WS_URL } from '../utils/apiConfig';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
-const WS_BASE_URL = process.env.REACT_APP_WS_URL ||
-  API_URL.replace(/^http/, 'ws').replace(/\/api\/?$/, '');
+const WS_BASE_URL = WS_URL;
 
 const MAX_RECONNECT_DELAY = 30000;
 

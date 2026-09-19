@@ -357,7 +357,9 @@
     "byStatus": "Par statut",
     "blockedCount": "Bloquées",
     "completedCount": "Terminées",
-    "searchPlaceholder": "Rechercher un projet..."
+    "searchPlaceholder": "Rechercher un projet...",
+    "adjustProgress": "Ajuster la progression",
+    "noMilestones": "Aucun jalon associé à ce projet"
   },
   "tasks": {
     "title": "Tâches",
@@ -424,17 +426,16 @@
     "newTagPlaceholder": "Nouveau tag",
     "me": "Moi",
     "deleteTask": "Supprimer la tâche",
-     "priorities": {
-          "Low": "Basse", 
-          "Medium":"Moyenne", 
-"High": "Élevé",
-           "Critical": "Critique"
-        },
-        "addcomment":"Ajouter un commentaire... (Utilisez @ pour mentionner)",
-        "tocomment":"Commenter",
-        "nocomment":"Aucun commentaire pour le moment"
+    "priorities": {
+      "Low": "Basse",
+      "Medium": "Moyenne",
+      "High": "Élevé",
+      "Critical": "Critique"
+    },
+    "addcomment": "Ajouter un commentaire... (Utilisez @ pour mentionner)",
+    "tocomment": "Commenter",
+    "nocomment": "Aucun commentaire pour le moment"
   },
-  
   "kanban": {
     "title": "Tableau Kanban",
     "newTask": "Nouvelle tâche",
@@ -484,13 +485,27 @@
     "completed": "Terminé",
     "inprogress": "En cours",
     "overdue": "En retard",
-    "highrisk":"Risque élévé",
+    "highrisk": "Risque élévé",
     "searchPlaceholder": "Rechercher un jalon...",
-    "Sortbyduedate":"Trier: Échéance",
-    "Sortbyprogress":"Trier: Progression",
-    "Sortbyduename":"Trier: Nom", 
-    "Grid": "Grille",   
-    "calendar":"Calendrier",
+    "Sortbyduedate": "Trier: Échéance",
+    "Sortbyprogress": "Trier: Progression",
+    "Sortbyduename": "Trier: Nom",
+    "Grid": "Grille",
+    "calendar": "Calendrier",
+    "loadErrorDesc": "Impossible de charger le jalon",
+    "updateStatusError": "Impossible de mettre à jour le statut",
+    "updateProgressError": "Impossible de mettre à jour la progression",
+    "deleteErrorDesc": "Impossible de supprimer le jalon",
+    "aiAnalysis": "Analyse IA",
+    "riskCalculated": "Risque calculé: {{risk}}%",
+    "aiAnalysisError": "Impossible de lancer l'analyse IA",
+    "selectProjectError": "Veuillez sélectionner un projet",
+    "loadingDetail": "Chargement du jalon...",
+    "backToMilestones": "Retour aux jalons",
+    "overdueDesc": "Ce jalon est en retard.",
+    "noTasks": "Aucune tâche associée à ce jalon",
+    "riskStat": "Risque",
+    "deleteTitle": "Supprimer le jalon",
     "weekdays": [
       "Dim",
       "Lun",

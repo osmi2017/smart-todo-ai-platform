@@ -595,7 +595,11 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         else:
             projects = Project.objects.none()
 
-        tasks_activity = tasks.filter(updated_at__date__gte=since_date)
+        tasks_activity = tasks.filter(
+            Q(created_at__date__gte=since_date) |
+            Q(updated_at__date__gte=since_date) |
+            Q(completed_at__date__gte=since_date)
+        )
 
         total_tasks = tasks.count()
         completed_tasks = tasks.filter(status='completed').count()
@@ -615,19 +619,23 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
 
         day_names = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
         month_names = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+
+        def activity_on(day):
+            return Q(created_at__date=day) | Q(updated_at__date=day) | Q(completed_at__date=day)
+
         if time_range == 'week':
             activity_period = 7
             activity_start = today - timedelta(days=today.weekday())
             weekly_activity = []
             for i in range(activity_period):
                 day_date = activity_start + timedelta(days=i)
-                count = tasks_activity.filter(updated_at__date=day_date).count()
+                count = tasks_activity.filter(activity_on(day_date)).count()
                 weekly_activity.append({'day': day_names[i], 'tasks': count})
         elif time_range == 'month':
             weekly_activity = []
             for i in range(30):
                 day_date = today - timedelta(days=29 - i)
-                count = tasks_activity.filter(updated_at__date=day_date).count()
+                count = tasks_activity.filter(activity_on(day_date)).count()
                 weekly_activity.append({'day': day_date.strftime('%d/%m'), 'tasks': count})
         else:
             weekly_activity = []
@@ -636,20 +644,18 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
                 month_start = month_date.replace(day=1)
                 month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
                 count = tasks_activity.filter(
-                    updated_at__date__gte=month_start,
-                    updated_at__date__lte=month_end,
+                    Q(created_at__date__gte=month_start, created_at__date__lte=month_end) |
+                    Q(updated_at__date__gte=month_start, updated_at__date__lte=month_end) |
+                    Q(completed_at__date__gte=month_start, completed_at__date__lte=month_end),
                 ).count()
                 weekly_activity.append({'day': month_names[(month_start.month - 1) % 12], 'tasks': count})
 
         project_progress = []
         for proj in projects.order_by('-updated_at')[:8]:
-            proj_tasks = proj.tasks.count()
-            proj_completed = proj.tasks.filter(status='completed').count()
-            progress = round((proj_completed / proj_tasks * 100) if proj_tasks > 0 else 0)
             project_progress.append({
                 'id': proj.id,
                 'name': proj.name,
-                'progress': progress,
+                'progress': round(proj.progress),
                 'color': proj.color or '#4299E1',
             })
 

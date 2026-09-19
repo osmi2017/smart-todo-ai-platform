@@ -357,7 +357,9 @@
     "byStatus": "By Status",
     "blockedCount": "Blocked",
     "completedCount": "Completed",
-    "searchPlaceholder": "Search projects..."
+    "searchPlaceholder": "Search projects...",
+    "adjustProgress": "Adjust progress",
+    "noMilestones": "No milestones associated with this project"
   },
   "tasks": {
     "title": "Tasks",
@@ -424,15 +426,15 @@
     "newTagPlaceholder": "New tag",
     "me": "Me",
     "deleteTask": "Delete task",
-     "priorities": {
-          "Low": "Low", 
-          "Medium":"Medium", 
-"High": "High",
-           "Critical": "Critical"
-        },
-    "addcomment":"Add a comment... (Use @ to mention)",
-    "tocomment":"Comment",
-    "nocomment":"No comments yet"
+    "priorities": {
+      "Low": "Low",
+      "Medium": "Medium",
+      "High": "High",
+      "Critical": "Critical"
+    },
+    "addcomment": "Add a comment... (Use @ to mention)",
+    "tocomment": "Comment",
+    "nocomment": "No comments yet"
   },
   "kanban": {
     "title": "Kanban Board",
@@ -483,13 +485,27 @@
     "completed": "Completed",
     "inprogress": "In progress",
     "overdue": "Overdue",
-    "highrisk":"High risk",
+    "highrisk": "High risk",
     "searchPlaceholder": "Search for a milestone...",
-    "Sortbyduedate":"Sort by: Due date",
-    "Sortbyprogress":"Sort by: Progress",
-    "Sortbyduename":"Sort by: Name",  
-    "Grid": "Grid",     
-    "calendar":"Calendar",
+    "Sortbyduedate": "Sort by: Due date",
+    "Sortbyprogress": "Sort by: Progress",
+    "Sortbyduename": "Sort by: Name",
+    "Grid": "Grid",
+    "calendar": "Calendar",
+    "loadErrorDesc": "Unable to load the milestone",
+    "updateStatusError": "Unable to update the status",
+    "updateProgressError": "Unable to update the progress",
+    "deleteErrorDesc": "Unable to delete the milestone",
+    "aiAnalysis": "AI Analysis",
+    "riskCalculated": "Calculated risk: {{risk}}%",
+    "aiAnalysisError": "Unable to run the AI analysis",
+    "selectProjectError": "Please select a project",
+    "loadingDetail": "Loading milestone...",
+    "backToMilestones": "Back to milestones",
+    "overdueDesc": "This milestone is overdue.",
+    "noTasks": "No tasks associated with this milestone",
+    "riskStat": "Risk",
+    "deleteTitle": "Delete milestone",
     "weekdays": [
       "Sun",
       "Mon",

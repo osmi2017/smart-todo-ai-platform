@@ -16,6 +16,7 @@ import {
 } from 'react-icons/fi';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { useAuth } from '../context/AuthContext';
+import { API_URL } from '../utils/apiConfig';
 import { useTranslation } from 'react-i18next';
 import EmptyState from '../components/EmptyState';
 import PageGuide from '../components/PageGuide';
@@ -339,7 +340,7 @@ const Files = () => {
   };
 
   const getPreviewUrl = (file) => {
-    const apiUrl = axiosInstance.defaults.baseURL || 'http://localhost:8000/api';
+    const apiUrl = axiosInstance.defaults.baseURL || API_URL;
     return `${apiUrl}/files/${file.id}/preview/`;
   };
 
