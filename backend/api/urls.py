@@ -8,6 +8,12 @@ from .views_mission import MissionViewSet
 from .views_currency import CurrencyListView
 from .views_geocode import GeocodeView
 from .views_tasks import task_status
+from .views_parc import (
+    VehicleViewSet, VehiclePhotoViewSet, VehicleAssignmentViewSet, VehicleDocumentViewSet,
+    MaintenanceViewSet, MaintenanceScheduleViewSet, OdometerReadingViewSet,
+    FuelRecordViewSet, DriverProfileViewSet, DriverInfractionViewSet,
+    FleetDashboardView,
+)
 
 search_view = views.GlobalSearchView.as_view()
 
@@ -27,6 +33,17 @@ router.register(r'meeting-chat-messages', MeetingChatMessageViewSet)
 router.register(r'files', FileViewSet)
 router.register(r'storage-notifications', StorageNotificationViewSet)
 router.register(r'missions', MissionViewSet)
+router.register(r'vehicles', VehicleViewSet)
+router.register(r'vehicle-photos', VehiclePhotoViewSet)
+router.register(r'vehicle-assignments', VehicleAssignmentViewSet)
+router.register(r'vehicle-documents', VehicleDocumentViewSet)
+router.register(r'maintenances', MaintenanceViewSet)
+router.register(r'maintenance-schedules', MaintenanceScheduleViewSet)
+router.register(r'odometer-readings', OdometerReadingViewSet)
+router.register(r'fuel-records', FuelRecordViewSet)
+router.register(r'drivers', DriverProfileViewSet)
+router.register(r'driver-infractions', DriverInfractionViewSet)
+router.register(r'fleet-dashboard', FleetDashboardView, basename='fleet-dashboard')
 
 urlpatterns = [
     path('jobs/<str:task_id>/', task_status, name='task-status'),

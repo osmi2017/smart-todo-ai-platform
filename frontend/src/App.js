@@ -30,6 +30,11 @@ import MissionDetail from './pages/MissionDetail';
 import CompanyManagement from './pages/admin/CompanyManagement';
 import GroupManagement from './pages/admin/GroupManagement';
 import UserManagement from './pages/admin/UserManagement';
+import FleetDashboard from './pages/parc/FleetDashboard';
+import Vehicles from './pages/parc/Vehicles';
+import Maintenance from './pages/parc/Maintenance';
+import Fuel from './pages/parc/Fuel';
+import Drivers from './pages/parc/Drivers';
 
 // Components
 import Layout from './components/Layout';
@@ -188,6 +193,11 @@ function App() {
                   <Route path="missions/:id" element={<MissionDetail />} />
                   <Route path="missions/:id/edit" element={<MissionForm />} />
                   <Route path="analytics" element={<Analytics />} />
+                  <Route path="parc" element={<FleetDashboard />} />
+                  <Route path="parc/vehicles" element={<Vehicles />} />
+                  <Route path="parc/maintenance" element={<Maintenance />} />
+                  <Route path="parc/fuel" element={<Fuel />} />
+                  <Route path="parc/drivers" element={<Drivers />} />
                   <Route path="admin/companies" element={<CompanyManagement />} />
                   <Route path="admin/groups" element={<GroupManagement />} />
                   <Route path="admin/users" element={<UserManagement />} />

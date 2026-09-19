@@ -27,9 +27,12 @@ import { useAuth } from '../context/AuthContext';
 import { useNotificationService } from '../services/notificationService';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { formatDistance } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 
 const NotificationBell = () => {
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language && i18n.language.startsWith('en') ? enUS : fr;
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const { user, token } = useAuth();
@@ -110,6 +113,45 @@ const NotificationBell = () => {
     return colors[type] || 'gray';
   };
 
+  const getNotificationContent = (notification) => {
+    const type = notification.type;
+    const data = notification.data || {};
+    const base = `notifications.types.${type}`;
+    const typeObj = t(base, { returnObjects: true });
+    const hasUnresolved = (s) => s && typeof s === 'string' && s.includes('{{');
+
+    const getLocalizedField = (key, fallbackKey) => {
+      const localizationKey = fallbackKey
+        ? `notifications.types.${type}.${fallbackKey}`
+        : `${base}.${key}`;
+      const localValue = t(localizationKey, data);
+      return localValue && !hasUnresolved(localValue) ? localValue : null;
+    };
+
+    const isUsable = typeObj && typeof typeObj === 'object' && (typeObj.title || typeObj.overdue);
+
+    if (isUsable) {
+      if (type === 'milestone_due') {
+        const variant = data.overdue ? 'overdue' : 'upcoming';
+        const title = typeObj.title ? t(`${base}.title`, data) : '';
+        const message = typeObj[variant] ? t(`${base}.${variant}`, data) : '';
+        if (title && message && !hasUnresolved(title) && !hasUnresolved(message)) {
+          return { title, message };
+        }
+      } else {
+        const title = typeObj.title ? t(`${base}.title`, data) : '';
+        const message = typeObj.message ? t(`${base}.message`, data) : '';
+        if (title && message && !hasUnresolved(title) && !hasUnresolved(message)) {
+          return { title, message };
+        }
+      }
+    }
+
+    return { title: notification.title, message: notification.message };
+  };
+
+  const getDateLocale = () => dateLocale;
+
   return (
     <>
       <Menu>
@@ -154,10 +196,12 @@ const NotificationBell = () => {
 
           {notifications.length === 0 ? (
             <Box p={4} textAlign="center">
-              <Text color="gray.500">Aucune notification</Text>
+              <Text color="gray.500">{t('notifications.noNotifications')}</Text>
             </Box>
           ) : (
-            notifications.map((notification) => (
+            notifications.map((notification) => {
+              const content = getNotificationContent(notification);
+              return (
               <MenuItem
                 key={notification.id}
                 onClick={() => handleMarkAsRead(notification.id)}
@@ -168,15 +212,15 @@ const NotificationBell = () => {
                   <Box fontSize="24px">{getNotificationIcon(notification.type)}</Box>
                   <Box flex={1}>
                     <Text fontWeight={notification.is_read ? 'normal' : 'bold'} fontSize="sm">
-                      {notification.title}
+                      {content.title}
                     </Text>
                     <Text fontSize="xs" color="gray.500" noOfLines={2}>
-                      {notification.message}
+                      {content.message}
                     </Text>
                     <Text fontSize="xs" color="gray.400" mt={1}>
                       {formatDistance(new Date(notification.created_at), new Date(), {
                         addSuffix: true,
-                        locale: fr
+                        locale: dateLocale
                       })}
                     </Text>
                   </Box>
@@ -185,8 +229,9 @@ const NotificationBell = () => {
                   )}
                 </HStack>
               </MenuItem>
-            ))
-          )}
+            );
+          })
+        )}
         </MenuList>
       </Menu>
 

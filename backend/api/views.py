@@ -595,17 +595,16 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         else:
             projects = Project.objects.none()
 
-        tasks_in_range = tasks.filter(created_at__date__gte=since_date)
-        projects_in_range = projects.filter(created_at__date__gte=since_date)
+        tasks_activity = tasks.filter(updated_at__date__gte=since_date)
 
-        total_tasks = tasks_in_range.count()
-        completed_tasks = tasks_in_range.filter(status='completed').count()
-        in_progress_tasks = tasks_in_range.filter(status='in_progress').count()
-        review_tasks = tasks_in_range.filter(status='review').count()
-        blocked_tasks = tasks_in_range.filter(status='blocked').count()
-        todo_tasks = tasks_in_range.filter(status='todo').count()
+        total_tasks = tasks.count()
+        completed_tasks = tasks.filter(status='completed').count()
+        in_progress_tasks = tasks.filter(status='in_progress').count()
+        review_tasks = tasks.filter(status='review').count()
+        blocked_tasks = tasks.filter(status='blocked').count()
+        todo_tasks = tasks.filter(status='todo').count()
 
-        delayed_count = tasks_in_range.filter(
+        delayed_count = tasks.filter(
             deadline__lt=today,
             status__in=['todo', 'in_progress', 'blocked']
         ).count()
@@ -622,13 +621,13 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             weekly_activity = []
             for i in range(activity_period):
                 day_date = activity_start + timedelta(days=i)
-                count = tasks_in_range.filter(updated_at__date=day_date).count()
+                count = tasks_activity.filter(updated_at__date=day_date).count()
                 weekly_activity.append({'day': day_names[i], 'tasks': count})
         elif time_range == 'month':
             weekly_activity = []
             for i in range(30):
                 day_date = today - timedelta(days=29 - i)
-                count = tasks_in_range.filter(updated_at__date=day_date).count()
+                count = tasks_activity.filter(updated_at__date=day_date).count()
                 weekly_activity.append({'day': day_date.strftime('%d/%m'), 'tasks': count})
         else:
             weekly_activity = []
@@ -636,14 +635,14 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
                 month_date = today - timedelta(days=30 * (11 - i))
                 month_start = month_date.replace(day=1)
                 month_end = (month_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
-                count = tasks_in_range.filter(
+                count = tasks_activity.filter(
                     updated_at__date__gte=month_start,
                     updated_at__date__lte=month_end,
                 ).count()
                 weekly_activity.append({'day': month_names[(month_start.month - 1) % 12], 'tasks': count})
 
         project_progress = []
-        for proj in projects_in_range[:8]:
+        for proj in projects.order_by('-updated_at')[:8]:
             proj_tasks = proj.tasks.count()
             proj_completed = proj.tasks.filter(status='completed').count()
             progress = round((proj_completed / proj_tasks * 100) if proj_tasks > 0 else 0)
@@ -655,8 +654,8 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             })
 
         data = {
-            'total_projects': projects_in_range.count(),
-            'active_projects': projects_in_range.filter(
+            'total_projects': projects.count(),
+            'active_projects': projects.filter(
                 status__in=['in_progress', 'not_started']
             ).count(),
             'total_tasks': total_tasks,
@@ -666,10 +665,10 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             'productivity_score': productivity_score,
 
             'tasks_by_priority': {
-                'low': tasks_in_range.filter(priority=1).count(),
-                'medium': tasks_in_range.filter(priority=2).count(),
-                'high': tasks_in_range.filter(priority=3).count(),
-                'critical': tasks_in_range.filter(priority=4).count(),
+                'low': tasks.filter(priority=1).count(),
+                'medium': tasks.filter(priority=2).count(),
+                'high': tasks.filter(priority=3).count(),
+                'critical': tasks.filter(priority=4).count(),
             },
 
             'tasks_by_status': {
@@ -716,7 +715,6 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             start_date = today - timedelta(days=7)
 
         tasks = self.get_queryset()
-        period_tasks = tasks.filter(created_at__date__gte=start_date)
         if user.role == 'superadmin':
             projects = Project.objects.all()
         elif user.role == 'admin' and user.company:
@@ -729,20 +727,20 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         else:
             projects = Project.objects.none()
 
-        total = period_tasks.count()
-        completed = period_tasks.filter(status='completed').count()
+        total = tasks.count()
+        completed = tasks.filter(status='completed').count()
         completion_rate = round((completed / total * 100) if total > 0 else 0)
 
-        avg_time = period_tasks.filter(
+        avg_time = tasks.filter(
             actual_time__isnull=False
         ).aggregate(Avg('actual_time'))['actual_time__avg'] or 0
 
-        delayed_count = period_tasks.filter(
+        delayed_count = tasks.filter(
             deadline__lt=today,
             status__in=['todo', 'in_progress', 'blocked']
         ).count()
 
-        ml_tasks = period_tasks.filter(predicted_priority__isnull=False)
+        ml_tasks = tasks.filter(predicted_priority__isnull=False)
         ml_total = ml_tasks.count()
         if ml_total > 0:
             ml_correct = ml_tasks.filter(predicted_priority=F('priority')).count()
@@ -763,10 +761,10 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
             })
 
         priority_data = [
-            {'name': 'Basse', 'value': period_tasks.filter(priority=1).count(), 'color': '#718096'},
-            {'name': 'Moyenne', 'value': period_tasks.filter(priority=2).count(), 'color': '#4299E1'},
-            {'name': 'Haute', 'value': period_tasks.filter(priority=3).count(), 'color': '#ED8936'},
-            {'name': 'Critique', 'value': period_tasks.filter(priority=4).count(), 'color': '#F56565'},
+            {'name': 'Basse', 'value': tasks.filter(priority=1).count(), 'color': '#718096'},
+            {'name': 'Moyenne', 'value': tasks.filter(priority=2).count(), 'color': '#4299E1'},
+            {'name': 'Haute', 'value': tasks.filter(priority=3).count(), 'color': '#ED8936'},
+            {'name': 'Critique', 'value': tasks.filter(priority=4).count(), 'color': '#F56565'},
         ]
 
         project_data = []
@@ -786,7 +784,7 @@ class TaskViewSet(ActivityLogMixin, viewsets.ModelViewSet):
         ).distinct()
         user_performance = []
         for member in members[:20]:
-            member_tasks = period_tasks.filter(assigned_to=member)
+            member_tasks = tasks.filter(assigned_to=member)
             m_total = member_tasks.count()
             m_completed = member_tasks.filter(status='completed').count()
             m_delayed = member_tasks.filter(

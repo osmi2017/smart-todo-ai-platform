@@ -36,6 +36,11 @@ import {
   FiMap,
   FiChevronLeft,
   FiChevronRight,
+  FiTruck,
+  FiTool,
+  FiDroplet,
+  FiUserCheck,
+  FiChevronDown,
 } from 'react-icons/fi';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
@@ -71,6 +76,12 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
   );
   const projectCount = Array.isArray(projects) ? projects.length : (projects?.results?.length || 0);
 
+  const [parcOpen, setParcOpen] = useState(false);
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/parc')) setParcOpen(true);
+  }, [location.pathname]);
+
   const menuItems = [
     { path: '/dashboard', name: t('sidebar.dashboard'), icon: FiHome },
     { path: '/projects', name: t('sidebar.projects'), icon: FiFolder },
@@ -81,6 +92,11 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
     { path: '/files', name: t('sidebar.files'), icon: FiHardDrive },
     { path: '/missions', name: t('sidebar.missions'), icon: FiMap },
     { path: '/analytics', name: t('sidebar.analytics'), icon: FiBarChart2 },
+    { path: '/parc', name: t('sidebar.parc'), icon: FiTruck, isParent: true },
+    { path: '/parc/vehicles', name: t('sidebar.parcVehicles'), icon: FiTruck, nested: true, parent: '/parc' },
+    { path: '/parc/maintenance', name: t('sidebar.parcMaintenance'), icon: FiTool, nested: true, parent: '/parc' },
+    { path: '/parc/fuel', name: t('sidebar.parcFuel'), icon: FiDroplet, nested: true, parent: '/parc' },
+    { path: '/parc/drivers', name: t('sidebar.parcDrivers'), icon: FiUserCheck, nested: true, parent: '/parc' },
     ...(isAdmin ? [
       { path: '/admin/users', name: t('sidebar.users'), icon: FiUsers },
       { path: '/admin/groups', name: t('sidebar.groups'), icon: FiGrid },
@@ -139,12 +155,17 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
         }}
       >
         {menuItems.map((item) => {
+          if (item.nested) {
+            const isVisible = !collapsed && parcOpen && location.pathname.startsWith(item.parent);
+            if (!isVisible) return null;
+          }
           const isActive = location.pathname === item.path ||
             (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
           const MenuItemContent = (
             <HStack
               as={RouterLink}
               to={item.path}
+              onClick={item.isParent ? () => setParcOpen(!parcOpen) : undefined}
               spacing={3}
               px={collapsed ? 0 : 3}
               py={2.5}
@@ -153,8 +174,9 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
               bg={isActive ? activeBg : 'transparent'}
               color={isActive ? activeColor : textColor}
               justify={collapsed ? 'center' : 'flex-start'}
+              cursor="pointer"
               _hover={{
-                bg: isActive ? activeBg : hoverBg,
+                bg: item.isParent ? (parcOpen ? activeBg : hoverBg) : isActive ? activeBg : hoverBg,
                 color: isActive ? activeColor : 'gray.800',
                 textDecoration: 'none',
               }}
@@ -177,11 +199,16 @@ const Sidebar = ({ collapsed, onToggle, isMobile, isOpen, onClose }) => {
               {!collapsed && (
                 <Text
                   fontSize="sm"
-                  fontWeight={isActive ? '600' : '400'}
+                  fontWeight={isActive || (item.isParent && parcOpen) ? '600' : '400'}
                   whiteSpace="nowrap"
+                  flex="1"
                 >
                   {item.name}
                 </Text>
+              )}
+              {!collapsed && item.isParent && (
+                <Icon as={FiChevronDown} boxSize={4} color={mutedColor}
+                  style={{ transform: parcOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
               )}
               {!collapsed && item.path === '/tasks' && taskCount > 0 && (
                 <Badge

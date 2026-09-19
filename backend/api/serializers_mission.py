@@ -1,5 +1,28 @@
 from rest_framework import serializers
-from .models import Mission, MissionMember, User, Project, Task, Milestone
+from .models import Mission, MissionMember, MissionTransport, User, Project, Task, Milestone, Vehicle
+
+
+class MissionTransportSerializer(serializers.ModelSerializer):
+    vehicule_detail = serializers.SerializerMethodField()
+    mode_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MissionTransport
+        fields = ['id', 'mode', 'mode_label', 'description', 'vehicule', 'vehicule_detail', 'cout']
+        extra_kwargs = {'vehicule': {'required': False, 'allow_null': True}}
+
+    def get_vehicule_detail(self, obj):
+        if obj.vehicule:
+            return {
+                'id': obj.vehicule.id,
+                'immatriculation': obj.vehicule.immatriculation,
+                'marque': obj.vehicule.marque,
+                'modele': obj.vehicule.modele,
+            }
+        return None
+
+    def get_mode_label(self, obj):
+        return dict(MissionTransport.MODE_CHOICES).get(obj.mode, obj.mode)
 
 
 class MissionMemberSerializer(serializers.ModelSerializer):
@@ -42,6 +65,8 @@ class MissionSerializer(serializers.ModelSerializer):
         queryset=User.objects.all(), write_only=True,
         source='leader_data', required=False, allow_null=True
     )
+    transports = MissionTransportSerializer(many=True, read_only=True)
+    transports_data = MissionTransportSerializer(many=True, write_only=True, required=False)
     created_by_name = serializers.CharField(source='created_by.username', read_only=True)
     total_cost = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     frais_de_mission = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
@@ -61,6 +86,7 @@ class MissionSerializer(serializers.ModelSerializer):
             'currency', 'total_cost', 'frais_de_mission', 'created_by', 'created_by_name',
             'expense_report', 'mission_report',
             'members', 'member_ids', 'leader_id',
+            'transports', 'transports_data',
             'project', 'project_detail',
             'tasks', 'tasks_detail',
             'milestones', 'milestones_detail',
@@ -73,11 +99,47 @@ class MissionSerializer(serializers.ModelSerializer):
             return (obj.end_date - obj.start_date).days + 1
         return None
 
+    def _apply_transports(self, mission, transports_data):
+        """Remplace les transports et recalcule le coût de transport total."""
+        mission.transports.all().delete()
+        total = 0
+        for t in transports_data or []:
+            # Pour un véhicule du parc, le cout saisi = carburant
+            MissionTransport.objects.create(
+                mission=mission,
+                company=mission.company,
+                mode=t.get('mode', 'taxi'),
+                description=t.get('description', ''),
+                vehicule=t.get('vehicule'),
+                cout=t.get('cout', 0),
+            )
+            total += float(t.get('cout', 0) or 0)
+        mission.cost_transport = total
+        mission.save(update_fields=['cost_transport', 'updated_at'])
+
+    def validate(self, attrs):
+        company = self.context['request'].user.company
+        transports = attrs.get('transports_data') or []
+        for t in transports:
+            vehicule = t.get('vehicule')
+            if vehicule is not None:
+                if vehicule.company_id != (company.id if company else vehicule.company_id):
+                    raise serializers.ValidationError(
+                        {'transports_data': 'Le véhicule sélectionné n\'appartient pas à votre entreprise.'}
+                    )
+                # Le véhicule du parc ne peut être choisi que dans le mode vehicule_parc
+                if t.get('mode') != 'vehicule_parc':
+                    raise serializers.ValidationError(
+                        {'transports_data': 'Un véhicule du parc ne peut être lié qu\'au mode "Véhicule du parc".'}
+                    )
+        return attrs
+
     def create(self, validated_data):
         members_data = validated_data.pop('members_data', [])
         leader_data = validated_data.pop('leader_data', None)
         task_ids = validated_data.pop('tasks', [])
         milestone_ids = validated_data.pop('milestones', [])
+        transports_data = validated_data.pop('transports_data', [])
 
         mission = Mission.objects.create(**validated_data)
 
@@ -100,6 +162,8 @@ class MissionSerializer(serializers.ModelSerializer):
                     mission=mission, user=user, is_leader=is_leader
                 )
 
+        self._apply_transports(mission, transports_data)
+
         return mission
 
     def update(self, instance, validated_data):
@@ -107,6 +171,7 @@ class MissionSerializer(serializers.ModelSerializer):
         leader_data = validated_data.pop('leader_data', None)
         task_ids = validated_data.pop('tasks', None)
         milestone_ids = validated_data.pop('milestones', None)
+        transports_data = validated_data.pop('transports_data', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -119,7 +184,7 @@ class MissionSerializer(serializers.ModelSerializer):
 
         if leader_data:
             instance.members.update(is_leader=False)
-            member, _ = MissionMember.objects.get_or_create(
+            member, _ = instance.members.get_or_create(
                 mission=instance, user=leader_data
             )
             member.is_leader = True
@@ -137,6 +202,12 @@ class MissionSerializer(serializers.ModelSerializer):
                     MissionMember.objects.create(
                         mission=instance, user=user, is_leader=is_leader
                     )
+
+        if transports_data is not None:
+            self._apply_transports(instance, transports_data)
+        else:
+            # Si les transports ne sont pas fournis, garder cost_transport cohérent
+            instance.save()
 
         return instance
 

@@ -98,7 +98,12 @@
     "users": "Utilisateurs",
     "groups": "Groupes",
     "companies": "Entreprises",
-    "projectManagement": "Gestion de projets"
+    "projectManagement": "Gestion de projets",
+    "parc": "Parc Auto",
+    "parcVehicles": "Véhicules",
+    "parcMaintenance": "Maintenance",
+    "parcFuel": "Carburant & Km",
+    "parcDrivers": "Conducteurs"
   },
   "quickCreate": {
     "title": "Créer rapidement",
@@ -404,8 +409,32 @@
     "createTask": "Créer la tâche",
     "newTaskInProject": "Nouvelle tâche dans le projet",
     "noDescription": "Aucune description",
-    "titleRequired": "Le titre est requis"
+    "titleRequired": "Le titre est requis",
+    "comment": "Commentaires",
+    "description": "Description",
+    "loadErrorDesc": "Impossible de charger la tâche",
+    "mlPrediction": "Prédiction ML",
+    "predictedTime": "Temps estimé",
+    "taskNotFound": "Tâche non trouvée",
+    "backToTasks": "Retour aux tâches",
+    "predict": "Prédire",
+    "delayRiskDetected": "Risque de retard détecté",
+    "delayProbability": "Probabilité de retard",
+    "recalculate": "Recalculer",
+    "newTagPlaceholder": "Nouveau tag",
+    "me": "Moi",
+    "deleteTask": "Supprimer la tâche",
+     "priorities": {
+          "Low": "Basse", 
+          "Medium":"Moyenne", 
+"High": "Élevé",
+           "Critical": "Critique"
+        },
+        "addcomment":"Ajouter un commentaire... (Utilisez @ pour mentionner)",
+        "tocomment":"Commenter",
+        "nocomment":"Aucun commentaire pour le moment"
   },
+  
   "kanban": {
     "title": "Tableau Kanban",
     "newTask": "Nouvelle tâche",
@@ -451,6 +480,17 @@
     "gridView": "Grille",
     "calendarView": "Calendrier",
     "statusTooltip": "Vous pouvez modifier manuellement le statut",
+    "total": "Total",
+    "completed": "Terminé",
+    "inprogress": "En cours",
+    "overdue": "En retard",
+    "highrisk":"Risque élévé",
+    "searchPlaceholder": "Rechercher un jalon...",
+    "Sortbyduedate":"Trier: Échéance",
+    "Sortbyprogress":"Trier: Progression",
+    "Sortbyduename":"Trier: Nom", 
+    "Grid": "Grille",   
+    "calendar":"Calendrier",
     "weekdays": [
       "Dim",
       "Lun",
@@ -731,7 +771,28 @@
       "distanceFromPosition": "depuis votre position",
       "searchForMap": "Recherchez une destination pour afficher la carte.",
       "selectCurrency": "Rechercher ou sélectionner une devise",
-      "noResults": "Aucun résultat trouvé"
+      "noResults": "Aucun résultat trouvé",
+      "transportModes": "Moyens de transport",
+      "addTransport": "Ajouter un moyen de transport",
+      "transportN": "Transport {{n}}",
+      "transportMode": "Moyen de transport",
+      "transportDescription": "Détails (n° vol, compagnie...)",
+      "transportDescriptionPh": "Ex : vol AF 512, SOTRA...",
+      "ticketPrice": "Prix du billet",
+      "fuelAmount": "Montant du carburant",
+      "parcVehicle": "Véhicule du parc",
+      "selectParcVehicle": "Sélectionner un véhicule du parc",
+      "loadingVehicles": "Chargement des véhicules..."
+    },
+    "transportModes": {
+      "avion": "Avion",
+      "vehiculePersonnel": "Véhicule personnel",
+      "vehiculeParc": "Véhicule du parc",
+      "taxi": "Taxi",
+      "bus": "Bus",
+      "train": "Train",
+      "bateau": "Bateau",
+      "autre": "Autre"
     },
     "actions": {
       "viewDetails": "Voir détails",
@@ -928,7 +989,70 @@
     "title": "Notifications",
     "markAllRead": "Tout marquer comme lu",
     "noNotifications": "Aucune notification",
-    "unreadCount": "{{count}} notification(s) non lue(s)"
+    "unreadCount": "{{count}} notification(s) non lue(s)",
+    "types": {
+      "task_assigned": {
+        "title": "Nouvelle tâche assignée",
+        "message": "La tâche « {{task_title}} » vous a été assignée."
+      },
+      "task_completed": {
+        "title": "Tâche terminée",
+        "message": "La tâche « {{task_title}} » a été terminée."
+      },
+      "task_delayed": {
+        "title": "Tâche en retard",
+        "message": "La tâche « {{task_title}} » est en retard."
+      },
+      "comment_added": {
+        "title": "Nouveau commentaire",
+        "message": "{{author_name}} a commenté la tâche « {{task_title}} »."
+      },
+      "member_added": {
+        "title": "Nouveau membre",
+        "message": "{{user_name}} a rejoint l'équipe."
+      },
+      "milestone_due": {
+        "title": "Jalon à échéance",
+        "overdue": "Le jalon « {{milestone_name}} » du projet « {{project_name}} » est en retard.",
+        "upcoming": "Le jalon « {{milestone_name}} » du projet « {{project_name}} » arrive à échéance le {{due_date}}."
+      },
+      "meeting_reminder": {
+        "title": "Rappel de réunion",
+        "message": "La réunion « {{meeting_title}} » commence à {{time}}."
+      },
+      "meeting_started": {
+        "title": "Réunion démarrée",
+        "message": "La réunion « {{meeting_title}} » a démarré."
+      },
+      "meeting_completed": {
+        "title": "Réunion terminée",
+        "message": "La réunion « {{meeting_title}} » a été terminée."
+      },
+      "meeting_processing": {
+        "title": "Traitement AI en cours",
+        "message": "L'analyse IA de « {{meeting_title}} » a démarré (transcription, résumé, actions)."
+      },
+      "meeting_processed": {
+        "title": "Analyse IA terminée",
+        "message": "Résumé et {{action_items_count}} action(s) extraite(s) pour « {{meeting_title}} »."
+      },
+      "project_created": {
+        "title": "Projet créé",
+        "message": "Le projet « {{project_name}} » a été créé."
+      },
+      "report_processing": {
+        "title": "Génération de rapport en cours",
+        "message": "Le rapport du projet « {{project_name}} » est en cours de génération."
+      },
+      "report_ready": {
+        "title": "Rapport de projet prêt",
+        "message": "Le rapport du projet « {{project_name}} » est disponible au téléchargement."
+      },
+      "task_failed": {
+        "title": "Échec d'une tâche en arrière-plan",
+        "message": "Une erreur est survenue lors du traitement en arrière-plan."
+      }
+    }
   },
   "comments": {
     "addComment": "Ajouter un commentaire... (Utilisez @ pour mentionner)",
@@ -1199,6 +1323,191 @@
           "description": "Le tableau de performance identifie les tendances par membre de l'équipe."
         }
       }
+    }
+  },
+  "parc": {
+    "moduleName": "Parc Auto",
+    "loadError": "Erreur de chargement des données",
+    "saved": "Enregistré avec succès",
+    "saveError": "Erreur lors de l'enregistrement",
+    "deleted": "Supprimé avec succès",
+    "deleteError": "Erreur lors de la suppression",
+    "confirmDelete": "Confirmer la suppression",
+    "confirmDeleteDesc": "Voulez-vous vraiment supprimer cet élément ?",
+    "allStatus": "Tous les statuts",
+    "allVehicles": "Tous les véhicules",
+    "status": {
+      "label": "Statut",
+      "disponible": "Disponible",
+      "en_mission": "En mission",
+      "en_maintenance": "En maintenance",
+      "reforme": "Réformé"
+    },
+    "actions": {
+      "view": "Voir les détails",
+      "edit": "Modifier",
+      "delete": "Supprimer"
+    },
+    "dashboard": {
+      "title": "Tableau de bord Parc Auto",
+      "empty": "Aucune donnée disponible",
+      "totalVehicles": "Véhicules",
+      "available": "Disponibles",
+      "inMission": "En mission",
+      "inMaintenance": "En maintenance",
+      "costPerKm": "Coût / km",
+      "consumption": "Consommation",
+      "totalKm": "Kilométrage total",
+      "drivers": "Conducteurs",
+      "alertsTitle": "Alertes & Échéances",
+      "noAlerts": "Aucune alerte, tout est en règle."
+    },
+    "vehicles": {
+      "title": "Véhicules",
+      "newVehicle": "Nouveau véhicule",
+      "search": "Rechercher (immatriculation, marque...)",
+      "notFound": "Aucun véhicule trouvé",
+      "edit": "Modifier le véhicule",
+      "reg": "Immatriculation",
+      "brand": "Marque",
+      "model": "Modèle",
+      "year": "Année",
+      "fuel": "Carburant",
+      "type": "Type de véhicule",
+      "vin": "Numéro de châssis (VIN)",
+      "purchaseCost": "Coût d'achat",
+      "costPerKm": "Coût / km"
+    },
+    "vehicleType": {
+      "berline": "Berline",
+      "suv": "SUV / 4×4",
+      "pickup": "Pick-up",
+      "utilitaire": "Utilitaire",
+      "camion": "Camion",
+      "moto": "Moto",
+      "autre": "Autre"
+    },
+    "photos": {
+      "title": "Photos",
+      "add": "Ajouter une photo",
+      "choose": "Choisir une image…",
+      "upload": "Téléverser",
+      "empty": "Aucune photo pour ce véhicule.",
+      "delete": "Supprimer la photo"
+    },
+    "detail": {
+      "main": "Informations",
+      "photos": "Photos",
+      "assign": "Affectations",
+      "doc": "Documents",
+      "odo": "Kilométrage",
+      "noData": "Aucune donnée",
+      "expired": "Expiré",
+      "expiringSoon": "Échéance < 30j",
+      "due": "À faire",
+      "nextDueDate": "Prochaine échéance (date)",
+      "nextDueKm": "Prochaine échéance (km)"
+    },
+    "assign": {
+      "add": "Affecter",
+      "serviceName": "Employé / Service",
+      "temporary": "Temporaire",
+      "permanent": "Permanente"
+    },
+    "doc": {
+      "add": "Ajouter un document",
+      "type": "Type de document",
+      "title": "Titre",
+      "number": "Numéro",
+      "fileUrl": "URL du fichier"
+    },
+    "docType": {
+      "carte_grise": "Carte grise",
+      "assurance": "Assurance",
+      "controle_technique": "Contrôle technique",
+      "leasing": "Contrat de leasing",
+      "autre": "Autre"
+    },
+    "odo": {
+      "add": "Relevé kilométrique",
+      "value": "Kilométrage total (km)"
+    },
+    "maintenance": {
+      "title": "Maintenance & Entretien",
+      "newMaintenance": "Nouvelle maintenance",
+      "newSchedule": "Nouveau calendrier d'entretien",
+      "maintenances": "Maintenances",
+      "schedules": "Calendrier d'entretien",
+      "notFound": "Aucune maintenance",
+      "noSchedules": "Aucun calendrier d'entretien",
+      "type": "Type",
+      "description": "Description",
+      "complete": "Marquer terminée",
+      "edit": "Modifier la maintenance",
+      "supplier": "Fournisseur / Garage"
+    },
+    "maintStatus": {
+      "planifiee": "Planifiée",
+      "en_cours": "En cours",
+      "terminee": "Terminée",
+      "annulee": "Annulée"
+    },
+    "maintType": {
+      "preventive": "Préventive",
+      "corrective": "Corrective",
+      "vidange": "Vidange",
+      "controle_technique": "Contrôle technique",
+      "pneu": "Pneumatique",
+      "autre": "Autre"
+    },
+    "fuel": {
+      "title": "Carburant & Kilométrage",
+      "newRefuel": "Nouveau plein",
+      "newReading": "Nouveau relevé",
+      "totalLiters": "Total litres",
+      "totalCost": "Coût total carburant",
+      "readings": "Relevés",
+      "refuels": "Pleins",
+      "notFound": "Aucun plein",
+      "noReadings": "Aucun relevé",
+      "source": "Source",
+      "station": "Station",
+      "odometer": "Kilométrage (km)"
+    },
+    "drivers": {
+      "title": "Conducteurs & Permis",
+      "newDriver": "Nouveau conducteur",
+      "notFound": "Aucun conducteur",
+      "edit": "Modifier le conducteur",
+      "user": "Utilisateur",
+      "selectUser": "Sélectionner un utilisateur…",
+      "fullName": "Nom complet",
+      "licenseType": "Type de permis",
+      "licenseNumber": "N° de permis",
+      "licenseExp": "Expiration du permis",
+      "phone": "Téléphone",
+      "fromUser": "de l'utilisateur",
+      "notes": "Notes",
+      "noInfractions": "Aucune infraction",
+      "addInfraction": "Ajouter une infraction"
+    },
+    "infractionType": {
+      "placeholder": "Type d'infraction",
+      "excès_vitesse": "Excès de vitesse",
+      "stationnement": "Stationnement",
+      "feu_rouge": "Feu rouge",
+      "telephone": "Téléphone au volant",
+      "alcool": "Conduite en état d'ivresse",
+      "autre": "Autre"
+    },
+    "infractionStatus": {
+      "en_attente": "En attente de paiement",
+      "payee": "Payée",
+      "conteste": "Contestée"
+    },
+    "infraction": {
+      "amount": "Montant",
+      "location": "Lieu"
     }
   }
 }

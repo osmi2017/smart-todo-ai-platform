@@ -98,7 +98,12 @@
     "users": "Users",
     "groups": "Groups",
     "companies": "Companies",
-    "projectManagement": "Project Management"
+    "projectManagement": "Project Management",
+    "parc": "Fleet",
+    "parcVehicles": "Vehicles",
+    "parcMaintenance": "Maintenance",
+    "parcFuel": "Fuel & Mileage",
+    "parcDrivers": "Drivers"
   },
   "quickCreate": {
     "title": "Quick create",
@@ -404,7 +409,30 @@
     "createTask": "Create Task",
     "newTaskInProject": "New task in project",
     "noDescription": "No description",
-    "titleRequired": "Title is required"
+    "titleRequired": "Title is required",
+    "comment": "Comments",
+    "description": "Description",
+    "loadErrorDesc": "Unable to load the task",
+    "mlPrediction": "ML Prediction",
+    "predictedTime": "Estimated time",
+    "taskNotFound": "Task not found",
+    "backToTasks": "Back to tasks",
+    "predict": "Predict",
+    "delayRiskDetected": "Delay risk detected",
+    "delayProbability": "Delay probability",
+    "recalculate": "Recalculate",
+    "newTagPlaceholder": "New tag",
+    "me": "Me",
+    "deleteTask": "Delete task",
+     "priorities": {
+          "Low": "Low", 
+          "Medium":"Medium", 
+"High": "High",
+           "Critical": "Critical"
+        },
+    "addcomment":"Add a comment... (Use @ to mention)",
+    "tocomment":"Comment",
+    "nocomment":"No comments yet"
   },
   "kanban": {
     "title": "Kanban Board",
@@ -451,6 +479,17 @@
     "gridView": "Grid",
     "calendarView": "Calendar",
     "statusTooltip": "You can manually change the status",
+    "total": "Total",
+    "completed": "Completed",
+    "inprogress": "In progress",
+    "overdue": "Overdue",
+    "highrisk":"High risk",
+    "searchPlaceholder": "Search for a milestone...",
+    "Sortbyduedate":"Sort by: Due date",
+    "Sortbyprogress":"Sort by: Progress",
+    "Sortbyduename":"Sort by: Name",  
+    "Grid": "Grid",     
+    "calendar":"Calendar",
     "weekdays": [
       "Sun",
       "Mon",
@@ -731,7 +770,28 @@
       "distanceFromPosition": "from your position",
       "searchForMap": "Search for a destination to display the map.",
       "selectCurrency": "Search or select a currency",
-      "noResults": "No results found"
+      "noResults": "No results found",
+      "transportModes": "Means of transport",
+      "addTransport": "Add a means of transport",
+      "transportN": "Transport {{n}}",
+      "transportMode": "Means of transport",
+      "transportDescription": "Details (flight no., company...)",
+      "transportDescriptionPh": "e.g. flight AF 512, SOTRA...",
+      "ticketPrice": "Ticket price",
+      "fuelAmount": "Fuel amount",
+      "parcVehicle": "Fleet vehicle",
+      "selectParcVehicle": "Select a fleet vehicle",
+      "loadingVehicles": "Loading vehicles..."
+    },
+    "transportModes": {
+      "avion": "Plane",
+      "vehiculePersonnel": "Personal vehicle",
+      "vehiculeParc": "Fleet vehicle",
+      "taxi": "Taxi",
+      "bus": "Bus",
+      "train": "Train",
+      "bateau": "Boat",
+      "autre": "Other"
     },
     "actions": {
       "viewDetails": "View Details",
@@ -928,7 +988,70 @@
     "title": "Notifications",
     "markAllRead": "Mark all as read",
     "noNotifications": "No notifications",
-    "unreadCount": "{{count}} unread notification(s)"
+    "unreadCount": "{{count}} unread notification(s)",
+    "types": {
+      "task_assigned": {
+        "title": "New task assigned",
+        "message": "The task \"{{task_title}}\" has been assigned to you."
+      },
+      "task_completed": {
+        "title": "Task completed",
+        "message": "The task \"{{task_title}}\" has been completed."
+      },
+      "task_delayed": {
+        "title": "Delayed task",
+        "message": "The task \"{{task_title}}\" is overdue."
+      },
+      "comment_added": {
+        "title": "New comment",
+        "message": "{{author_name}} commented on the task \"{{task_title}}\"."
+      },
+      "member_added": {
+        "title": "New member",
+        "message": "{{user_name}} joined the team."
+      },
+      "milestone_due": {
+        "title": "Milestone due",
+        "overdue": "The milestone \"{{milestone_name}}\" of project \"{{project_name}}\" is overdue.",
+        "upcoming": "The milestone \"{{milestone_name}}\" of project \"{{project_name}}\" is due on {{due_date}}."
+      },
+      "meeting_reminder": {
+        "title": "Meeting reminder",
+        "message": "The meeting \"{{meeting_title}}\" starts at {{time}}."
+      },
+      "meeting_started": {
+        "title": "Meeting started",
+        "message": "The meeting \"{{meeting_title}}\" has started."
+      },
+      "meeting_completed": {
+        "title": "Meeting completed",
+        "message": "The meeting \"{{meeting_title}}\" has been completed."
+      },
+      "meeting_processing": {
+        "title": "AI processing in progress",
+        "message": "AI analysis of \"{{meeting_title}}\" has started (transcription, summary, actions)."
+      },
+      "meeting_processed": {
+        "title": "AI analysis completed",
+        "message": "Summary and {{action_items_count}} action item(s) extracted for \"{{meeting_title}}\"."
+      },
+      "project_created": {
+        "title": "Project created",
+        "message": "The project \"{{project_name}}\" has been created."
+      },
+      "report_processing": {
+        "title": "Report generation in progress",
+        "message": "The report of project \"{{project_name}}\" is being generated."
+      },
+      "report_ready": {
+        "title": "Project report ready",
+        "message": "The report of project \"{{project_name}}\" is available for download."
+      },
+      "task_failed": {
+        "title": "Background task failed",
+        "message": "An error occurred during background processing."
+      }
+    }
   },
   "comments": {
     "addComment": "Add a comment... (Use @ to mention)",
@@ -1199,6 +1322,191 @@
           "description": "The performance table highlights trends for each team member."
         }
       }
+    }
+  },
+  "parc": {
+    "moduleName": "Vehicle Fleet",
+    "loadError": "Error loading data",
+    "saved": "Saved successfully",
+    "saveError": "Error saving",
+    "deleted": "Deleted successfully",
+    "deleteError": "Error deleting",
+    "confirmDelete": "Confirm deletion",
+    "confirmDeleteDesc": "Do you really want to delete this item?",
+    "allStatus": "All statuses",
+    "allVehicles": "All vehicles",
+    "status": {
+      "label": "Status",
+      "disponible": "Available",
+      "en_mission": "Out on mission",
+      "en_maintenance": "In maintenance",
+      "reforme": "Written off"
+    },
+    "actions": {
+      "view": "View details",
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "dashboard": {
+      "title": "Fleet Dashboard",
+      "empty": "No data available",
+      "totalVehicles": "Vehicles",
+      "available": "Available",
+      "inMission": "On mission",
+      "inMaintenance": "In maintenance",
+      "costPerKm": "Cost / km",
+      "consumption": "Consumption",
+      "totalKm": "Total mileage",
+      "drivers": "Drivers",
+      "alertsTitle": "Alerts & Due dates",
+      "noAlerts": "No alerts, everything is up to date."
+    },
+    "vehicles": {
+      "title": "Vehicles",
+      "newVehicle": "New vehicle",
+      "search": "Search (plate, brand...)",
+      "notFound": "No vehicles found",
+      "edit": "Edit vehicle",
+      "reg": "Registration",
+      "brand": "Brand",
+      "model": "Model",
+      "year": "Year",
+      "fuel": "Fuel type",
+      "type": "Vehicle type",
+      "vin": "Chassis number (VIN)",
+      "purchaseCost": "Purchase cost",
+      "costPerKm": "Cost / km"
+    },
+    "vehicleType": {
+      "berline": "Sedan",
+      "suv": "SUV / 4×4",
+      "pickup": "Pickup",
+      "utilitaire": "Van",
+      "camion": "Truck",
+      "moto": "Motorcycle",
+      "autre": "Other"
+    },
+    "photos": {
+      "title": "Photos",
+      "add": "Add a photo",
+      "choose": "Choose an image…",
+      "upload": "Upload",
+      "empty": "No photo for this vehicle.",
+      "delete": "Delete photo"
+    },
+    "detail": {
+      "main": "Information",
+      "photos": "Photos",
+      "assign": "Assignments",
+      "doc": "Documents",
+      "odo": "Mileage",
+      "noData": "No data",
+      "expired": "Expired",
+      "expiringSoon": "Due < 30d",
+      "due": "Due",
+      "nextDueDate": "Next due (date)",
+      "nextDueKm": "Next due (km)"
+    },
+    "assign": {
+      "add": "Assign",
+      "serviceName": "Employee / Service",
+      "temporary": "Temporary",
+      "permanent": "Permanent"
+    },
+    "doc": {
+      "add": "Add a document",
+      "type": "Document type",
+      "title": "Title",
+      "number": "Number",
+      "fileUrl": "File URL"
+    },
+    "docType": {
+      "carte_grise": "Registration certificate",
+      "assurance": "Insurance",
+      "controle_technique": "Technical inspection",
+      "leasing": "Leasing contract",
+      "autre": "Other"
+    },
+    "odo": {
+      "add": "Odometer reading",
+      "value": "Total mileage (km)"
+    },
+    "maintenance": {
+      "title": "Maintenance & Service",
+      "newMaintenance": "New maintenance",
+      "newSchedule": "New service schedule",
+      "maintenances": "Maintenance",
+      "schedules": "Service schedule",
+      "notFound": "No maintenance",
+      "noSchedules": "No service schedules",
+      "type": "Type",
+      "description": "Description",
+      "complete": "Mark completed",
+      "edit": "Edit maintenance",
+      "supplier": "Supplier / Garage"
+    },
+    "maintStatus": {
+      "planifiee": "Planned",
+      "en_cours": "In progress",
+      "terminee": "Completed",
+      "annulee": "Cancelled"
+    },
+    "maintType": {
+      "preventive": "Preventive",
+      "corrective": "Corrective",
+      "vidange": "Oil change",
+      "controle_technique": "Technical inspection",
+      "pneu": "Tyre / Tyres",
+      "autre": "Other"
+    },
+    "fuel": {
+      "title": "Fuel & Mileage",
+      "newRefuel": "New refuel",
+      "newReading": "New reading",
+      "totalLiters": "Total liters",
+      "totalCost": "Total fuel cost",
+      "readings": "Readings",
+      "refuels": "Refuels",
+      "notFound": "No refuels",
+      "noReadings": "No readings",
+      "source": "Source",
+      "station": "Station",
+      "odometer": "Mileage (km)"
+    },
+    "drivers": {
+      "title": "Drivers & Licenses",
+      "newDriver": "New driver",
+      "notFound": "No drivers",
+      "edit": "Edit driver",
+      "user": "User",
+      "selectUser": "Select a user…",
+      "fullName": "Full name",
+      "licenseType": "License type",
+      "licenseNumber": "License number",
+      "licenseExp": "License expiry",
+      "phone": "Phone",
+      "fromUser": "from the user",
+      "notes": "Notes",
+      "noInfractions": "No infractions",
+      "addInfraction": "Add infraction"
+    },
+    "infractionType": {
+      "placeholder": "Infraction type",
+      "excès_vitesse": "Speeding",
+      "stationnement": "Parking",
+      "feu_rouge": "Red light",
+      "telephone": "Phone while driving",
+      "alcool": "Drunk driving",
+      "autre": "Other"
+    },
+    "infractionStatus": {
+      "en_attente": "Awaiting payment",
+      "payee": "Paid",
+      "conteste": "Disputed"
+    },
+    "infraction": {
+      "amount": "Amount",
+      "location": "Location"
     }
   }
 }

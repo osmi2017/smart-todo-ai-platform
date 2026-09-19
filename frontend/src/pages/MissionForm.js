@@ -6,7 +6,7 @@ import {
   FormControl, FormLabel, Input, Textarea, Select,
   useToast, useColorModeValue, Text,
   Skeleton, Tag, TagLabel, TagCloseButton, Wrap, WrapItem,
-  Divider, Flex, Spinner, Avatar, Icon, Badge,
+  Divider, Flex, Spinner, Avatar, Icon, IconButton, Badge,
   NumberInput, NumberInputField, NumberInputStepper, NumberIncrementStepper, NumberDecrementStepper,
   Alert, AlertIcon,
 } from '@chakra-ui/react';
@@ -19,6 +19,27 @@ import { useCrudService } from '../utils/createCrudService';
 import { useAuth } from '../context/AuthContext';
 import LocationSearch from '../components/LocationSearch';
 import SearchableSelect from '../components/SearchableSelect';
+
+const TRANSPORT_MODES = [
+  { value: 'avion', key: 'avion', public: true },
+  { value: 'vehicule_personnel', key: 'vehiculePersonnel', public: false },
+  { value: 'vehicule_parc', key: 'vehiculeParc', public: false },
+  { value: 'taxi', key: 'taxi', public: false },
+  { value: 'bus', key: 'bus', public: true },
+  { value: 'train', key: 'train', public: true },
+  { value: 'bateau', key: 'bateau', public: true },
+  { value: 'autre', key: 'autre', public: true },
+];
+
+const modeLabel = (m, t) => t(`missions.transportModes.${m.key}`);
+
+const emptyTransport = () => ({
+  mode: 'avion',
+  description: '',
+  vehicule: '',
+  cout: 0,
+});
+
 
 const MissionForm = () => {
   const { t } = useTranslation();
@@ -43,6 +64,10 @@ const MissionForm = () => {
   const [projectTasks, setProjectTasks] = useState([]);
   const [projectMilestones, setProjectMilestones] = useState([]);
   const [loadingLinked, setLoadingLinked] = useState(false);
+
+  const [parkVehicles, setParkVehicles] = useState([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+  const [transports, setTransports] = useState([emptyTransport()]);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -74,6 +99,7 @@ const MissionForm = () => {
     loadCompanyUsers();
     loadCurrencies();
     loadProjects();
+    loadParkVehicles();
     if (isEditing) loadMissionData();
   }, [id]);
 
@@ -100,6 +126,19 @@ const MissionForm = () => {
       console.error('Error loading currencies:', error);
     } finally {
       setLoadingCurrencies(false);
+    }
+  };
+
+  const loadParkVehicles = async () => {
+    setLoadingVehicles(true);
+    try {
+      const response = await axiosInstance.get('/vehicles/', { params: { page_size: 200 } });
+      const data = response.data;
+      setParkVehicles(Array.isArray(data) ? data : data.results || []);
+    } catch (error) {
+      // non-critical
+    } finally {
+      setLoadingVehicles(false);
     }
   };
 
@@ -179,6 +218,17 @@ const MissionForm = () => {
       if (data.milestones && data.milestones.length > 0) {
         setSelectedMilestoneIds(data.milestones);
       }
+      if (data.transports && data.transports.length > 0) {
+        setTransports(data.transports.map(t => ({
+          id: t.id,
+          mode: t.mode,
+          description: t.description || '',
+          vehicule: t.vehicule || '',
+          cout: parseFloat(t.cout) || 0,
+        })));
+      } else {
+        setTransports([emptyTransport()]);
+      }
     } catch (error) {
       toast({ title: t('missions.loadErrorTitle'), status: 'error', duration: 3000 });
       navigate('/missions');
@@ -220,6 +270,23 @@ const MissionForm = () => {
     );
   };
 
+  const updateTransport = (index, field, value) => {
+    setTransports(prev => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+  };
+
+  const addTransport = () => {
+    setTransports(prev => [...prev, emptyTransport()]);
+  };
+
+  const removeTransport = (index) => {
+    setTransports(prev => prev.length > 1
+      ? prev.filter((_, i) => i !== index)
+      : prev
+    );
+  };
+
+  const transportTotal = transports.reduce((sum, t) => sum + (parseFloat(t.cout) || 0), 0);
+
   const missionDays = (() => {
     if (formData.start_date && formData.end_date) {
       const start = new Date(formData.start_date);
@@ -233,7 +300,6 @@ const MissionForm = () => {
   const accomDays = Math.max(missionDays - 1, 0);
   const perDiemTotal = (parseFloat(formData.cost_per_diem) || 0) * missionDays;
   const accomTotal = (parseFloat(formData.cost_accommodation) || 0) * accomDays;
-  const transportTotal = parseFloat(formData.cost_transport) || 0;
   const otherTotal = parseFloat(formData.cost_other) || 0;
   const estimatedTotal = perDiemTotal + accomTotal + transportTotal + otherTotal;
   const currencyCode = formData.currency.toUpperCase();
@@ -277,6 +343,15 @@ const MissionForm = () => {
         tasks: selectedTaskIds,
         milestones: selectedMilestoneIds,
         project: formData.project || null,
+        cost_transport: transportTotal,
+        transports_data: transports
+          .filter(t => t.mode)
+          .map(t => ({
+            mode: t.mode,
+            description: t.description || '',
+            vehicule: t.mode === 'vehicule_parc' && t.vehicule ? parseInt(t.vehicule) : null,
+            cout: parseFloat(t.cout) || 0,
+          })),
       };
 
       if (isEditing) {
@@ -686,36 +761,112 @@ const MissionForm = () => {
                   </NumberInput>
                 </FormControl>
               </HStack>
-              <HStack spacing={4} flexWrap="wrap">
-                <FormControl>
-                  <FormLabel>{t('missions.form.transport')} ({formData.currency.toUpperCase()})</FormLabel>
-                  <NumberInput
-                    value={formData.cost_transport}
-                    onChange={(val) => setFormData(prev => ({ ...prev, cost_transport: parseFloat(val) || 0 }))}
-                    min={0}
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                </FormControl>
-                <FormControl>
-                  <FormLabel>{t('missions.form.otherExpenses')} ({formData.currency.toUpperCase()})</FormLabel>
-                  <NumberInput
-                    value={formData.cost_other}
-                    onChange={(val) => setFormData(prev => ({ ...prev, cost_other: parseFloat(val) || 0 }))}
-                    min={0}
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                </FormControl>
-              </HStack>
+              {/* Moyens de transport */}
+              <Box p={3} borderWidth="1px" borderRadius="md" borderColor={borderColor}>
+                <HStack justify="space-between" mb={3}>
+                  <HStack>
+                    <Icon as={FiDollarSign} />
+                    <Text fontWeight="600">{t('missions.form.transportModes')}</Text>
+                  </HStack>
+                  <Button size="sm" leftIcon={<FiPlus />} colorScheme="blue" variant="outline" onClick={addTransport}>
+                    {t('missions.form.addTransport')}
+                  </Button>
+                </HStack>
+
+                {transports.map((tr, idx) => {
+                  const modeInfo = TRANSPORT_MODES.find(m => m.value === tr.mode) || TRANSPORT_MODES[0];
+                  const costLabel = modeInfo.public
+                    ? t('missions.form.ticketPrice')
+                    : t('missions.form.fuelAmount');
+                  return (
+                    <VStack key={idx} align="stretch" spacing={3} mb={4} p={3} borderWidth="1px" borderRadius="md">
+                      <HStack justify="space-between">
+                        <Text fontSize="xs" fontWeight="600" color="gray.500">
+                          {t('missions.form.transportN', { n: idx + 1 })}
+                        </Text>
+                        <IconButton
+                          aria-label={t('common.remove')}
+                          icon={<FiTrash2 />}
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => removeTransport(idx)}
+                        />
+                      </HStack>
+                      <HStack spacing={3} align="flex-end" flexWrap="wrap">
+                        <FormControl w={{ base: '100%', sm: '240px' }}>
+                          <FormLabel>{t('missions.form.transportMode')}</FormLabel>
+                          <Select
+                            value={tr.mode}
+                            onChange={(e) => {
+                              const next = { ...tr, mode: e.target.value };
+                              if (e.target.value !== 'vehicule_parc') next.vehicule = '';
+                              updateTransport(idx, 'mode', e.target.value);
+                              if (e.target.value !== 'vehicule_parc') updateTransport(idx, 'vehicule', '');
+                            }}
+                          >
+                            {TRANSPORT_MODES.map(m => (
+                              <option key={m.value} value={m.value}>{modeLabel(m, t)}</option>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <FormControl w={{ base: '100%', sm: '220px' }}>
+                          <FormLabel>{t('missions.form.transportDescription')}</FormLabel>
+                          <Input
+                            value={tr.description}
+                            onChange={(e) => updateTransport(idx, 'description', e.target.value)}
+                            placeholder={t('missions.form.transportDescriptionPh')}
+                          />
+                        </FormControl>
+                        <FormControl w={{ base: '100%', sm: '180px' }}>
+                          <FormLabel>{costLabel} ({currencyCode})</FormLabel>
+                          <NumberInput
+                            value={tr.cout}
+                            onChange={(val) => updateTransport(idx, 'cout', parseFloat(val) || 0)}
+                            min={0}
+                          >
+                            <NumberInputField />
+                            <NumberInputStepper>
+                              <NumberIncrementStepper />
+                              <NumberDecrementStepper />
+                            </NumberInputStepper>
+                          </NumberInput>
+                        </FormControl>
+                      </HStack>
+                      {tr.mode === 'vehicule_parc' && (
+                        <FormControl>
+                          <FormLabel>{t('missions.form.parcVehicle')}</FormLabel>
+                          <Select
+                            value={tr.vehicule || ''}
+                            onChange={(e) => updateTransport(idx, 'vehicule', e.target.value)}
+                            placeholder={loadingVehicles ? t('missions.form.loadingVehicles') : t('missions.form.selectParcVehicle')}
+                          >
+                            {parkVehicles.map(v => (
+                              <option key={v.id} value={v.id}>
+                                {v.immatriculation} — {v.marque} {v.modele}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      )}
+                    </VStack>
+                  );
+                })}
+              </Box>
+
+              <FormControl>
+                <FormLabel>{t('missions.form.otherExpenses')} ({formData.currency.toUpperCase()})</FormLabel>
+                <NumberInput
+                  value={formData.cost_other}
+                  onChange={(val) => setFormData(prev => ({ ...prev, cost_other: parseFloat(val) || 0 }))}
+                  min={0}
+                >
+                  <NumberInputField />
+                  <NumberInputStepper>
+                    <NumberIncrementStepper />
+                    <NumberDecrementStepper />
+                  </NumberInputStepper>
+                </NumberInput>
+              </FormControl>
 
               <Alert status="info" borderRadius="md" fontSize="sm" flexDirection="column" alignItems="stretch" py={3}>
                 <AlertIcon alignSelf="flex-start" />

@@ -15,6 +15,7 @@ import {
 import { FiSearch } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const TYPE_CONFIG = {
   task: { label: 'Tâches', color: 'blue' },
@@ -35,6 +36,8 @@ const GlobalSearch = () => {
   const bgColor = useColorModeValue('white', 'gray.800');
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const hoverBg = useColorModeValue('gray.50', 'gray.700');
+  const { t, i18n } = useTranslation();
+
 
   const search = useCallback(async (q) => {
     if (q.length < 3) {
@@ -91,7 +94,7 @@ const GlobalSearch = () => {
         </InputLeftElement>
         <Input
           type="search"
-          placeholder="Rechercher..."
+          placeholder={t('header.search')}
           borderRadius="full"
           bg="gray.50"
           fontSize="sm"

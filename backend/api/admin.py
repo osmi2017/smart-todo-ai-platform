@@ -5,6 +5,8 @@ from .models import (
     ActivityLog, Comment, Notification,
     Meeting, MeetingParticipant, MeetingSummary, MeetingActionItem,
     Company, CompanyGroup, EventAuditLog, EventMetric, EventOutbox, ProcessedEvent,
+    Vehicle, VehiclePhoto, VehicleAssignment, VehicleDocument, Maintenance,
+    MaintenanceSchedule, OdometerReading, FuelRecord, DriverProfile, DriverInfraction,
 )
 
 # ----------------------------------------------------------------------
@@ -253,3 +255,74 @@ class EventMetricAdmin(admin.ModelAdmin):
     list_display = ('event_type', 'company', 'date', 'count', 'updated_at')
     list_filter = ('event_type', 'company', 'date')
     readonly_fields = ('updated_at',)
+
+
+# ----------------------------------------------------------------------
+# Parc Auto
+# ----------------------------------------------------------------------
+@admin.register(Vehicle)
+class VehicleAdmin(admin.ModelAdmin):
+    list_display = ('immatriculation', 'marque', 'modele', 'annee', 'type_vehicule', 'type_carburant', 'statut', 'odometer_km', 'company')
+    list_filter = ('statut', 'type_vehicule', 'type_carburant', 'company')
+    search_fields = ('immatriculation', 'marque', 'modele', 'numero_chassis')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(VehiclePhoto)
+class VehiclePhotoAdmin(admin.ModelAdmin):
+    list_display = ('id', 'vehicle', 'caption', 'uploaded_by', 'created_at')
+    readonly_fields = ('created_at',)
+
+
+@admin.register(VehicleAssignment)
+class VehicleAssignmentAdmin(admin.ModelAdmin):
+    list_display = ('vehicle', 'user', 'service_name', 'type', 'start_date', 'end_date')
+    list_filter = ('type',)
+    search_fields = ('vehicle__immatriculation', 'user__username', 'service_name')
+
+
+@admin.register(VehicleDocument)
+class VehicleDocumentAdmin(admin.ModelAdmin):
+    list_display = ('vehicle', 'type', 'title', 'date_expiration')
+    list_filter = ('type',)
+    search_fields = ('vehicle__immatriculation', 'title', 'numero')
+
+
+@admin.register(Maintenance)
+class MaintenanceAdmin(admin.ModelAdmin):
+    list_display = ('vehicle', 'type', 'title', 'status', 'scheduled_date', 'cout')
+    list_filter = ('type', 'status')
+    search_fields = ('vehicle__immatriculation', 'title', 'fournisseur')
+
+
+@admin.register(MaintenanceSchedule)
+class MaintenanceScheduleAdmin(admin.ModelAdmin):
+    list_display = ('vehicle', 'title', 'next_due_date', 'next_due_km')
+    search_fields = ('vehicle__immatriculation', 'title')
+
+
+@admin.register(OdometerReading)
+class OdometerReadingAdmin(admin.ModelAdmin):
+    list_display = ('vehicle', 'odometer_km', 'recorded_date', 'source')
+    search_fields = ('vehicle__immatriculation',)
+
+
+@admin.register(FuelRecord)
+class FuelRecordAdmin(admin.ModelAdmin):
+    list_display = ('vehicle', 'date', 'volume_liters', 'cost', 'station')
+    list_filter = ('date',)
+    search_fields = ('vehicle__immatriculation', 'station')
+
+
+@admin.register(DriverProfile)
+class DriverProfileAdmin(admin.ModelAdmin):
+    list_display = ('full_name', 'user', 'type_permis', 'date_expiration_permis', 'company')
+    list_filter = ('company',)
+    search_fields = ('full_name', 'type_permis', 'numero_permis')
+
+
+@admin.register(DriverInfraction)
+class DriverInfractionAdmin(admin.ModelAdmin):
+    list_display = ('driver', 'type', 'montant', 'date', 'status')
+    list_filter = ('type', 'status')
+    search_fields = ('driver__full_name', 'lieu')

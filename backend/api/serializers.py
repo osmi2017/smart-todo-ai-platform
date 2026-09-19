@@ -103,7 +103,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'username', 'email', 'first_name', 'last_name', 'role',
                   'company', 'company_detail', 'groups',
-                  'avatar', 'bio', 'avg_completion_time', 'delay_rate', 'date_joined')
+                  'avatar', 'bio', 'phone', 'avg_completion_time', 'delay_rate', 'date_joined')
         read_only_fields = ('id', 'avg_completion_time', 'delay_rate', 'date_joined')
 
     def get_groups(self, obj):

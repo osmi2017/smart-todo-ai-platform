@@ -78,7 +78,8 @@ import { useTaskService } from '../services/taskService';
 import { useProjectService } from '../services/projectService';
 import { useMilestoneService } from '../services/milestoneService';
 import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
+import { useTranslation } from 'react-i18next';
 
 const TaskDetail = () => {
   const { id } = useParams();
@@ -88,6 +89,8 @@ const TaskDetail = () => {
   const taskService = useTaskService();
   const projectService = useProjectService();
   const milestoneService = useMilestoneService();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language && i18n.language.toLowerCase().startsWith('en') ? enUS : fr;
 
   const [newComment, setNewComment] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -118,8 +121,8 @@ const TaskDetail = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: 'Impossible de charger la tâche',
+          title: t('common.error'),
+          description: t('tasks.loadErrorDesc'),
           status: 'error',
           duration: 3000,
         });
@@ -150,8 +153,8 @@ const TaskDetail = () => {
         queryClient.invalidateQueries(['task', id]);
         queryClient.invalidateQueries('tasks');
         toast({
-          title: 'Succès',
-          description: 'Tâche mise à jour',
+          title: t('common.success'),
+          description: t('tasks.updatedSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -159,8 +162,8 @@ const TaskDetail = () => {
       },
       onError: (error) => {
         toast({
-          title: 'Erreur',
-          description: error.response?.data?.message || 'Erreur lors de la mise à jour',
+          title: t('common.error'),
+          description: error.response?.data?.message || t('tasks.updateError'),
           status: 'error',
           duration: 3000,
         });
@@ -174,8 +177,8 @@ const TaskDetail = () => {
     {
       onSuccess: () => {
         toast({
-          title: 'Succès',
-          description: 'Tâche supprimée',
+          title: t('common.success'),
+          description: t('tasks.deletedSuccess'),
           status: 'success',
           duration: 3000,
         });
@@ -191,8 +194,8 @@ const TaskDetail = () => {
       onSuccess: (data) => {
         queryClient.invalidateQueries(['task', id]);
         toast({
-          title: 'Prédiction ML',
-          description: `Temps estimé: ${data.predicted_time?.toFixed(1)}h, Risque: ${Math.round(data.delay_probability * 100)}%`,
+          title: t('tasks.mlPrediction'),
+          description: `${t('tasks.predictedTime')}: ${data.predicted_time?.toFixed(1)}h, ${t('tasks.risk')}: ${Math.round(data.delay_probability * 100)}%`,
           status: 'info',
           duration: 5000,
         });
@@ -204,7 +207,7 @@ const TaskDetail = () => {
     return (
       <Box textAlign="center" py={10}>
         <Spinner size="xl" color="blue.500" />
-        <Text mt={4}>Chargement de la tâche...</Text>
+        <Text mt={4}>{t('tasks.loading')}</Text>
       </Box>
     );
   }
@@ -212,9 +215,9 @@ const TaskDetail = () => {
   if (!task) {
     return (
       <Box textAlign="center" py={10}>
-        <Text color="red.500">Tâche non trouvée</Text>
+        <Text color="red.500">{t('tasks.taskNotFound')}</Text>
         <Button mt={4} as={RouterLink} to="/tasks">
-          Retour aux tâches
+          {t('tasks.backToTasks')}
         </Button>
       </Box>
     );
@@ -226,7 +229,12 @@ const TaskDetail = () => {
   };
 
   const getPriorityLabel = (priority) => {
-    const labels = { 1: 'Basse', 2: 'Moyenne', 3: 'Haute', 4: 'Critique' };
+    const labels = {
+      1: t('common.low'),
+      2: t('common.medium'),
+      3: t('common.high'),
+      4: t('common.critical'),
+    };
     return labels[priority] || priority;
   };
 
@@ -243,11 +251,11 @@ const TaskDetail = () => {
 
   const getStatusLabel = (status) => {
     const labels = {
-      'todo': 'À faire',
-      'in_progress': 'En cours',
-      'review': 'En révision',
-      'blocked': 'Bloquée',
-      'completed': 'Terminée',
+      'todo': t('common.todo'),
+      'in_progress': t('common.inProgress'),
+      'review': t('common.review'),
+      'blocked': t('common.blocked'),
+      'completed': t('common.completed'),
     };
     return labels[status] || status;
   };
@@ -281,7 +289,7 @@ const TaskDetail = () => {
   };
 
   const handleAddChecklistItem = () => {
-    const newChecklist = [...(task.checklist || []), { text: 'Nouvel élément', completed: false }];
+    const newChecklist = [...(task.checklist || []), { text: t('common.newItem'), completed: false }];
     updateMutation.mutate({ checklist: newChecklist });
   };
 
@@ -310,16 +318,16 @@ const TaskDetail = () => {
               onClick={() => predictMutation.mutate()}
               isLoading={predictMutation.isLoading}
             >
-              Prédire
+              {t('tasks.predict')}
             </Button>
             <Menu>
               <MenuButton as={IconButton} icon={<FiMoreVertical />} variant="ghost" />
               <MenuList>
                 <MenuItem icon={<FiEdit2 />} onClick={() => setIsEditing(true)}>
-                  Modifier
+                  {t('common.edit')}
                 </MenuItem>
                 <MenuItem icon={<FiTrash2 />} color="red.500" onClick={onDeleteOpen}>
-                  Supprimer
+                  {t('common.delete')}
                 </MenuItem>
               </MenuList>
             </Menu>
@@ -335,14 +343,14 @@ const TaskDetail = () => {
           >
             <AlertIcon />
             <Box flex={1}>
-              <AlertTitle>Risque de retard détecté</AlertTitle>
+              <AlertTitle>{t('tasks.delayRiskDetected')}</AlertTitle>
               <AlertDescription>
-                Probabilité de retard: {Math.round(task.delay_probability * 100)}%
-                {task.predicted_time && ` | Temps estimé: ${task.predicted_time.toFixed(1)}h`}
+                {t('tasks.delayProbability')}: {Math.round(task.delay_probability * 100)}%
+                {task.predicted_time && ` | ${t('tasks.predictedTime')}: ${task.predicted_time.toFixed(1)}h`}
               </AlertDescription>
             </Box>
             <Button size="sm" colorScheme="blue" onClick={() => predictMutation.mutate()}>
-              Recalculer
+              {t('tasks.recalculate')}
             </Button>
           </Alert>
         )}
@@ -354,9 +362,9 @@ const TaskDetail = () => {
             {/* Description */}
             <Card>
               <CardBody>
-                <Heading size="md" mb={4}>Description</Heading>
+                <Heading size="md" mb={4}>{t('tasks.taskDescription')}</Heading>
                 <Text color="gray.700" whiteSpace="pre-wrap">
-                  {task.description || 'Aucune description'}
+                  {task.description || t('tasks.noDescription')}
                 </Text>
               </CardBody>
             </Card>
@@ -366,7 +374,7 @@ const TaskDetail = () => {
               <Card>
                 <CardBody>
                   <Flex justify="space-between" align="center" mb={4}>
-                    <Heading size="md">Checklist</Heading>
+                    <Heading size="md">{t('tasks.checklist')}</Heading>
                     <Button
                       size="xs"
                       leftIcon={<FiPlus />}
@@ -374,7 +382,7 @@ const TaskDetail = () => {
                       variant="ghost"
                       onClick={handleAddChecklistItem}
                     >
-                      Ajouter
+                      {t('common.add')}
                     </Button>
                   </Flex>
                   <VStack align="stretch" spacing={2}>
@@ -392,7 +400,7 @@ const TaskDetail = () => {
                           size="xs"
                           variant="ghost"
                           colorScheme="red"
-                          aria-label="Supprimer"
+                          aria-label={t('common.delete')}
                           onClick={() => {
                             const newChecklist = task.checklist.filter((_, i) => i !== index);
                             updateMutation.mutate({ checklist: newChecklist });
@@ -417,7 +425,7 @@ const TaskDetail = () => {
               <CardHeader>
                 <HStack>
                   <FiMessageSquare />
-                  <Heading size="md">Commentaires</Heading>
+                  <Heading size="md">{t('tasks.comment')}</Heading>
                 </HStack>
               </CardHeader>
               <CardBody>
@@ -431,22 +439,22 @@ const TaskDetail = () => {
             {/* Métadonnées */}
             <Card>
               <CardBody>
-                <Heading size="md" mb={4}>Détails</Heading>
+                <Heading size="md" mb={4}>{t('tasks.details')}</Heading>
                 <VStack align="stretch" spacing={3}>
                   <HStack justify="space-between">
-                    <Text color="gray.500">Projet</Text>
+                    <Text color="gray.500">{t('tasks.project')}</Text>
                     <Text fontWeight="500">{task.project_name}</Text>
                   </HStack>
                   
                   {task.milestone_name && (
                     <HStack justify="space-between">
-                      <Text color="gray.500">Jalon</Text>
+                      <Text color="gray.500">{t('tasks.milestoneLabel')}</Text>
                       <Text fontWeight="500">{task.milestone_name}</Text>
                     </HStack>
                   )}
                   
                   <HStack justify="space-between">
-                    <Text color="gray.500">Assigné à</Text>
+                    <Text color="gray.500">{t('common.assignedTo')}</Text>
                     <HStack>
                       {task.assigned_to_name ? (
                         <>
@@ -454,32 +462,32 @@ const TaskDetail = () => {
                           <Text>{task.assigned_to_name}</Text>
                         </>
                       ) : (
-                        <Text color="gray.400">Non assigné</Text>
+                        <Text color="gray.400">{t('common.notAssigned')}</Text>
                       )}
                     </HStack>
                   </HStack>
                   
                   <HStack justify="space-between">
-                    <Text color="gray.500">Date limite</Text>
+                    <Text color="gray.500">{t('tasks.dueDate')}</Text>
                     <HStack>
                       <FiCalendar />
                       <Text>
                         {task.deadline 
-                          ? format(new Date(task.deadline), 'dd MMMM yyyy', { locale: fr })
-                          : 'Non définie'
+                          ? format(new Date(task.deadline), 'dd MMMM yyyy', { locale: dateLocale })
+                          : t('common.notDefined')
                         }
                       </Text>
                     </HStack>
                   </HStack>
                   
                   <HStack justify="space-between">
-                    <Text color="gray.500">Temps estimé</Text>
-                    <Text>{task.estimated_time || 'Non défini'}h</Text>
+                    <Text color="gray.500">{t('tasks.estimatedTime')}</Text>
+                    <Text>{task.estimated_time || t('common.notDefined')}h</Text>
                   </HStack>
                   
                   {task.actual_time && (
                     <HStack justify="space-between">
-                      <Text color="gray.500">Temps réel</Text>
+                      <Text color="gray.500">{t('tasks.realTime')}</Text>
                       <Text>{task.actual_time.toFixed(1)}h</Text>
                     </HStack>
                   )}
@@ -493,12 +501,12 @@ const TaskDetail = () => {
                 <CardBody>
                   <HStack mb={4}>
                     <FiCpu />
-                    <Heading size="md">Prédictions IA</Heading>
+                    <Heading size="md">{t('tasks.aiPredictions')}</Heading>
                   </HStack>
                   <SimpleGrid columns={2} spacing={4}>
                     {task.predicted_time && (
                       <Box>
-                        <Text fontSize="sm" color="gray.600">Temps estimé</Text>
+                        <Text fontSize="sm" color="gray.600">{t('tasks.predictedTime')}</Text>
                         <Text fontSize="lg" fontWeight="bold">
                           {task.predicted_time.toFixed(1)}h
                         </Text>
@@ -506,7 +514,7 @@ const TaskDetail = () => {
                     )}
                     {task.delay_probability && (
                       <Box>
-                        <Text fontSize="sm" color="gray.600">Risque retard</Text>
+                        <Text fontSize="sm" color="gray.600">{t('tasks.risk')}</Text>
                         <Text fontSize="lg" fontWeight="bold" color={task.delay_probability > 0.7 ? 'red.500' : 'orange.500'}>
                           {Math.round(task.delay_probability * 100)}%
                         </Text>
@@ -514,7 +522,7 @@ const TaskDetail = () => {
                     )}
                     {task.predicted_priority && (
                       <Box>
-                        <Text fontSize="sm" color="gray.600">Priorité suggérée</Text>
+                        <Text fontSize="sm" color="gray.600">{t('tasks.suggestedPriority')}</Text>
                         <Badge colorScheme={getPriorityColor(task.predicted_priority)}>
                           {getPriorityLabel(task.predicted_priority)}
                         </Badge>
@@ -528,7 +536,7 @@ const TaskDetail = () => {
             {/* Tags */}
             <Card>
               <CardBody>
-                <Heading size="md" mb={4}>Tags</Heading>
+                <Heading size="md" mb={4}>{t('tasks.tags')}</Heading>
                 <HStack spacing={2} flexWrap="wrap" mb={3}>
                   {task.tags?.map((tag, index) => (
                     <Tag key={index} size="md" colorScheme="blue" borderRadius="full">
@@ -539,14 +547,14 @@ const TaskDetail = () => {
                 </HStack>
                 <HStack>
                   <Input
-                    placeholder="Nouveau tag"
+                    placeholder={t('tasks.newTagPlaceholder')}
                     size="sm"
                     value={newTag}
                     onChange={(e) => setNewTag(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddTag()}
                   />
                   <Button size="sm" onClick={handleAddTag} isDisabled={!newTag}>
-                    Ajouter
+                    {t('common.add')}
                   </Button>
                 </HStack>
               </CardBody>
@@ -555,7 +563,7 @@ const TaskDetail = () => {
             {/* Actions rapides */}
             <Card>
               <CardBody>
-                <Heading size="md" mb={4}>Actions</Heading>
+                <Heading size="md" mb={4}>{t('common.actions')}</Heading>
                 <VStack spacing={2}>
                   <Button
                     w="100%"
@@ -565,7 +573,7 @@ const TaskDetail = () => {
                     onClick={() => handleStatusChange('in_progress')}
                     isLoading={updateMutation.isLoading}
                   >
-                    {task.status === 'in_progress' ? 'Déjà en cours' : 'Commencer'}
+                    {task.status === 'in_progress' ? t('tasks.alreadyInProgress') : t('tasks.start')}
                   </Button>
                   <Button
                     w="100%"
@@ -576,7 +584,7 @@ const TaskDetail = () => {
                     isDisabled={task.status === 'completed'}
                     isLoading={updateMutation.isLoading}
                   >
-                    Marquer comme terminée
+                    {t('tasks.markCompleted')}
                   </Button>
                   {task.status === 'blocked' && (
                     <Button
@@ -587,7 +595,7 @@ const TaskDetail = () => {
                       onClick={() => handleStatusChange('todo')}
                       isLoading={updateMutation.isLoading}
                     >
-                      Réactiver
+                      {t('tasks.reactivate')}
                     </Button>
                   )}
                 </VStack>
@@ -602,12 +610,12 @@ const TaskDetail = () => {
         <ModalOverlay />
         <ModalContent>
           <form onSubmit={handleEditSubmit}>
-            <ModalHeader>Modifier la tâche</ModalHeader>
+            <ModalHeader>{t('tasks.editTask')}</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
               <VStack spacing={4}>
                 <FormControl isRequired>
-                  <FormLabel>Titre</FormLabel>
+                  <FormLabel>{t('tasks.taskTitle')}</FormLabel>
                   <Input
                     value={editForm.title}
                     onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
@@ -615,7 +623,7 @@ const TaskDetail = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Description</FormLabel>
+                  <FormLabel>{t('tasks.taskDescription')}</FormLabel>
                   <Textarea
                     value={editForm.description}
                     onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
@@ -624,7 +632,7 @@ const TaskDetail = () => {
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel>Projet</FormLabel>
+                  <FormLabel>{t('tasks.project')}</FormLabel>
                   <Select
                     value={editForm.project}
                     onChange={(e) => setEditForm({ 
@@ -643,12 +651,12 @@ const TaskDetail = () => {
 
                 {editForm.project && (
                   <FormControl>
-                    <FormLabel>Jalon</FormLabel>
+                    <FormLabel>{t('tasks.milestoneLabel')}</FormLabel>
                     <Select
                       value={editForm.milestone}
                       onChange={(e) => setEditForm({ ...editForm, milestone: e.target.value })}
                     >
-                      <option value="">Aucun jalon</option>
+                      <option value="">{t('tasks.noMilestone')}</option>
                       {milestones?.map(milestone => (
                         <option key={milestone.id} value={milestone.id}>
                           {milestone.name}
@@ -660,36 +668,36 @@ const TaskDetail = () => {
 
                 <SimpleGrid columns={2} spacing={4}>
                   <FormControl>
-                    <FormLabel>Priorité</FormLabel>
+                    <FormLabel>{t('common.priority')}</FormLabel>
                     <Select
                       value={editForm.priority}
                       onChange={(e) => setEditForm({ ...editForm, priority: parseInt(e.target.value) })}
                     >
-                      <option value={1}>Basse</option>
-                      <option value={2}>Moyenne</option>
-                      <option value={3}>Haute</option>
-                      <option value={4}>Critique</option>
+                      <option value={1}>{t('common.low')}</option>
+                      <option value={2}>{t('common.medium')}</option>
+                      <option value={3}>{t('common.high')}</option>
+                      <option value={4}>{t('common.critical')}</option>
                     </Select>
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>Statut</FormLabel>
+                    <FormLabel>{t('common.status')}</FormLabel>
                     <Select
                       value={editForm.status}
                       onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
                     >
-                      <option value="todo">À faire</option>
-                      <option value="in_progress">En cours</option>
-                      <option value="review">En révision</option>
-                      <option value="blocked">Bloquée</option>
-                      <option value="completed">Terminée</option>
+                      <option value="todo">{t('common.todo')}</option>
+                      <option value="in_progress">{t('common.inProgress')}</option>
+                      <option value="review">{t('common.review')}</option>
+                      <option value="blocked">{t('common.blocked')}</option>
+                      <option value="completed">{t('common.completed')}</option>
                     </Select>
                   </FormControl>
                 </SimpleGrid>
 
                 <SimpleGrid columns={2} spacing={4}>
                   <FormControl>
-                    <FormLabel>Temps estimé (heures)</FormLabel>
+                    <FormLabel>{t('tasks.estimatedTime')}</FormLabel>
                     <NumberInput
                       value={editForm.estimated_time}
                       onChange={(value) => setEditForm({ ...editForm, estimated_time: value })}
@@ -705,7 +713,7 @@ const TaskDetail = () => {
                   </FormControl>
 
                   <FormControl>
-                    <FormLabel>Date limite</FormLabel>
+                    <FormLabel>{t('tasks.dueDate')}</FormLabel>
                     <Input
                       type="date"
                       value={editForm.deadline}
@@ -715,13 +723,13 @@ const TaskDetail = () => {
                 </SimpleGrid>
 
                 <FormControl>
-                  <FormLabel>Assigné à</FormLabel>
+                  <FormLabel>{t('tasks.assignTo')}</FormLabel>
                   <Select
                     value={editForm.assigned_to}
                     onChange={(e) => setEditForm({ ...editForm, assigned_to: e.target.value })}
                   >
-                    <option value="">Non assigné</option>
-                    <option value="1">Moi</option>
+                    <option value="">{t('common.notAssigned')}</option>
+                    <option value="1">{t('tasks.me')}</option>
                   </Select>
                 </FormControl>
               </VStack>
@@ -729,14 +737,14 @@ const TaskDetail = () => {
 
             <ModalFooter>
               <Button variant="ghost" mr={3} onClick={() => setIsEditing(false)}>
-                Annuler
+                {t('common.cancel')}
               </Button>
               <Button
                 type="submit"
                 colorScheme="blue"
                 isLoading={updateMutation.isLoading}
               >
-                Enregistrer
+                {t('tasks.save')}
               </Button>
             </ModalFooter>
           </form>
@@ -747,14 +755,14 @@ const TaskDetail = () => {
       <Modal isOpen={isDeleteOpen} onClose={onDeleteClose}>
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Supprimer la tâche</ModalHeader>
+          <ModalHeader>{t('tasks.deleteTask')}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            Êtes-vous sûr de vouloir supprimer cette tâche ? Cette action est irréversible.
+            {t('tasks.confirmDeleteDesc')}
           </ModalBody>
           <ModalFooter>
             <Button variant="ghost" mr={3} onClick={onDeleteClose}>
-              Annuler
+              {t('common.cancel')}
             </Button>
             <Button
               colorScheme="red"
@@ -764,7 +772,7 @@ const TaskDetail = () => {
               }}
               isLoading={deleteMutation.isLoading}
             >
-              Supprimer
+              {t('common.delete')}
             </Button>
           </ModalFooter>
         </ModalContent>

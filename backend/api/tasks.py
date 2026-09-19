@@ -153,7 +153,12 @@ def send_meeting_reminder(self, meeting_id, user_id):
         notification_type='meeting_reminder',
         title='Rappel de réunion',
         message=f"La réunion « {meeting.title} » commence à {when}.",
-        data={'meeting_id': meeting.id, 'scheduled_at': meeting.scheduled_at.isoformat() if meeting.scheduled_at else None},
+        data={
+            'meeting_id': meeting.id,
+            'scheduled_at': meeting.scheduled_at.isoformat() if meeting.scheduled_at else None,
+            'meeting_title': meeting.title,
+            'time': when,
+        },
     )
     return {'meeting_id': meeting.id, 'user_id': user.id, 'status': 'sent'}
 
@@ -188,7 +193,14 @@ def send_milestone_deadline_reminders():
             notification_type='milestone_due',
             title=title,
             message=message,
-            data={'milestone_id': milestone.id, 'project_id': milestone.project_id},
+            data={
+                'milestone_id': milestone.id,
+                'project_id': milestone.project_id,
+                'milestone_name': milestone.name,
+                'project_name': milestone.project.name,
+                'overdue': overdue,
+                'due_date': milestone.due_date.isoformat(),
+            },
         )
         notified += 1
 
@@ -277,9 +289,9 @@ def process_meeting_ai(self, meeting_id, user_id=None):
 
     if requester:
         _notify(
-            requester, 'meeting_processing', 'Traitement IA en cours',
+            requester, 'meeting_processing', 'Traitement AI en cours',
             f"L'analyse IA de « {meeting.title} » a démarré (transcription, résumé, actions).",
-            {'meeting_id': meeting.id},
+            {'meeting_id': meeting.id, 'meeting_title': meeting.title},
         )
 
     # Étape 1 : transcription si nécessaire
@@ -356,8 +368,8 @@ def process_meeting_ai(self, meeting_id, user_id=None):
         else:
             _notify(
                 requester, 'meeting_processed', 'Analyse IA terminée',
-                f"Résumé et {len(created_items)} action(s) extraite(s) pour « {meeting.title} ».",
-                {'meeting_id': meeting.id, 'action_items_count': len(created_items)},
+                 f"Résumé et {len(created_items)} action(s) extraite(s) pour « {meeting.title} ».",
+                {'meeting_id': meeting.id, 'meeting_title': meeting.title, 'action_items_count': len(created_items)},
             )
 
     return {
@@ -389,7 +401,7 @@ def generate_project_report(self, project_id, user_id, report_format='json'):
     _notify(
         requester, 'report_processing', 'Génération du rapport en cours',
         f"Le rapport du projet « {project.name} » est en cours de génération.",
-        {'project_id': project.id},
+        {'project_id': project.id, 'project_name': project.name},
     )
 
     tasks = Task.objects.filter(project=project)
@@ -461,7 +473,7 @@ def generate_project_report(self, project_id, user_id, report_format='json'):
     _notify(
         requester, 'report_ready', 'Rapport de projet prêt',
         f"Le rapport du projet « {project.name} » est disponible au téléchargement.",
-        {'project_id': project.id, 'file_id': file_obj.id if file_obj else None},
+        {'project_id': project.id, 'project_name': project.name, 'file_id': file_obj.id if file_obj else None},
     )
 
     return {

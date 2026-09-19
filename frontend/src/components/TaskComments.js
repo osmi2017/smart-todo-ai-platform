@@ -37,6 +37,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { io } from 'socket.io-client';
 import { useCommentService } from '../services/commentService';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 const MEETING_SERVICE_URL = process.env.REACT_APP_MEETING_SERVICE_URL || 'http://localhost:4000';
 
@@ -57,6 +58,7 @@ const TaskComments = ({ taskId }) => {
   const replyInputRef = useRef(null);
   const queryClientRef = useRef(queryClient);
   queryClientRef.current = queryClient;
+  const { t, i18n } = useTranslation();
 
   // Real-time Socket.IO connection for comment updates
   useEffect(() => {
@@ -215,7 +217,7 @@ const TaskComments = ({ taskId }) => {
             <Avatar size="sm" name={user?.username} />
             <Box flex={1}>
               <Textarea
-                placeholder="Ajouter un commentaire... (Utilisez @ pour mentionner)"
+                placeholder={t('tasks.addcomment')}
                 value={newComment}
                 onChange={(e) => {
                   setNewComment(e.target.value);
@@ -255,7 +257,7 @@ const TaskComments = ({ taskId }) => {
                   isLoading={addMutation.isLoading}
                   isDisabled={!newComment.trim()}
                 >
-                  Commenter
+                  {t('tasks.tocomment')}
                 </Button>
               </HStack>
             </Box>
@@ -267,7 +269,7 @@ const TaskComments = ({ taskId }) => {
         {/* Liste des commentaires */}
         {parentComments.length === 0 ? (
           <Text color="gray.500" textAlign="center" py={4}>
-            Aucun commentaire pour le moment
+            {t('tasks.nocomment')}
           </Text>
         ) : (
           <VStack spacing={4} align="stretch">

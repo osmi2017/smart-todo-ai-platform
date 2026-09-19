@@ -1,0 +1,118 @@
+# ==============================================================================
+# docker-compose.aws.yml — déploiement "lean" pour AWS Free Tier
+#
+# Différences avec docker-compose.yml :
+#   - Pas de service "postgres" : la base de données est RDS (externe), son
+#     endpoint est fourni via DB_HOST dans .env.
+#   - Kafka, kafka-init, celery-events, les 4 consommateurs Kafka, ml-service,
+#     ml-stats-consumer et meeting-service sont désactivés (KAFKA_ENABLED=False
+#     désactive proprement le code Kafka ; les endpoints ML retombent sur leur
+#     fallback puisque les appels HTTP sont protégés par except RequestException).
+#   - Le frontend est buildé en mode production puis servi par "serve" (léger),
+#     au lieu du serveur de dev webpack (gros consommateur de RAM).
+#
+# Usage : docker compose -f docker-compose.aws.yml up -d --build
+# ==============================================================================
+
+services:
+  redis:
+    image: redis:7
+    container_name: todo_ai_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - todo_ai_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: todo_ai_backend
+    command: sh -c "python manage.py migrate --noinput && daphne -b 0.0.0.0 -p 8000 core.asgi:application"
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_ENABLED: "False"
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('localhost', 8000), 2).close()"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - todo_ai_network
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: todo_ai_celery_worker
+    command: celery -A core worker -l info -Q default,heavy --concurrency=2
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_ENABLED: "False"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - todo_ai_network
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: todo_ai_celery_beat
+    command: celery -A core beat -l info
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_ENABLED: "False"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - todo_ai_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: todo_ai_frontend
+    # Build de production (bien plus léger à l'exécution que "npm start"),
+    # servi par "serve" — un serveur statique minimal.
+    command: sh -c "npm run build && npx --yes serve -s build -l 3000"
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - todo_ai_network
+
+volumes:
+  redis_data:
+
+networks:
+  todo_ai_network:
+    driver: bridge

@@ -111,7 +111,11 @@ def _handle_notifications(event: dict) -> None:
             'task_assigned',
             'Nouvelle tâche assignée',
             f"La tâche « {data.get('title', '')} » vous a été assignée.",
-            {'task_id': data.get('task_id'), 'project_id': data.get('project_id')},
+            {
+                'task_id': data.get('task_id'),
+                'project_id': data.get('project_id'),
+                'task_title': data.get('title', ''),
+            },
         )
     elif event_type == EventTypes.TASK_COMPLETED:
         _notify_users(
@@ -119,7 +123,11 @@ def _handle_notifications(event: dict) -> None:
             'task_completed',
             'Tâche terminée',
             f"La tâche « {data.get('title', '')} » a été terminée.",
-            {'task_id': data.get('task_id'), 'project_id': data.get('project_id')},
+            {
+                'task_id': data.get('task_id'),
+                'project_id': data.get('project_id'),
+                'task_title': data.get('title', ''),
+            },
         )
     elif event_type == EventTypes.COMMENT_CREATED:
         _notify_users(
@@ -127,7 +135,12 @@ def _handle_notifications(event: dict) -> None:
             'comment_added',
             'Nouveau commentaire',
             f"{data.get('author_name', 'Un utilisateur')} a commenté la tâche « {data.get('task_title', '')} ».",
-            {'task_id': data.get('task_id'), 'comment_id': data.get('comment_id')},
+            {
+                'task_id': data.get('task_id'),
+                'comment_id': data.get('comment_id'),
+                'author_name': data.get('author_name', ''),
+                'task_title': data.get('task_title', ''),
+            },
         )
     elif event_type == EventTypes.PROJECT_CREATED:
         _notify_users(
@@ -135,7 +148,10 @@ def _handle_notifications(event: dict) -> None:
             'project_created',
             'Projet créé',
             f"Le projet « {data.get('name', '')} » a été créé.",
-            {'project_id': data.get('project_id')},
+            {
+                'project_id': data.get('project_id'),
+                'project_name': data.get('name', ''),
+            },
         )
     elif event_type in (EventTypes.MEETING_STARTED, EventTypes.MEETING_COMPLETED):
         started = event_type == EventTypes.MEETING_STARTED
@@ -144,7 +160,10 @@ def _handle_notifications(event: dict) -> None:
             'meeting_started' if started else 'meeting_completed',
             'Réunion démarrée' if started else 'Réunion terminée',
             f"La réunion « {data.get('title', '')} » a {'démarré' if started else 'été terminée'}.",
-            {'meeting_id': data.get('meeting_id')},
+            {
+                'meeting_id': data.get('meeting_id'),
+                'meeting_title': data.get('title', ''),
+            },
         )
 
 

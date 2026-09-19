@@ -108,6 +108,7 @@ class User(AbstractUser):
     company = models.ForeignKey(Company, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
     bio = models.TextField(max_length=500, blank=True)
+    phone = models.CharField(max_length=50, blank=True, default='')
     
     # Métriques pour ML
     avg_completion_time = models.FloatField(default=0, validators=[MinValueValidator(0)])
@@ -984,4 +985,414 @@ class MissionMember(models.Model):
     def __str__(self):
         role = ' (Chef)' if self.is_leader else ''
         return f'{self.user.username} - {self.mission.title}{role}'
+
+
+class MissionTransport(models.Model):
+    """Moyen de transport utilisé pour une mission (0 à N par mission)."""
+    MODE_CHOICES = [
+        ('avion', 'Avion'),
+        ('vehicule_personnel', 'Véhicule personnel'),
+        ('vehicule_parc', 'Véhicule du parc'),
+        ('taxi', 'Taxi'),
+        ('bus', 'Bus'),
+        ('train', 'Train'),
+        ('bateau', 'Bateau'),
+        ('autre', 'Autre'),
+    ]
+
+    mission = models.ForeignKey(Mission, on_delete=models.CASCADE, related_name='transports')
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='mission_transports')
+    mode = models.CharField(max_length=30, choices=MODE_CHOICES, default='taxi')
+    description = models.CharField(max_length=255, blank=True, default='')
+    # Véhicule du parc sélectionné (uniquement pour le mode vehicule_parc)
+    vehicule = models.ForeignKey(
+        'Vehicle', on_delete=models.SET_NULL, null=True, blank=True, related_name='mission_transports'
+    )
+    # Coût du billet (transport public) OU montant du carburant (véhicule privé / parc)
+    cout = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'mission_transports'
+        verbose_name = 'Transport de mission'
+        verbose_name_plural = 'Transports de mission'
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.get_mode_display()} - {self.mission.title}'
+
+
+# ==============================================================================
+# PARC AUTO — Gestion de flotte de véhicules (multi-tenant par entreprise)
+# ==============================================================================
+
+
+class Vehicle(models.Model):
+    """Véhicule du parc (référentiel)"""
+    FUEL_CHOICES = (
+        ('essence', 'Essence'),
+        ('diesel', 'Diesel'),
+        ('hybride', 'Hybride'),
+        ('electrique', 'Électrique'),
+        ('gpl', 'GPL'),
+    )
+
+    STATUS_CHOICES = (
+        ('disponible', 'Disponible'),
+        ('en_mission', 'En mission'),
+        ('en_maintenance', 'En maintenance'),
+        ('reforme', 'Réformé'),
+    )
+
+    TYPE_VEHICULE_CHOICES = (
+        ('berline', 'Berline'),
+        ('suv', 'SUV / 4x4'),
+        ('pickup', 'Pick-up'),
+        ('utilitaire', 'Utilitaire'),
+        ('camion', 'Camion'),
+        ('moto', 'Moto'),
+        ('autre', 'Autre'),
+    )
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='vehicles')
+    immatriculation = models.CharField(max_length=50)
+    marque = models.CharField(max_length=100)
+    modele = models.CharField(max_length=100)
+    annee = models.IntegerField(null=True, blank=True)
+    type_vehicule = models.CharField(max_length=20, choices=TYPE_VEHICULE_CHOICES, default='berline')
+    type_carburant = models.CharField(max_length=20, choices=FUEL_CHOICES, default='diesel')
+    numero_chassis = models.CharField(max_length=100, blank=True, default='')  # VIN
+    statut = models.CharField(max_length=20, choices=STATUS_CHOICES, default='disponible')
+
+    # Kilométrage courant (mis à jour via les relevés)
+    odometer_km = models.FloatField(default=0)
+
+    # Coûts
+    cout_achat = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    cout_kilometre = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    consommation_moyenne = models.FloatField(default=0)  # L/100km
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='vehicles_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'vehicles'
+        verbose_name = 'Véhicule'
+        verbose_name_plural = 'Véhicules'
+        ordering = ['immatriculation']
+        constraints = [
+            models.UniqueConstraint(fields=['company', 'immatriculation'], name='unique_company_vehicle')
+        ]
+        indexes = [
+            models.Index(fields=['company', 'statut']),
+        ]
+
+    def __str__(self):
+        return f'{self.immatriculation} - {self.marque} {self.modele}'
+
+    def current_assignment(self):
+        return self.assignments.filter(end_date__isnull=True).order_by('-start_date').first()
+
+
+class VehiclePhoto(models.Model):
+    """Photo d'un véhicule du parc."""
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='photos')
+    image = models.ImageField(upload_to='vehicles/photos/')
+    caption = models.CharField(max_length=200, blank=True, default='')
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='vehicle_photos_uploaded')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'vehicle_photos'
+        verbose_name = 'Photo véhicule'
+        verbose_name_plural = 'Photos véhicules'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'{self.vehicle} — photo {self.id}'
+
+
+class VehicleAssignment(models.Model):
+    """Affectation temporaire ou permanente d'un véhicule à un employé/service"""
+    TYPE_CHOICES = (
+        ('temporaire', 'Temporaire'),
+        ('permanente', 'Permanente'),
+    )
+
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='assignments')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='vehicle_assignments', null=True, blank=True)
+    service_name = models.CharField(max_length=200, blank=True, default='')
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='temporaire')
+    start_date = models.DateField()
+    end_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'vehicle_assignments'
+        verbose_name = 'Affectation de véhicule'
+        verbose_name_plural = 'Affectations de véhicules'
+        ordering = ['-start_date']
+        indexes = [
+            models.Index(fields=['vehicle', 'start_date']),
+            models.Index(fields=['user']),
+        ]
+
+    def __str__(self):
+        target = self.user.username if self.user else self.service_name
+        return f'{self.vehicle} -> {target}'
+
+    @property
+    def is_active(self):
+        return self.end_date is None
+
+
+class VehicleDocument(models.Model):
+    """Document numérique d'un véhicule (carte grise, assurance, CT, leasing)"""
+    TYPE_CHOICES = (
+        ('carte_grise', 'Carte grise'),
+        ('assurance', 'Assurance'),
+        ('controle_technique', 'Contrôle technique'),
+        ('leasing', 'Contrat de leasing'),
+        ('autre', 'Autre'),
+    )
+
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='documents')
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    title = models.CharField(max_length=200)
+    file_name = models.CharField(max_length=500, blank=True, default='')
+    file_url = models.CharField(max_length=1000, blank=True, default='')
+    numero = models.CharField(max_length=200, blank=True, default='')
+    date_emission = models.DateField(null=True, blank=True)
+    date_expiration = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, default='')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='vehicle_docs_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'vehicle_documents'
+        verbose_name = 'Document véhicule'
+        verbose_name_plural = 'Documents véhicules'
+        ordering = ['-date_expiration']
+
+    def __str__(self):
+        return f'{self.get_type_display()} - {self.vehicle}'
+
+    @property
+    def is_expired(self):
+        return bool(self.date_expiration and self.date_expiration < timezone.now().date())
+
+    @property
+    def expires_soon(self):
+        if not self.date_expiration:
+            return False
+        return self.date_expiration <= timezone.now().date() + timezone.timedelta(days=30)
+
+
+class Maintenance(models.Model):
+    """Tâche de maintenance corrective ou préventive d'un véhicule"""
+    TYPE_CHOICES = (
+        ('preventive', 'Préventive'),
+        ('corrective', 'Corrective'),
+        ('vidange', 'Vidange'),
+        ('controle_technique', 'Contrôle technique'),
+        ('pneu', 'Pneumatique'),
+        ('autre', 'Autre'),
+    )
+
+    STATUS_CHOICES = (
+        ('planifiee', 'Planifiée'),
+        ('en_cours', 'En cours'),
+        ('terminee', 'Terminée'),
+        ('annulee', 'Annulée'),
+    )
+
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='maintenances')
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES, default='preventive')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='planifiee')
+    scheduled_date = models.DateField(null=True, blank=True)
+    completed_date = models.DateField(null=True, blank=True)
+    odometer_at = models.FloatField(null=True, blank=True)
+    cout = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    fournisseur = models.CharField(max_length=200, blank=True, default='')
+    facture_ref = models.CharField(max_length=200, blank=True, default='')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='maintenances_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'maintenances'
+        verbose_name = 'Maintenance'
+        verbose_name_plural = 'Maintenances'
+        ordering = ['-scheduled_date']
+        indexes = [
+            models.Index(fields=['vehicle', 'status']),
+            models.Index(fields=['status', 'scheduled_date']),
+        ]
+
+    def __str__(self):
+        return f'{self.get_type_display()} - {self.vehicle} - {self.title}'
+
+
+class MaintenanceSchedule(models.Model):
+    """Planification des révisions systématiques (intervalle kilométrique ou temporel)"""
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='maintenance_schedules')
+    title = models.CharField(max_length=255)
+    interval_kilometers = models.FloatField(null=True, blank=True)
+    interval_months = models.IntegerField(null=True, blank=True)
+    last_done_km = models.FloatField(null=True, blank=True)
+    last_done_date = models.DateField(null=True, blank=True)
+    next_due_km = models.FloatField(null=True, blank=True)
+    next_due_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'maintenance_schedules'
+        verbose_name = "Calendrier d'entretien"
+        verbose_name_plural = "Calendriers d'entretien"
+        ordering = ['next_due_date']
+
+    def __str__(self):
+        return f'{self.title} - {self.vehicle}'
+
+    @property
+    def is_due(self):
+        today = timezone.now().date()
+        if self.next_due_date and self.next_due_date <= today:
+            return True
+        if self.next_due_km and self.vehicle.odometer_km >= self.next_due_km:
+            return True
+        return False
+
+
+class OdometerReading(models.Model):
+    """Relevé de kilométrage (saisie manuelle ou télématique)"""
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='odometer_readings')
+    odometer_km = models.FloatField()
+    recorded_date = models.DateField()
+    source = models.CharField(max_length=30, choices=(('manuel', 'Manuel'), ('telematic', 'Télématique')), default='manuel')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='odometer_readings')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'odometer_readings'
+        verbose_name = 'Relevé kilométrique'
+        verbose_name_plural = 'Relevés kilométriques'
+        ordering = ['-recorded_date']
+
+    def __str__(self):
+        return f'{self.vehicle} - {self.odometer_km} km'
+
+
+class FuelRecord(models.Model):
+    """Plein de carburant d'un véhicule"""
+    vehicle = models.ForeignKey(Vehicle, on_delete=models.CASCADE, related_name='fuel_records')
+    date = models.DateField()
+    volume_liters = models.FloatField()
+    cost = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    station = models.CharField(max_length=200, blank=True, default='')
+    odometer_km = models.FloatField(null=True, blank=True)
+    full_tank = models.BooleanField(default=True)
+    currency = models.CharField(max_length=10, default='xof', blank=True)
+    notes = models.TextField(blank=True, default='')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='fuel_records')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'fuel_records'
+        verbose_name = 'Plein carburant'
+        verbose_name_plural = 'Pleins carburant'
+        ordering = ['-date']
+        indexes = [
+            models.Index(fields=['vehicle', 'date']),
+        ]
+
+    def __str__(self):
+        return f'{self.vehicle} - {self.volume_liters} L - {self.date}'
+
+    @property
+    def cost_per_liter(self):
+        if not self.volume_liters:
+            return 0
+        return float(self.cost) / self.volume_liters
+
+
+class DriverProfile(models.Model):
+    """Fiche conducteur : affectations, permis, date d'expiration"""
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='drivers')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='driver_profile')
+    full_name = models.CharField(max_length=200)
+    type_permis = models.CharField(max_length=50, blank=True, default='')
+    date_expiration_permis = models.DateField(null=True, blank=True)
+    numero_permis = models.CharField(max_length=100, blank=True, default='')
+    telephone = models.CharField(max_length=50, blank=True, default='')
+    email = models.CharField(max_length=200, blank=True, default='')
+    notes = models.TextField(blank=True, default='')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='drivers_created')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'driver_profiles'
+        verbose_name = 'Conducteur'
+        verbose_name_plural = 'Conducteurs'
+        ordering = ['full_name']
+
+    def __str__(self):
+        return self.full_name
+
+    @property
+    def permis_expired(self):
+        return bool(self.date_expiration_permis and self.date_expiration_permis < timezone.now().date())
+
+    @property
+    def permis_expires_soon(self):
+        if not self.date_expiration_permis:
+            return False
+        return self.date_expiration_permis <= timezone.now().date() + timezone.timedelta(days=30)
+
+
+class DriverInfraction(models.Model):
+    """Amende / contredanse attribuée à un conducteur"""
+    TYPE_CHOICES = (
+        ('excès_vitesse', 'Excès de vitesse'),
+        ('stationnement', 'Stationnement'),
+        ('feu_rouge', 'Feu rouge'),
+        ('telephone', 'Téléphone au volant'),
+        ('alcool', "Conduite en état d'ivresse"),
+        ('autre', 'Autre'),
+    )
+
+    STATUS_CHOICES = (
+        ('en_attente', "En attente de paiement"),
+        ('payee', 'Payée'),
+        ('conteste', 'Contestée'),
+    )
+
+    driver = models.ForeignKey(DriverProfile, on_delete=models.CASCADE, related_name='infractions')
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES)
+    description = models.TextField(blank=True, default='')
+    montant = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    currency = models.CharField(max_length=10, default='xof', blank=True)
+    date = models.DateField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='en_attente')
+    lieu = models.CharField(max_length=255, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'driver_infractions'
+        verbose_name = 'Infraction conducteur'
+        verbose_name_plural = 'Infractions conducteurs'
+        ordering = ['-date']
+
+    def __str__(self):
+        return f'{self.get_type_display()} - {self.driver} - {self.montant}'
 

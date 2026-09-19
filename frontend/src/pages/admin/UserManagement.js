@@ -89,18 +89,19 @@ const UserManagement = () => {
         role: user.role,
         password: '',
         company: user.company || '',
+        phone: user.phone || '',
         group_ids: user.groups || [],
       });
     } else {
       setEditingUser(null);
-      setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || ''), group_ids: [] });
+      setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || ''), phone: '', group_ids: [] });
     }
     onOpen();
   };
 
   const handleClose = () => {
     setEditingUser(null);
-    setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || ''), group_ids: [] });
+    setForm({ username: '', email: '', first_name: '', last_name: '', role: 'user', password: '', company: isSuperAdmin ? '' : (currentUser?.company || ''), phone: '', group_ids: [] });
     setSelectedGroupId('');
     onClose();
   };
@@ -175,6 +176,7 @@ const UserManagement = () => {
           <Tr>
             <Th>Nom d'utilisateur</Th>
             <Th>Email</Th>
+            <Th>Téléphone</Th>
             <Th>Nom complet</Th>
             <Th>Profile</Th>
             <Th>Entreprise</Th>
@@ -187,6 +189,7 @@ const UserManagement = () => {
             <Tr key={u.id}>
               <Td fontWeight="600">{u.username}</Td>
               <Td>{u.email}</Td>
+              <Td>{u.phone || '-'}</Td>
               <Td>{u.first_name} {u.last_name}</Td>
               <Td>{getRoleBadge(u.role)}</Td>
               <Td>{u.company_detail?.name || '-'}</Td>
@@ -234,6 +237,10 @@ const UserManagement = () => {
             <FormControl mb={4} isRequired>
               <FormLabel>Email</FormLabel>
               <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </FormControl>
+            <FormControl mb={4}>
+              <FormLabel>Téléphone</FormLabel>
+              <Input value={form.phone || ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
             </FormControl>
             <HStack mb={4} spacing={4}>
               <FormControl>

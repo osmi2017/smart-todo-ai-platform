@@ -93,7 +93,7 @@ import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import PageGuide from '../components/PageGuide';
 import { FiFlag } from 'react-icons/fi';
-
+import { useTranslation } from 'react-i18next';
 const MILESTONES_STEPS = [
   { key: 'overview', icon: FiFlag },
   { key: 'create', icon: FiPlus },
@@ -108,7 +108,7 @@ const isOverdue = (milestone) => {
 
 const MilestoneProgress = ({ milestone, onSave }) => {
   const [value, setValue] = useState(milestone.progress || 0);
-
+  
   useEffect(() => {
     setValue(milestone.progress || 0);
   }, [milestone.progress]);
@@ -172,6 +172,7 @@ const Milestones = () => {
     status: 'not_started',
     progress: 0,
   });
+  const { t, i18n } = useTranslation();
   const [filterProject, setFilterProject] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterHighRisk, setFilterHighRisk] = useState(false);
@@ -516,35 +517,35 @@ const Milestones = () => {
 
   const statCards = [
     {
-      label: 'Total',
+      label: t('milestones.total'),
       value: stats.total,
       color: undefined,
       active: !filterStatus && !filterHighRisk,
       onClick: () => { setFilterStatus(''); setFilterHighRisk(false); },
     },
     {
-      label: 'Terminés',
+      label: t('milestones.completed'),
       value: stats.completed,
       color: 'green.500',
       active: filterStatus === 'completed',
       onClick: () => { setFilterStatus('completed'); setFilterHighRisk(false); },
     },
     {
-      label: 'En cours',
+      label: t('milestones.inprogress'),
       value: stats.inProgress,
       color: 'blue.500',
       active: filterStatus === 'in_progress',
       onClick: () => { setFilterStatus('in_progress'); setFilterHighRisk(false); },
     },
     {
-      label: 'En retard',
+      label: t('milestones.overdue'),
       value: stats.delayed,
       color: 'red.500',
       active: filterStatus === 'delayed',
       onClick: () => { setFilterStatus('delayed'); setFilterHighRisk(false); },
     },
     {
-      label: 'Risque élevé',
+      label: t('milestones.highrisk'),
       value: stats.highRisk,
       color: 'orange.500',
       active: filterHighRisk,
@@ -565,19 +566,21 @@ const Milestones = () => {
     navigate(`/milestones/${milestoneId}`);
   };
 
+  const weekdays = t('milestones.weekdays', { returnObjects: true });
+
   return (
     <Box>
       <VStack spacing={6} align="stretch">
         {/* En-tête */}
         <Flex justify="space-between" align="center">
-          <Heading size="lg">Jalons</Heading>
+          <Heading size="lg">{t('milestones.title')}</Heading>
           <HStack spacing={3}>
             <Button
               leftIcon={<FiPlus />}
               colorScheme="blue"
               onClick={() => handleOpenModal()}
             >
-              Nouveau jalon
+              {t('milestones.newMilestone')}
             </Button>
           </HStack>
         </Flex>
@@ -610,7 +613,7 @@ const Milestones = () => {
           <CardBody>
             <HStack spacing={4} flexWrap="wrap" align="center">
               <Select
-                placeholder="Tous les projets"
+                placeholder={t('common.allProjects')}
                 value={filterProject}
                 onChange={(e) => setFilterProject(e.target.value)}
                 size="sm"
@@ -622,7 +625,7 @@ const Milestones = () => {
               </Select>
 
               <Select
-                placeholder="Tous les statuts"
+                placeholder={t('common.allStatuses')}
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
                 size="sm"
@@ -640,7 +643,7 @@ const Milestones = () => {
                   <FiSearch />
                 </InputLeftElement>
                 <Input
-                  placeholder="Rechercher un jalon..."
+                  placeholder={t('milestones.searchPlaceholder')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -652,9 +655,9 @@ const Milestones = () => {
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value)}
               >
-                <option value="due_date">Trier: Échéance</option>
-                <option value="progress">Trier: Progression</option>
-                <option value="name">Trier: Nom</option>
+                <option value="due_date">{t('milestones.Sortbyduedate')}</option>
+                <option value="progress">{t('milestones.Sortbyprogress')}</option>
+                <option value="name">{t('milestones.Sortbyname')}</option>
               </Select>
 
               <IconButton
@@ -686,7 +689,7 @@ const Milestones = () => {
                   onClick={() => setViewMode('grid')}
                   leftIcon={<FiBarChart2 />}
                 >
-                  Grille
+                  {t('milestones.Grid')}
                 </Button>
                 <Button
                   size="sm"
@@ -695,7 +698,7 @@ const Milestones = () => {
                   onClick={() => setViewMode('calendar')}
                   leftIcon={<FiCalendar />}
                 >
-                  Calendrier
+                  {t('milestones.calendar')}
                 </Button>
               </HStack>
             </HStack>
@@ -935,10 +938,8 @@ const Milestones = () => {
                   }
                   return null;
                 }}
-                locale="fr-FR"
-                formatShortWeekday={(locale, date) =>
-                  ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'][date.getDay()]
-                }
+                locale={i18n.language === 'fr' ? 'fr-FR' : 'en-US'}
+                formatShortWeekday={(locale, date) => weekdays?.[date.getDay()]}
               />
               <style>{`
                 .milestone-day {
